@@ -1172,10 +1172,14 @@ impl TriggersService {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_ids,
             dry_run: opts.dry_run,
-            request_id: super::orders::OrdersService::coalesce_request_id(
-                opts.request_id,
-                "cancel-all-triggers",
-            )?,
+            // A caller's request ID is sent exactly as given, or refused:
+            // never trimmed or replaced, so a retry replays the same key.
+            request_id: match opts.request_id {
+                Some(id) => super::correlation_id::exact_request_id(&id)?,
+                None => {
+                    super::orders::OrdersService::coalesce_request_id(None, "cancel-all-triggers")?
+                }
+            },
             trigger_types: trigger_types.into_iter().map(Into::into).collect(),
             ..Default::default()
         };
@@ -4123,7 +4127,7 @@ mod tests {
                     CreateTriggerType::StopLoss,
                 ],
                 dry_run: true,
-                request_id: Some(" ui/tpsl:cancel-all.7f3a ".into()),
+                request_id: Some("ui/tpsl:cancel-all.7f3a".into()),
                 ..Default::default()
             })
             .unwrap();
@@ -4225,6 +4229,17 @@ mod tests {
             },
             "DOGE-USDT",
         );
+        // A supplied request ID is never trimmed or replaced: a blank or
+        // padded one is refused.
+        for id in ["", "   ", " retry-1 "] {
+            refused(
+                CancelAllTriggersOpts {
+                    request_id: Some(id.into()),
+                    ..Default::default()
+                },
+                "request_id",
+            );
+        }
         refused(
             CancelAllTriggersOpts {
                 request_id: Some("has space".into()),

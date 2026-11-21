@@ -225,6 +225,10 @@ pub struct LedgerTransfer {
     /// same debit for a withdrawal from the Funding account. A rejected
     /// withdrawal refunds that amount less the request fee to the account's
     /// own wallet; one that failed to execute is not refunded.
+    /// `FUNDING_OPENING_BALANCE` (1064) is the opening balance of a funding
+    /// account, credited from a system account when its transfer history
+    /// starts: show it as an incoming balance, like a deposit. Treat a number
+    /// this SDK does not name as unclassified.
     pub transfer_type: i32,
     pub account_code: i32,
     /// When the transfer happened, in microseconds since the Unix epoch.

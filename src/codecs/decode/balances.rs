@@ -815,6 +815,7 @@ mod tests {
         use buffa::Enumeration;
 
         for (code, number) in [
+            (TransferCode::FUNDING_OPENING_BALANCE, 1064),
             (TransferCode::TRADING_WITHDRAW_FEE_LEG, 1066),
             (TransferCode::QUICKSWAP_POLYESTER_FEE, 1067),
             (TransferCode::QUICKSWAP_BROKER_FEE, 1068),

@@ -562,14 +562,15 @@ pub struct CancelAllTriggersOpts {
     pub trigger_types: Vec<CreateTriggerType>,
     /// Return the number of matching triggers without canceling any.
     pub dry_run: bool,
-    /// Idempotency key: 1 to 64 letters, digits, `.`, `_`, `:`, `/` or `-`,
-    /// sent trimmed. Generate it once per user action and keep it: a retry
-    /// needs the same key and filters, and within two minutes returns the
-    /// original count and cancels nothing again. When omitted or blank a key
-    /// is generated, but it is not returned, so such a request cannot be
-    /// retried safely: supply your own whenever a retry may follow. The same
-    /// key with other filters is refused with
-    /// `ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE`.
+    /// Idempotency key: 1 to 64 letters, digits, `.`, `_`, `:`, `/` or `-`.
+    /// A supplied key is sent exactly as given, never trimmed or replaced;
+    /// one that breaks the rule, a blank one included, is refused before
+    /// sending. Generate it once per user action and keep it: a retry needs
+    /// the same key and filters, and within two minutes returns the original
+    /// count and cancels nothing again. When `None`, a key is generated, but
+    /// it is not returned, so such a request cannot be retried safely: supply
+    /// your own whenever a retry may follow. The same key with other filters
+    /// is refused with `ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE`.
     pub request_id: Option<String>,
 }
 

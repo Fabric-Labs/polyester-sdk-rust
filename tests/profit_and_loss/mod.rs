@@ -356,6 +356,30 @@ async fn invalid_reads_are_refused_before_sending() {
             assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
             assert!(err.to_string().contains(want), "{wire:?}: {want}: {err}");
         }
+        // 9999-12-31T00:00:00Z, the last 00:00 UTC a protobuf timestamp
+        // holds, ends a valid range; a bound past the timestamp range is
+        // refused, with no overflow.
+        const LAST_MIDNIGHT: u64 = 253_402_214_400;
+        for (opts, want) in [
+            (
+                days(Some(LAST_MIDNIGHT + DAY), Some(LAST_MIDNIGHT + 2 * DAY)),
+                "start_time is outside the timestamp range",
+            ),
+            (
+                days(Some(LAST_MIDNIGHT), Some(LAST_MIDNIGHT + DAY)),
+                "end_time is outside the timestamp range",
+            ),
+        ] {
+            let err = s.client.pnl.list_daily(opts).await.expect_err("refused");
+            assert!(err.to_string().contains(want), "{wire:?}: {want}: {err}");
+        }
+        let before = s.http.requests.load(Ordering::SeqCst);
+        s.client
+            .pnl
+            .list_daily(days(Some(LAST_MIDNIGHT - 366 * DAY), Some(LAST_MIDNIGHT)))
+            .await
+            .expect("a range ending at the last timestamp day");
+        assert_eq!(s.http.requests.load(Ordering::SeqCst), before + 1);
         // The longest range is accepted locally.
         let max = days(Some(NOV_1), Some(NOV_1 + 366 * DAY));
         let before = s.http.requests.load(Ordering::SeqCst);

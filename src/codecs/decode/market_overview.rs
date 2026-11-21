@@ -5,8 +5,9 @@ use super::money::{
 };
 use crate::models::{
     CurrencyConversionConfig, CurrencyConversionRates, CurrencyMetadata, FiatConversionRate,
-    FiatConversionSnapshot, MarketOverviewEntry, MarketOverviewList, MarketOverviewSparkline,
-    SpotPairVolumeSeries, SpotVolumeHistory, StablecoinConversionRate,
+    FiatConversionSnapshot, LivePriceBand, MarketOverviewEntry, MarketOverviewList,
+    MarketOverviewSparkline, PriceBand, SpotPairVolumeSeries, SpotVolumeHistory,
+    StablecoinConversionRate,
 };
 use crate::proto::marketoverview::v1::{
     CurrencyMetadata as ProtoCurrencyMetadata,
@@ -44,6 +45,54 @@ pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOver
         best_ask_qty,
         last_trade_ts_ns: ts_ns_or_empty(msg.last_trade_ts_ns),
         listed_ts_ns: ts_ns_or_empty(msg.listed_ts_ns),
+        price_band: msg.price_band.as_option().map(live_price_band_from_proto),
+    }
+}
+
+/// Decode a live price band, as the market overview row carries it.
+pub fn live_price_band_from_proto(
+    band: &crate::proto::marketdata::v1::LivePriceBand,
+) -> LivePriceBand {
+    use crate::proto::marketdata::v1::{
+        PriceBandReferenceSource as Source, PriceBandState as State,
+    };
+    let price = |ticks: Option<i64>| ticks.and_then(|t| decode_price_ticks_allow_zero(t, None));
+    let state = match band.state.as_known() {
+        Some(State::ACTIVE) => "active".to_owned(),
+        Some(State::OFF) => "off".to_owned(),
+        Some(State::EMPTY) => "empty".to_owned(),
+        Some(State::UNKNOWN) => "unknown".to_owned(),
+        Some(State::BAND_STATE_UNSPECIFIED) => String::new(),
+        None => format!("unknown({})", band.state.to_i32()),
+    };
+    let reference_source = match band.reference_source.as_known() {
+        Some(Source::LAST_TRADE) => "last_trade".to_owned(),
+        Some(Source::LISTING_REFERENCE) => "listing_reference".to_owned(),
+        Some(Source::INDEX_PRICE) => "index_price".to_owned(),
+        Some(Source::REFERENCE_SOURCE_UNSPECIFIED) => String::new(),
+        None => format!("unknown({})", band.reference_source.to_i32()),
+    };
+    LivePriceBand {
+        symbol_id: band.symbol_id,
+        state,
+        reference_price: price(band.reference_price_ticks),
+        reference_source,
+        max_buy_price: price(band.max_buy_price_ticks),
+        min_sell_price: price(band.min_sell_price_ticks),
+        min_buy_price: price(band.min_buy_price_ticks),
+        max_sell_price: price(band.max_sell_price_ticks),
+        updated_ts_ns: band.updated_ts_ns,
+        reanchor_eligible_ts_ns: band.reanchor_eligible_ts_ns,
+        reanchor_pending: band.reanchor_pending,
+        parameters: band.parameters.as_option().map(|p| PriceBand {
+            lower_bps: p.lower_bps,
+            upper_bps: p.upper_bps,
+            reference_window_ms: p.reference_window_ms,
+        }),
+        epoch: band.epoch,
+        update_id: band.update_id,
+        as_of_ts_ns: band.as_of_ts_ns,
+        valid_until_ts_ns: band.valid_until_ts_ns,
     }
 }
 
@@ -406,5 +455,71 @@ mod tests {
         assert!(absent.fiat.is_none());
         assert!(absent.stablecoins.is_empty());
         assert_eq!(absent.snapshot_ts_sec, 7);
+    }
+
+    /// A row's live price band keeps its limits, settings and freshness; an
+    /// absent band is `None`, and a band past `valid_until` is not fresh.
+    #[test]
+    fn market_overview_row_carries_its_live_price_band() {
+        use crate::proto::marketdata::v1::{
+            LivePriceBand as ProtoBand, PriceBand as ProtoParams, PriceBandReferenceSource,
+            PriceBandState,
+        };
+        use std::time::{Duration, UNIX_EPOCH};
+        let msg = ProtoMarketOverview {
+            symbol_id: 1,
+            price_band: ProtoBand {
+                symbol_id: 1,
+                state: PriceBandState::ACTIVE.into(),
+                reference_price_ticks: Some(61_000_250_000_000),
+                reference_source: PriceBandReferenceSource::LAST_TRADE.into(),
+                max_buy_price_ticks: Some(64_050_250_000_000),
+                min_sell_price_ticks: Some(57_950_250_000_000),
+                reanchor_eligible_ts_ns: Some(7),
+                parameters: ProtoParams {
+                    lower_bps: 500,
+                    upper_bps: 500,
+                    reference_window_ms: 1_000,
+                    ..Default::default()
+                }
+                .into(),
+                epoch: 3,
+                update_id: 41,
+                as_of_ts_ns: 1_000_000_000,
+                valid_until_ts_ns: 6_000_000_000,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let band = market_overview_entry_from_proto(&msg)
+            .price_band
+            .expect("band");
+        assert_eq!(band.state, "active");
+        assert_eq!(band.reference_source, "last_trade");
+        assert_eq!(
+            band.reference_price.as_ref().unwrap().as_ticks(),
+            61_000_250_000_000
+        );
+        assert_eq!(
+            band.max_buy_price.as_ref().unwrap().as_ticks(),
+            64_050_250_000_000
+        );
+        assert_eq!(
+            band.min_sell_price.as_ref().unwrap().as_ticks(),
+            57_950_250_000_000
+        );
+        assert!(band.min_buy_price.is_none() && band.max_sell_price.is_none());
+        assert_eq!(band.reanchor_eligible_ts_ns, Some(7));
+        assert_eq!(band.parameters.unwrap().lower_bps, 500);
+        assert_eq!((band.epoch, band.update_id), (3, 41));
+        assert!(band.is_fresh_at(UNIX_EPOCH + Duration::from_secs(6)));
+        assert!(!band.is_fresh_at(UNIX_EPOCH + Duration::from_nanos(6_000_000_001)));
+        let mut lapsed = band.clone();
+        lapsed.state = "unknown".into();
+        assert!(!lapsed.is_fresh_at(UNIX_EPOCH));
+
+        let none = market_overview_entry_from_proto(&ProtoMarketOverview::default());
+        assert_eq!(none.price_band, None);
     }
 }

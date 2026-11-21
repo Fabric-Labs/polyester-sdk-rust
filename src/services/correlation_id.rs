@@ -26,6 +26,13 @@ fn validate_correlation_id(trimmed: &str, field: &str, max_len: usize) -> Result
     Ok(())
 }
 
+/// Validate a request ID the caller supplied, exactly as given: it is never
+/// trimmed, and a blank one is refused rather than replaced.
+pub(crate) fn exact_request_id(value: &str) -> Result<String> {
+    validate_correlation_id(value, "request_id", REQUEST_ID_MAX_LEN)?;
+    Ok(value.to_owned())
+}
+
 /// Trim and validate an optional client order id. Blank/whitespace becomes `None`.
 pub(crate) fn optional_client_order_id(value: Option<&str>) -> Result<Option<String>> {
     let Some(raw) = value else {

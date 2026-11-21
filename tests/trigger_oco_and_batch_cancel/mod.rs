@@ -626,6 +626,13 @@ async fn cancel_all_refuses_invalid_filters_before_sending() {
                 },
                 "request_id",
             ),
+            (
+                CancelAllTriggersOpts {
+                    request_id: Some(" ".into()),
+                    ..Default::default()
+                },
+                "request_id",
+            ),
         ] {
             let err = s
                 .client
