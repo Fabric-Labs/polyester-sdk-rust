@@ -1948,9 +1948,9 @@ impl OrdersService {
     /// replaced, so a blank or padded one is refused.
     ///
     /// Refused before sending, and before waiting for the catalogs: a blank
-    /// `symbol` or `symbols` entry (leave them unset to match every market)
-    /// and an invalid `request_id`. More than one of `symbol`, `symbols` and
-    /// `symbol_ids`/`symbol_id`, an unknown symbol, a zero symbol ID and more
+    /// `symbol` or `symbols` entry (leave them unset to match every market),
+    /// more than one of `symbol`, `symbols` and `symbol_ids`/`symbol_id`, and
+    /// an invalid `request_id`. An unknown symbol, a zero symbol ID and more
     /// than 100 markets are refused before sending too.
     pub async fn cancel_all_with(&self, opts: CancelAllOpts) -> Result<CancelAllOrdersResult> {
         Self::check_cancel_all(&opts)?;
@@ -2014,6 +2014,17 @@ impl OrdersService {
         if let Some(i) = opts.symbols.iter().position(|s| s.trim().is_empty()) {
             return Err(Error::validation(format!(
                 "{OP} symbols[{i}] must not be blank; leave symbols empty to match every market"
+            )));
+        }
+        // More than one selector is refused before the catalogs are awaited,
+        // so a failed or pending catalog load never decides the answer.
+        // `symbol_id` is an alias of `symbol_ids`, as the resolver reads it.
+        let selected = usize::from(opts.symbol.is_some())
+            + usize::from(!opts.symbols.is_empty())
+            + usize::from(opts.symbol_id.is_some() || !opts.symbol_ids.is_empty());
+        if selected > 1 {
+            return Err(Error::validation(format!(
+                "{OP} accepts only one of symbol, symbols, or symbol_ids"
             )));
         }
         if let Some(id) = opts.request_id.as_deref() {
