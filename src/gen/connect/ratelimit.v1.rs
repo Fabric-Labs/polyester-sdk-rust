@@ -77,10 +77,10 @@ pub const RATE_LIMIT_SERVICE_GET_TRADING_RATE_LIMITS_SPEC: ::connectrpc::Spec = 
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// RateLimitService serves public trading quota reference data and authenticated
-/// effective trading limits. A trading read costs units of the root account's
-/// read limit: one unit per call, or for a list, one unit per 100 rows its
-/// limit asks for, rounded up (two for order history, fills and trigger
-/// events). A read over the limit is refused RESOURCE_EXHAUSTED (REST 429
+/// effective trading limits. A trading read costs units of the read limit of
+/// the account it reads: one unit per call, or for a list, one unit per 100
+/// rows its limit asks for, rounded up (two for order history, fills and
+/// trigger events). A read over the limit is refused RESOURCE_EXHAUSTED (REST 429
 /// RATE_LIMIT_EXCEEDED) with its RateLimitDetail.
 ///
 /// # Implementing handlers
@@ -159,7 +159,7 @@ pub trait RateLimitService: Send + Sync + 'static {
     > + Send;
     /// Get the effective placement, cancellation and read limits for the
     /// authenticated caller's root account or selected subaccount. Costs one
-    /// unit of the root account's read limit.
+    /// unit of the account's read limit.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

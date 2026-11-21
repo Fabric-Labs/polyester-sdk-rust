@@ -1156,8 +1156,11 @@ pub enum ErrorCode {
     ERROR_CODE_GATEWAY_MISCONFIGURED = 77i32,
     /// The order identifier or the replacement order identifier is not valid.
     ERROR_CODE_INVALID_ORDER_ID = 80i32,
-    /// The quantity of a trigger's child order or a ladder order can't be raised
-    /// above its planned quantity. Nothing changed.
+    /// A ladder level or the exit order of a take-profit, stop-loss or trailing
+    /// leg can't be raised above its cap. Nothing changed. A ladder level's cap
+    /// is its planned quantity, even after the level was reduced. An exit
+    /// order's cap is its current quantity: reducing an exit returns the reduced
+    /// quantity to the legs that protect the position.
     ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED = 81i32,
     /// Attached take-profit, stop-loss or trailing legs can't be applied to this
     /// order: it was placed by a triggered take-profit, stop-loss or
@@ -1254,6 +1257,10 @@ pub enum ErrorCode {
     /// refresh of the same order can get this code. Retry after a short backoff.
     /// For a batch item, resend only that item in a new batch under a fresh request
     /// ID, because the rejected batch's request ID returns this rejection again.
+    /// A modify that adds or changes an attached take-profit, stop-loss or
+    /// trailing leg also gets this code while a cancel of triggers is ending
+    /// the order's attached legs, which end together; retry it once they have
+    /// ended.
     ERROR_CODE_ORDER_MODIFY_IN_PROGRESS = 226i32,
     /// The placement of the order, or of the replacement an earlier replace
     /// created, has not been confirmed yet, so it cannot be modified. It may already
@@ -11608,10 +11615,11 @@ pub mod risk_policy {
 /// CancelAllOrders: filter-based mass cancel (kill switch / safety)
 /// =============================================================================
 ///
-/// CancelAllOrdersRequest cancels all matching open orders for an account.
-/// It cancels orders only, never triggers: see CancelAllOrders for what
-/// happens to stop-loss, take-profit and trailing stops, TWAPs, ladders and
-/// attached legs, and how to stop them too.
+/// CancelAllOrdersRequest cancels all matching open orders for an account,
+/// and with `include_triggers` its matching triggers too: see CancelAllOrders
+/// for what happens to stop-loss, take-profit and trailing stops, TWAPs,
+/// ladders and attached legs without it. To cancel triggers without
+/// canceling orders, use triggers.v1.TriggersService.CancelAllTriggers.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -12843,7 +12851,8 @@ pub mod cancel_all_orders_response {
 ///
 /// CancelAllAfterRequest arms/disables a dead-man switch for automatic cancel-all.
 /// When the switch fires, it cancels what a CancelAllOrders with the same
-/// scope cancels: open orders, never triggers. See CancelAllAfter.
+/// scope cancels: open orders, and triggers only with `include_triggers`.
+/// See CancelAllAfter.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -13127,9 +13136,10 @@ pub const __CANCEL_ALL_AFTER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEn
 };
 /// DeadManSwitchScope describes the recorded scope of an armed dead-man switch.
 /// Expiry cancels working orders in this scope, including orders that
-/// triggers placed. It cancels no trigger: armed stop-loss, take-profit and
-/// trailing stops and running TWAPs remain active and may create further
-/// orders after expiry. Cancel them with TriggersService.CancelTrigger.
+/// triggers placed. Unless the switch was armed with `include_triggers`, it
+/// cancels no trigger: armed stop-loss, take-profit and trailing stops and
+/// running TWAPs remain active and may create further orders after expiry.
+/// Cancel them with triggers.v1.TriggersService.CancelAllTriggers.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -37167,10 +37177,11 @@ pub mod __buffa {
         /// CancelAllOrders: filter-based mass cancel (kill switch / safety)
         /// =============================================================================
         ///
-        /// CancelAllOrdersRequest cancels all matching open orders for an account.
-        /// It cancels orders only, never triggers: see CancelAllOrders for what
-        /// happens to stop-loss, take-profit and trailing stops, TWAPs, ladders and
-        /// attached legs, and how to stop them too.
+        /// CancelAllOrdersRequest cancels all matching open orders for an account,
+        /// and with `include_triggers` its matching triggers too: see CancelAllOrders
+        /// for what happens to stop-loss, take-profit and trailing stops, TWAPs,
+        /// ladders and attached legs without it. To cancel triggers without
+        /// canceling orders, use triggers.v1.TriggersService.CancelAllTriggers.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllOrdersRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -38721,7 +38732,8 @@ pub mod __buffa {
         ///
         /// CancelAllAfterRequest arms/disables a dead-man switch for automatic cancel-all.
         /// When the switch fires, it cancels what a CancelAllOrders with the same
-        /// scope cancels: open orders, never triggers. See CancelAllAfter.
+        /// scope cancels: open orders, and triggers only with `include_triggers`.
+        /// See CancelAllAfter.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllAfterRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -39189,9 +39201,10 @@ pub mod __buffa {
         }
         /// DeadManSwitchScope describes the recorded scope of an armed dead-man switch.
         /// Expiry cancels working orders in this scope, including orders that
-        /// triggers placed. It cancels no trigger: armed stop-loss, take-profit and
-        /// trailing stops and running TWAPs remain active and may create further
-        /// orders after expiry. Cancel them with TriggersService.CancelTrigger.
+        /// triggers placed. Unless the switch was armed with `include_triggers`, it
+        /// cancels no trigger: armed stop-loss, take-profit and trailing stops and
+        /// running TWAPs remain active and may create further orders after expiry.
+        /// Cancel them with triggers.v1.TriggersService.CancelAllTriggers.
         #[derive(Clone, Debug, Default)]
         pub struct DeadManSwitchScopeView<'a> {
             /// Public ID of the account or sub-account whose orders are canceled.

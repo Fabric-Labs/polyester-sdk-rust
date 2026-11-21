@@ -176,6 +176,10 @@ pub enum TransferCode {
     TRADING_WITHDRAW_RESERVE = 1062i32,
     /// Funding user-to-user transfer.
     FUNDING_USER_TRANSFER = 1063i32,
+    /// Opening balance of a funding account: the balance it held on Polyester
+    /// Chain when the account's transfer history starts, credited from a system
+    /// account.
+    FUNDING_OPENING_BALANCE = 1064i32,
     /// Debit of a withdrawal from the Trading account that Zipper rejected or that failed to
     /// execute: the whole amount sent to Zipper for it, the request fee included. The withdrawal's
     /// other fees are not charged. A rejected withdrawal refunds that amount, less the request fee,
@@ -249,6 +253,9 @@ impl TransferCode {
     ///Idiomatic alias for [`Self::FUNDING_USER_TRANSFER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const FundingUserTransfer: Self = Self::FUNDING_USER_TRANSFER;
+    ///Idiomatic alias for [`Self::FUNDING_OPENING_BALANCE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FundingOpeningBalance: Self = Self::FUNDING_OPENING_BALANCE;
     ///Idiomatic alias for [`Self::TRADING_WITHDRAW_REQUEST_FEE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TradingWithdrawRequestFee: Self = Self::TRADING_WITHDRAW_REQUEST_FEE;
@@ -387,6 +394,7 @@ impl ::buffa::Enumeration for TransferCode {
             1061i32 => ::core::option::Option::Some(Self::TRADING_TO_FUNDING),
             1062i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_RESERVE),
             1063i32 => ::core::option::Option::Some(Self::FUNDING_USER_TRANSFER),
+            1064i32 => ::core::option::Option::Some(Self::FUNDING_OPENING_BALANCE),
             1065i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_REQUEST_FEE),
             1066i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_FEE_LEG),
             1067i32 => ::core::option::Option::Some(Self::QUICKSWAP_POLYESTER_FEE),
@@ -418,6 +426,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::TRADING_TO_FUNDING => "TRADING_TO_FUNDING",
             Self::TRADING_WITHDRAW_RESERVE => "TRADING_WITHDRAW_RESERVE",
             Self::FUNDING_USER_TRANSFER => "FUNDING_USER_TRANSFER",
+            Self::FUNDING_OPENING_BALANCE => "FUNDING_OPENING_BALANCE",
             Self::TRADING_WITHDRAW_REQUEST_FEE => "TRADING_WITHDRAW_REQUEST_FEE",
             Self::TRADING_WITHDRAW_FEE_LEG => "TRADING_WITHDRAW_FEE_LEG",
             Self::QUICKSWAP_POLYESTER_FEE => "QUICKSWAP_POLYESTER_FEE",
@@ -454,6 +463,9 @@ impl ::buffa::Enumeration for TransferCode {
             }
             "FUNDING_USER_TRANSFER" => {
                 ::core::option::Option::Some(Self::FUNDING_USER_TRANSFER)
+            }
+            "FUNDING_OPENING_BALANCE" => {
+                ::core::option::Option::Some(Self::FUNDING_OPENING_BALANCE)
             }
             "TRADING_WITHDRAW_REQUEST_FEE" => {
                 ::core::option::Option::Some(Self::TRADING_WITHDRAW_REQUEST_FEE)
@@ -493,6 +505,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::TRADING_TO_FUNDING,
             Self::TRADING_WITHDRAW_RESERVE,
             Self::FUNDING_USER_TRANSFER,
+            Self::FUNDING_OPENING_BALANCE,
             Self::TRADING_WITHDRAW_REQUEST_FEE,
             Self::TRADING_WITHDRAW_FEE_LEG,
             Self::QUICKSWAP_POLYESTER_FEE,
