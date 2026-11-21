@@ -60,6 +60,15 @@ pub(crate) const LIST_STATEMENT_EXPORTS_LIMIT_MAX: u32 = 100;
 /// Longest `ListStatementExports` page token: the `string.max_len` rule on
 /// `ListStatementExportsRequest.page_token`.
 pub(crate) const STATEMENT_EXPORT_PAGE_TOKEN_MAX_LEN: usize = 512;
+/// Most days one `ListDailyProfitAndLoss` page returns: the `uint32.lte`
+/// rule on `ListDailyProfitAndLossRequest.limit`.
+pub(crate) const PNL_DAILY_LIMIT_MAX: u32 = 366;
+/// Longest `ListDailyProfitAndLoss` range: `end_time` at most 366 days after
+/// `start_time`.
+pub(crate) const PNL_DAILY_PERIOD_MAX_SECS: u64 = 366 * 86_400;
+/// Longest `ListDailyProfitAndLoss` page token: the `string.max_len` rule on
+/// `ListDailyProfitAndLossRequest.page_token`.
+pub(crate) const PNL_PAGE_TOKEN_MAX_LEN: usize = 512;
 
 /// Largest page of the order reads: the `uint32 {gte: 1, lte: 1000}` rule on
 /// the optional `limit` of `GetOpenOrdersRequest`, `GetOrderHistoryRequest`,

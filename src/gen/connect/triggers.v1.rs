@@ -64,6 +64,14 @@ pub type OwnedBatchCancelTriggersRequestView = ::buffa::view::OwnedView<
 pub type OwnedBatchCancelTriggersResponseView = ::buffa::view::OwnedView<
     crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CancelAllTriggersRequestView<'static>>`.
+pub type OwnedCancelAllTriggersRequestView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CancelAllTriggersRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CancelAllTriggersResponseView<'static>>`.
+pub type OwnedCancelAllTriggersResponseView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CancelAllTriggersResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<ModifyTriggerRequestView<'static>>`.
 pub type OwnedModifyTriggerRequestView = ::buffa::view::OwnedView<
     crate::proto::triggers::v1::__buffa::view::ModifyTriggerRequestView<'static>,
@@ -248,6 +256,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::CancelAllTriggersResponse>
+for crate::proto::triggers::v1::__buffa::view::CancelAllTriggersResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::CancelAllTriggersResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CancelAllTriggersResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::triggers::v1::ModifyTriggerResponse>
 for crate::proto::triggers::v1::__buffa::view::ModifyTriggerResponseView<'_> {
     fn encode(
@@ -379,6 +407,15 @@ pub const TRIGGERS_SERVICE_CANCEL_TRIGGER_SPEC: ::connectrpc::Spec = ::connectrp
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const TRIGGERS_SERVICE_BATCH_CANCEL_TRIGGERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/triggers.v1.TriggersService/BatchCancelTriggers",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CancelAllTriggers` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const TRIGGERS_SERVICE_CANCEL_ALL_TRIGGERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/triggers.v1.TriggersService/CancelAllTriggers",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -530,8 +567,7 @@ pub trait TriggersService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Get a trigger by ID. Costs one unit of the root account's trading read
-    /// limit.
+    /// Get a trigger by ID. Costs one unit of the account's trading read limit.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -555,7 +591,7 @@ pub trait TriggersService: Send + Sync + 'static {
         >,
     > + Send;
     /// List triggers for a sub-account with optional filters. Costs one unit of
-    /// the root account's trading read limit per 100 rows the limit asks for,
+    /// the account's trading read limit per 100 rows the limit asks for,
     /// rounded up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -583,7 +619,7 @@ pub trait TriggersService: Send + Sync + 'static {
     /// read (no such trigger, another account's, or one outside the selected
     /// sub-account) answers NOT_FOUND, as GetTrigger does. A trigger the caller
     /// can read that has no event yet answers an empty list. Costs two units of
-    /// the root account's trading read limit per 100 rows the limit asks for,
+    /// the account's trading read limit per 100 rows the limit asks for,
     /// rounded up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -610,11 +646,12 @@ pub trait TriggersService: Send + Sync + 'static {
     /// Cancel a trigger: a standalone stop-loss, take-profit, trailing stop,
     /// TWAP or ladder, or an order's attached leg. Canceling a TWAP or a ladder
     /// also cancels its open child orders.
-    /// OrdersService.CancelAllOrders and the dead-man switch
-    /// (OrdersService.CancelAllAfter) cancel open orders only, never triggers:
-    /// after either, armed stops and running TWAPs can still place orders. To
-    /// stop them, cancel each live trigger with this method; ListTriggers lists
-    /// them.
+    /// To cancel many triggers in one request, use CancelAllTriggers, which
+    /// cancels every trigger matching symbols, side and trigger types and no
+    /// order. OrdersService.CancelAllOrders and the dead-man switch
+    /// (OrdersService.CancelAllAfter) cancel triggers only with
+    /// `include_triggers`; without it, armed stops and running TWAPs can still
+    /// place orders after either.
     /// A trigger that has ended (completed, canceled or failed) answers a
     /// cancel with ERROR_CODE_TRIGGER_STATUS_INVALID for at least 60 s after it
     /// ends, including a repeat of a cancel that succeeded and a cancel retried
@@ -679,6 +716,51 @@ pub trait TriggersService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::triggers::v1::BatchCancelTriggersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Cancel all of the account's triggers that match the filters (symbols,
+    /// side and trigger types) in one request, without canceling any order.
+    /// Unless dry_run is set, what it cancels is fixed when its request_id is
+    /// first accepted: every matching trigger created before that, and none
+    /// created after it. Each ends canceled with reason
+    /// TRIGGER_CANCEL_REASON_CANCEL_ALL and releases its reserved funds, and
+    /// none places an order after the response. Its open orders are canceled
+    /// with it, as CancelTrigger cancels them: a TWAP's working slice, a
+    /// ladder's open levels, and the working exit of an attached take-profit,
+    /// stop-loss or trailing leg. An order that a stop already placed when it
+    /// fired is a plain order and stays open; so does the parent order of
+    /// canceled attached legs, which then has no protection left. Use
+    /// OrdersService.CancelAllOrders for orders; its `include_triggers` cancels
+    /// orders and triggers in one request.
+    /// Every request counts 10 against the account's cancel rate limit, as a
+    /// CancelAllOrders does, however many triggers it cancels: a dry run and a
+    /// retry with the same request_id count the same. A retry with the same
+    /// request_id and criteria
+    /// within two minutes returns the original outcome and cancels nothing
+    /// again; the same request_id with other criteria is rejected with
+    /// ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE. A rejected request, or one
+    /// whose outcome is unknown, is no barrier: retry it with the same
+    /// request_id, or list the triggers before relying on it.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn cancel_all_triggers<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::triggers::v1::CancelAllTriggersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::triggers::v1::CancelAllTriggersResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1017,6 +1099,35 @@ impl<S: TriggersService> TriggersServiceExt for S {
             .with_spec(TRIGGERS_SERVICE_BATCH_CANCEL_TRIGGERS_SPEC)
             .route_view(
                 TRIGGERS_SERVICE_SERVICE_NAME,
+                "CancelAllTriggers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::triggers::v1::__buffa::view::CancelAllTriggersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::triggers::v1::CancelAllTriggersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.cancel_all_triggers(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::triggers::v1::CancelAllTriggersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(TRIGGERS_SERVICE_CANCEL_ALL_TRIGGERS_SPEC)
+            .route_view(
+                TRIGGERS_SERVICE_SERVICE_NAME,
                 "ModifyTrigger",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -1202,6 +1313,12 @@ impl<T: TriggersService> ::connectrpc::Dispatcher for TriggersServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(TRIGGERS_SERVICE_BATCH_CANCEL_TRIGGERS_SPEC),
+                )
+            }
+            "CancelAllTriggers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(TRIGGERS_SERVICE_CANCEL_ALL_TRIGGERS_SPEC),
                 )
             }
             "ModifyTrigger" => {
@@ -1396,6 +1513,27 @@ impl<T: TriggersService> ::connectrpc::Dispatcher for TriggersServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::triggers::v1::BatchCancelTriggersResponse,
+                        >(format)
+                })
+            }
+            "CancelAllTriggers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::triggers::v1::CancelAllTriggersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::triggers::v1::__buffa::view::CancelAllTriggersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::triggers::v1::CancelAllTriggersRequest,
+                    >::from_parts(&req, &body);
+                    svc.cancel_all_triggers(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::triggers::v1::CancelAllTriggersResponse,
                         >(format)
                 })
             }
@@ -1911,6 +2049,51 @@ where
                 &self.config,
                 TRIGGERS_SERVICE_SERVICE_NAME,
                 "BatchCancelTriggers",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CancelAllTriggers RPC. Sends a request to /triggers.v1.TriggersService/CancelAllTriggers.
+    pub async fn cancel_all_triggers(
+        &self,
+        request: crate::proto::triggers::v1::CancelAllTriggersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::CancelAllTriggersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.cancel_all_triggers_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CancelAllTriggers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn cancel_all_triggers_with_options(
+        &self,
+        request: crate::proto::triggers::v1::CancelAllTriggersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::CancelAllTriggersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                TRIGGERS_SERVICE_SERVICE_NAME,
+                "CancelAllTriggers",
                 request,
                 options,
             )

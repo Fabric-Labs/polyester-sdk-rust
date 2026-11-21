@@ -11,8 +11,9 @@ pub enum TradingRateLimitClass {
     /// Order and trigger cancellation.
     TRADING_RATE_LIMIT_CLASS_CANCEL = 2i32,
     /// Order, fill, trigger, trading-limit and fee reads, and order previews.
-    /// Every API key, session and subaccount of a root account shares the root
-    /// account's read limit.
+    /// Each account has its own read limit: the root account and each
+    /// subaccount separately, shared by every API key and session that reads
+    /// for that account.
     TRADING_RATE_LIMIT_CLASS_READ = 3i32,
 }
 impl TradingRateLimitClass {
@@ -861,12 +862,10 @@ pub const __GET_TRADING_RATE_LIMITS_REQUEST_JSON_ANY: ::buffa::type_registry::Js
     is_wkt: false,
 };
 /// GetTradingRateLimitsResponse contains the placement, cancellation and read
-/// limits enforced for the selected account target. Placement and cancellation
-/// limits apply per account: the root account and each subaccount have their
-/// own limits, and every API key and session that trades for an account shares
-/// that account's limits. The read limit applies per root account: the root
-/// account, all of its subaccounts and every API key and session share one
-/// read limit.
+/// limits enforced for the selected account target. All three limits apply per
+/// account: the root account and each subaccount have their own limits, and
+/// every API key and session that trades or reads for an account shares that
+/// account's limits.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -895,8 +894,7 @@ pub struct GetTradingRateLimitsResponse {
     >,
     /// Placement, cancellation and read rules enforced for the selected
     /// account, ordered placement, cancellation, read. All of the account's API
-    /// keys and sessions draw on the placement and cancellation limits together;
-    /// the read rule is the root account's, shared with all of its subaccounts.
+    /// keys and sessions draw on these limits together.
     ///
     /// Field 3: `rules`
     #[serde(
@@ -907,9 +905,10 @@ pub struct GetTradingRateLimitsResponse {
     pub rules: ::buffa::alloc::vec::Vec<TradingRateLimitRule>,
     /// Placement, cancellation and read rules resolved for the calling API key,
     /// ordered placement, cancellation, read. Present only when the caller
-    /// authenticated with an API key. These rules are informational: trading
-    /// requests are not limited per API key, and only the account rules in
-    /// `rules` are enforced.
+    /// authenticated with an API key. The read rule is enforced per API key on
+    /// top of the account's read limit: a read or preview is refused when either
+    /// is exhausted. The placement and cancellation rules are informational:
+    /// orders are limited per account only, by the account rules in `rules`.
     ///
     /// Field 4: `api_key_rules`
     #[serde(
@@ -2506,12 +2505,10 @@ pub mod __buffa {
             }
         }
         /// GetTradingRateLimitsResponse contains the placement, cancellation and read
-        /// limits enforced for the selected account target. Placement and cancellation
-        /// limits apply per account: the root account and each subaccount have their
-        /// own limits, and every API key and session that trades for an account shares
-        /// that account's limits. The read limit applies per root account: the root
-        /// account, all of its subaccounts and every API key and session share one
-        /// read limit.
+        /// limits enforced for the selected account target. All three limits apply per
+        /// account: the root account and each subaccount have their own limits, and
+        /// every API key and session that trades or reads for an account shares that
+        /// account's limits.
         #[derive(Clone, Debug, Default)]
         pub struct GetTradingRateLimitsResponseView<'a> {
             /// Positive identifier of the rate-limit policy version used for the
@@ -2527,8 +2524,7 @@ pub mod __buffa {
             >,
             /// Placement, cancellation and read rules enforced for the selected
             /// account, ordered placement, cancellation, read. All of the account's API
-            /// keys and sessions draw on the placement and cancellation limits together;
-            /// the read rule is the root account's, shared with all of its subaccounts.
+            /// keys and sessions draw on these limits together.
             ///
             /// Field 3: `rules`
             pub rules: ::buffa::RepeatedView<
@@ -2537,9 +2533,10 @@ pub mod __buffa {
             >,
             /// Placement, cancellation and read rules resolved for the calling API key,
             /// ordered placement, cancellation, read. Present only when the caller
-            /// authenticated with an API key. These rules are informational: trading
-            /// requests are not limited per API key, and only the account rules in
-            /// `rules` are enforced.
+            /// authenticated with an API key. The read rule is enforced per API key on
+            /// top of the account's read limit: a read or preview is refused when either
+            /// is exhausted. The placement and cancellation rules are informational:
+            /// orders are limited per account only, by the account rules in `rules`.
             ///
             /// Field 4: `api_key_rules`
             pub api_key_rules: ::buffa::RepeatedView<
@@ -2934,8 +2931,7 @@ pub mod __buffa {
             }
             /// Placement, cancellation and read rules enforced for the selected
             /// account, ordered placement, cancellation, read. All of the account's API
-            /// keys and sessions draw on the placement and cancellation limits together;
-            /// the read rule is the root account's, shared with all of its subaccounts.
+            /// keys and sessions draw on these limits together.
             ///
             /// Field 3: `rules`
             #[must_use]
@@ -2949,9 +2945,10 @@ pub mod __buffa {
             }
             /// Placement, cancellation and read rules resolved for the calling API key,
             /// ordered placement, cancellation, read. Present only when the caller
-            /// authenticated with an API key. These rules are informational: trading
-            /// requests are not limited per API key, and only the account rules in
-            /// `rules` are enforced.
+            /// authenticated with an API key. The read rule is enforced per API key on
+            /// top of the account's read limit: a read or preview is refused when either
+            /// is exhausted. The placement and cancellation rules are informational:
+            /// orders are limited per account only, by the account rules in `rules`.
             ///
             /// Field 4: `api_key_rules`
             #[must_use]

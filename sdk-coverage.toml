@@ -43,6 +43,14 @@ procedure = "/auth.v1.ApiKeyService/DeleteApiKey"
 reason = "API key create/update/delete need a session or an admin API key with MANAGE_API_KEYS, and are not wrapped yet; list/get/subscribe remain."
 
 [[allowlist]]
+procedure = "/auth.v1.ApiKeyService/SetStrategyBotAccess"
+reason = "Strategy bot access is managed in the web app; not part of this SDK yet."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/EndStrategyBotAccess"
+reason = "Strategy bot access is managed in the web app; not part of this SDK yet."
+
+[[allowlist]]
 procedure = "/auth.v1.SubaccountService/CreateSubaccount"
 reason = "Subaccount mutations and invite/member writes are JWT/session-only."
 

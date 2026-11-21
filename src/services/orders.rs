@@ -1993,6 +1993,12 @@ impl OrdersService {
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value when retrying the same logical modification — omitting it on retry mints a
     /// new id and is not an idempotent replay.
+    ///
+    /// While a cancel of triggers ([`crate::services::TriggersService::cancel_all`], or
+    /// [`Self::cancel_all_with`] with `include_triggers`) is ending the order's attached legs, a
+    /// modify that adds or changes an attached take-profit, stop-loss or trailing leg is refused
+    /// with the retryable `ERROR_CODE_ORDER_MODIFY_IN_PROGRESS`: retry it once the legs have
+    /// ended.
     pub async fn modify(&self, params: ModifyOrderParams) -> Result<ModifyOrderResult> {
         self.ctx.wait_for_catalogs().await?;
         let req = self.encode_modify_params(params)?;

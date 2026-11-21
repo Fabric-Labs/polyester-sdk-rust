@@ -287,12 +287,14 @@ fn reference_candles_from_points(
 
 /// Decode columnar OHLCV into row-oriented [`CandlesResult`] (Go `CandlesColumnsFromProto`).
 ///
-/// The columnar reply carries no closed flag, so every row reads
-/// `is_closed: true`, which is exact for a page requested without
-/// `include_incomplete`, for a continuation page (a page token set) and for
-/// every reference row. For a first page requested with `include_incomplete`,
-/// the newest primary row may be the open bucket: set its `is_closed` to
-/// `false`, as `MarketDataService::get_candles_columns` does.
+/// Each primary row's `is_closed` is the server's `is_closed[i]`, aligned
+/// with `ts_sec`: with `include_incomplete` the current open candle comes last
+/// on the first page and is the only row that reads `false`. Every reference
+/// row is a closed bucket and reads `true`. A server that predates the column
+/// sends it empty: then every primary row reads `true`, and for a first page
+/// requested with `include_incomplete` the newest primary row may be the open
+/// bucket, which `MarketDataService::get_candles_columns` marks `false`. A
+/// non-empty column of another length than `ts_sec` is refused.
 pub fn candles_columns_from_proto(
     msg: &GetCandlesColumnsResponse,
     volume_scale: u32,
@@ -308,15 +310,17 @@ pub fn candles_columns_from_proto(
     ];
     if lengths.iter().any(|(_, len)| *len != rows)
         || (!msg.quote_volume.is_empty() && msg.quote_volume.len() != rows)
+        || (!msg.is_closed.is_empty() && msg.is_closed.len() != rows)
     {
         return Err(Error::transport(format!(
-            "invalid GetCandlesColumns response lengths: ts_sec={rows}, open={}, high={}, low={}, close={}, volume={}, quote_volume={}",
+            "invalid GetCandlesColumns response lengths: ts_sec={rows}, open={}, high={}, low={}, close={}, volume={}, quote_volume={}, is_closed={}",
             msg.open.len(),
             msg.high.len(),
             msg.low.len(),
             msg.close.len(),
             msg.volume.len(),
-            msg.quote_volume.len()
+            msg.quote_volume.len(),
+            msg.is_closed.len()
         )));
     }
 
@@ -336,7 +340,8 @@ pub fn candles_columns_from_proto(
             quote_volume: msg.quote_volume.get(i).cloned().unwrap_or_default(),
             symbol_id,
             timeframe: timeframe.clone(),
-            is_closed: true,
+            // An empty column is "not provided", not "every row open".
+            is_closed: msg.is_closed.get(i).copied().unwrap_or(true),
         });
     }
     let reference_candles = reference_candles_from_columns(
@@ -923,5 +928,36 @@ mod tests {
             .expect_err("misaligned columnar response must fail closed");
         assert!(err.to_string().contains("response lengths"));
         assert!(err.to_string().contains("high=1"));
+    }
+
+    /// `is_closed` is read row by row; an empty column (a server that
+    /// predates it) reads every row closed; a misaligned one is refused.
+    #[test]
+    fn candles_columns_read_the_closed_column() {
+        let columns = |is_closed: Vec<bool>| GetCandlesColumnsResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            ts_sec: vec![10, 20],
+            open: vec![1, 2],
+            high: vec![1, 2],
+            low: vec![1, 2],
+            close: vec![1, 2],
+            volume: vec![1, 2],
+            is_closed,
+            ..Default::default()
+        };
+        let closed = |msg| {
+            candles_columns_from_proto(&msg, 8, None)
+                .unwrap()
+                .candles
+                .iter()
+                .map(|c| c.is_closed)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(closed(columns(vec![true, false])), vec![true, false]);
+        assert_eq!(closed(columns(Vec::new())), vec![true, true]);
+        let err = candles_columns_from_proto(&columns(vec![false]), 8, None)
+            .expect_err("a misaligned is_closed column must fail closed");
+        assert!(err.to_string().contains("is_closed=1"), "{err}");
     }
 }

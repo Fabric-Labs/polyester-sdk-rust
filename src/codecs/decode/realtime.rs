@@ -5,7 +5,7 @@ use buffa::{Enumeration, Message};
 use super::enums::order_error_code_label;
 use super::{
     account_identity_from_proto, address_book_invalidation_from_proto, api_key_from_proto,
-    api_policy_from_proto, asset_balance_from_proto, candle_point_from_proto,
+    api_policy_from_proto, balance_update_from_proto, candle_point_from_proto,
     flow_summary_message_from_proto, market_overview_batch_from_proto, market_trade_from_proto,
     order_from_proto, subaccount_from_proto, subaccount_policy_from_proto, transfer_row_from_proto,
     trigger_event_from_proto, trigger_from_proto, user_trade_from_proto,
@@ -15,7 +15,7 @@ use super::{decode_price_ticks, decode_qty_scaled, order_cancel_reason, order_re
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{
-    AccountIdentity, AddressBookViewInvalidation, ApiData, ApiKeySummary, ApiPolicy, AssetBalance,
+    AccountIdentity, AddressBookViewInvalidation, ApiData, ApiKeySummary, ApiPolicy, BalanceUpdate,
     Candle, LedgerTransfer, LifecycleFlowSummary, MarketOverviewList, MarketTrade,
     OrderBookDeltaUpdate, PriceQtyPair, SubAccount, SubaccountPolicy, Trigger, TriggerEvent,
     UserTrade, ZippedAssetSupplyBatch,
@@ -29,7 +29,7 @@ use crate::proto::auth::v1::{
 };
 use crate::proto::chain::lifecycle::v1::{FlowDetailView, FlowSummaryView};
 use crate::proto::chain::zipper::v1::ZippedAssetSupplyBatch as ProtoZippedAssetSupplyBatch;
-use crate::proto::ledger::read::v1::{AssetBalance as ProtoAssetBalance, TransferRowBatch};
+use crate::proto::ledger::read::v1::{BalanceUpdate as ProtoBalanceUpdate, TransferRowBatch};
 use crate::proto::marketdata::v1::{CandlePoint, HeatmapLiveBucket, MarketTradeBatch};
 use crate::proto::marketoverview::v1::MarketOverviewBatch;
 use crate::proto::orderbook::v1::OrderBookDelta;
@@ -61,9 +61,12 @@ pub fn user_trade_batch_from_bytes(payload: &[u8]) -> Result<Vec<Result<UserTrad
     Ok(msg.events.iter().map(user_trade_from_proto).collect())
 }
 
-pub fn asset_balance_from_bytes(payload: &[u8]) -> Result<AssetBalance> {
-    let msg = decode_proto::<ProtoAssetBalance>(payload)?;
-    Ok(asset_balance_from_proto(&msg))
+/// Decode a balance stream publication, a `ledger.read.v1.BalanceUpdate`,
+/// as it is: no buffering, ordering or merging (see
+/// [`crate::services::BalancesService::subscribe`]).
+pub fn balance_update_from_bytes(payload: &[u8]) -> Result<BalanceUpdate> {
+    let msg = decode_proto::<ProtoBalanceUpdate>(payload)?;
+    Ok(balance_update_from_proto(&msg))
 }
 
 /// Decode a `TransferRowBatch` publication: every transfer leg in order.

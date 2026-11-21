@@ -1803,12 +1803,20 @@ pub struct ApiKeySummary {
     pub revision: u64,
     /// What the key is for: `"STANDARD"` for a key the user created,
     /// `"ASSISTANT"` for a key the user set up for the Polyester assistant
-    /// (listed and revoked like any key) and `"ADMIN_KEY"` for an elevated
+    /// (listed and revoked like any key), `"ADMIN_KEY"` for an elevated
     /// key that manages the account's other keys and its sub-accounts'
-    /// policies (show it as elevated); empty when the server names none,
-    /// and `"UNKNOWN(n)"` for a purpose this SDK version does not know.
-    /// Existing keys read `"STANDARD"`.
+    /// policies (show it as elevated) and `"STRATEGY_BOT"` for the key a
+    /// strategy bot trades with on its own sub-account; empty when the server
+    /// names none, and `"UNKNOWN(n)"` for a purpose this SDK version does not
+    /// know. Existing keys read `"STANDARD"`. A strategy bot manages its key
+    /// until its access ends: changing, deleting or re-binding the key, or
+    /// its policy, is refused with
+    /// [`crate::errors::auth_codes::STRATEGY_BOT_MANAGED`], so offer no edit
+    /// for it.
     pub purpose: String,
+    /// Public ID of the strategy bot a `"STRATEGY_BOT"` key trades for; empty
+    /// for every other key.
+    pub strategy_bot_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

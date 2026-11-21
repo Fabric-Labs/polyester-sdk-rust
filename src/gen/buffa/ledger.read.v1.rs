@@ -1095,19 +1095,9 @@ pub struct AssetBalance {
     pub available: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
-    /// Opaque monotonic revision for the atomic trading, reserved, and available
-    /// values. Higher means newer; zero means no trading state has been observed.
-    ///
-    /// Field 6: `trading_revision`
-    #[serde(
-        rename = "tradingRevision",
-        alias = "trading_revision",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub trading_revision: u64,
     /// Opaque monotonic revision for the funding value. Higher means newer; zero
-    /// means no funding state has been observed.
+    /// means no funding state has been observed. Trading values have no
+    /// revision: their position is (trading_epoch, trading_sequence).
     ///
     /// Field 7: `funding_revision`
     #[serde(
@@ -1129,7 +1119,6 @@ impl ::core::fmt::Debug for AssetBalance {
             .field("funding", &self.funding)
             .field("reserved", &self.reserved)
             .field("available", &self.available)
-            .field("trading_revision", &self.trading_revision)
             .field("funding_revision", &self.funding_revision)
             .finish()
     }
@@ -1194,11 +1183,6 @@ impl ::buffa::Message for AssetBalance {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.trading_revision != 0u64 {
-            size
-                += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.trading_revision) as u32;
-        }
         if self.funding_revision != 0u64 {
             size
                 += 1u32
@@ -1232,9 +1216,6 @@ impl ::buffa::Message for AssetBalance {
         if self.available.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.available.write_to(__cache, buf);
-        }
-        if self.trading_revision != 0u64 {
-            ::buffa::types::put_uint64_field(6u32, self.trading_revision, buf);
         }
         if self.funding_revision != 0u64 {
             ::buffa::types::put_uint64_field(7u32, self.funding_revision, buf);
@@ -1303,13 +1284,6 @@ impl ::buffa::Message for AssetBalance {
                     ctx,
                 )?;
             }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trading_revision = ::buffa::types::decode_uint64(buf)?;
-            }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -1330,7 +1304,6 @@ impl ::buffa::Message for AssetBalance {
         self.funding = ::buffa::MessageField::none();
         self.reserved = ::buffa::MessageField::none();
         self.available = ::buffa::MessageField::none();
-        self.trading_revision = 0u64;
         self.funding_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
@@ -1364,6 +1337,14 @@ pub const __ASSET_BALANCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
     from_json: ::buffa::type_registry::any_from_json::<AssetBalance>,
     is_wkt: false,
 };
+/// GetBalancesResponse is the account's balances with the position of its
+/// Trading values.
+///
+/// The Trading values of every asset are one atomic cut: all are taken at the
+/// single position (trading_epoch, trading_sequence) the response names, never
+/// a mix of two positions, and never at a position older than one the balance
+/// stream already published. The Funding values carry their own
+/// funding_revision and are not part of that position.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1379,13 +1360,57 @@ pub struct GetBalancesResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub balances: ::buffa::alloc::vec::Vec<AssetBalance>,
+    /// The Trading numbering the balances' Trading values are in. It changes
+    /// when the numbering restarts: then reload. Compare it only for equality;
+    /// its value has no order. Zero, with trading_sequence zero, when the
+    /// account has no Trading balances yet.
+    ///
+    /// Field 2: `trading_epoch`
+    #[serde(
+        rename = "tradingEpoch",
+        alias = "trading_epoch",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trading_epoch: u64,
+    /// The Trading sequence the balances' Trading values are at, within
+    /// trading_epoch: apply the balance stream's Trading updates from
+    /// trading_sequence + 1 on (see BalanceUpdate).
+    ///
+    /// Field 3: `trading_sequence`
+    #[serde(
+        rename = "tradingSequence",
+        alias = "trading_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trading_sequence: u64,
+    /// Every Trading transfer of the account whose ts_ns is at or below this
+    /// value is applied in these balances, a receipt within trading_epoch.
+    /// While a transfer of the account could not be applied, this value stays
+    /// below it, until a later balance of that asset includes it; it never
+    /// passes a transfer that is not applied. Nanoseconds since epoch (UTC).
+    ///
+    /// Field 4: `trading_applied_through_ts_ns`
+    #[serde(
+        rename = "tradingAppliedThroughTsNs",
+        alias = "trading_applied_through_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trading_applied_through_ts_ns: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for GetBalancesResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetBalancesResponse").field("balances", &self.balances).finish()
+        f.debug_struct("GetBalancesResponse")
+            .field("balances", &self.balances)
+            .field("trading_epoch", &self.trading_epoch)
+            .field("trading_sequence", &self.trading_sequence)
+            .field("trading_applied_through_ts_ns", &self.trading_applied_through_ts_ns)
+            .finish()
     }
 }
 impl GetBalancesResponse {
@@ -1421,6 +1446,21 @@ impl ::buffa::Message for GetBalancesResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.trading_epoch != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.trading_epoch) as u32;
+        }
+        if self.trading_sequence != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.trading_sequence) as u32;
+        }
+        if self.trading_applied_through_ts_ns != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(
+                        self.trading_applied_through_ts_ns,
+                    ) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1434,6 +1474,19 @@ impl ::buffa::Message for GetBalancesResponse {
         for v in &self.balances {
             ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        if self.trading_epoch != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.trading_epoch, buf);
+        }
+        if self.trading_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.trading_sequence, buf);
+        }
+        if self.trading_applied_through_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(
+                4u32,
+                self.trading_applied_through_ts_ns,
+                buf,
+            );
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1457,6 +1510,27 @@ impl ::buffa::Message for GetBalancesResponse {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.balances.push(elem);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trading_epoch = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trading_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trading_applied_through_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1466,6 +1540,9 @@ impl ::buffa::Message for GetBalancesResponse {
     }
     fn clear(&mut self) {
         self.balances.clear();
+        self.trading_epoch = 0u64;
+        self.trading_sequence = 0u64;
+        self.trading_applied_through_ts_ns = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1496,6 +1573,393 @@ pub const __GET_BALANCES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     type_url: "type.googleapis.com/ledger.read.v1.GetBalancesResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetBalancesResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetBalancesResponse>,
+    is_wkt: false,
+};
+/// BalanceUpdate is one publication on an account's balance stream.
+///
+/// A TRADING update is one step of the account's Trading balances, at a
+/// position (trading_epoch, trading_sequence). Within an epoch the sequence
+/// runs 1, 2, 3 with no gap. A new epoch starts again at 1, and its updates
+/// up to its first complete one carry every asset the account holds in
+/// Trading.
+///
+/// A FUNDING update carries one asset's Funding balance. It is not sequenced:
+/// a higher funding_revision is newer. Its trading_epoch and trading_sequence
+/// are unset: tell the two kinds apart by account, never by a zero epoch.
+///
+/// Keep the balances exact as follows:
+///
+/// 1. Subscribe to the stream and buffer its updates.
+/// 2. Call GetBalances and apply its balances. Its position (E, Q) is
+/// ```text
+/// (trading_epoch, trading_sequence). If it answers unavailable, retry it
+/// with a backoff.
+/// ```
+/// 3. Drop buffered and later TRADING updates of epoch E with a sequence at or
+/// ```text
+/// below Q; a reconnect can repeat one. Apply E's sequences Q + 1, Q + 2,
+/// and so on, in order.
+/// ```
+/// 4. Keep a dropped set of epochs: every epoch you held before E, and every
+/// ```text
+/// epoch other than E of an update received before the GetBalances call
+/// that answered E began. GetBalances never answers a dropped epoch again,
+/// so drop a TRADING update of a dropped epoch without reloading: after a
+/// move, the earlier epoch's late updates can still arrive. Reload, from
+/// step 2, when:
+/// - a TRADING update's epoch is neither E nor dropped, including one
+///  buffered while the call ran: the numbering restarted;
+/// - its sequence skips a number: an update was missed;
+/// - after an incomplete update of E, E's next sequence does not arrive
+///  within 2 seconds. FUNDING updates, repeats and updates of dropped
+///  epochs do not stop the timer;
+/// - the subscription reports that missed publications could not be
+///  recovered.
+/// ```
+/// 5. Apply a FUNDING update when its funding_revision is higher than the one
+/// ```text
+/// held for its asset.
+/// ```
+///
+/// GetBalances reflects every balance update published before the call began,
+/// so a reload covers anything the subscription missed in the answer's epoch,
+/// even a final update of an idle account, and an earlier epoch's Trading
+/// transfers as below. Show Trading values after an update with complete set:
+/// in between, the same step continues in the next update.
+///
+/// After a move, a new epoch's Trading values can be older than the previous
+/// epoch's last ones: its owner may not have applied the latest transfers yet.
+/// Until its trading_applied_through_ts_ns reaches the last one you saw, the
+/// epoch is catching up, and its later updates apply those transfers.
+/// GetBalances waits, or fails with UNAVAILABLE, rather than answer such a
+/// cut below a Trading transfer the stream published in an earlier epoch,
+/// including one you never received. Right after a server restart it may not
+/// know every such transfer, so still count a transfer as applied only by a
+/// receipt in the current epoch: its leg, or a trading_applied_through_ts_ns
+/// at or past its ts_ns.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BalanceUpdate {
+    /// TRADING or FUNDING: which balances this update carries.
+    ///
+    /// Field 1: `account`
+    #[serde(
+        rename = "account",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub account: ::buffa::EnumValue<super::super::v1::AccountCode>,
+    /// TRADING only. The Trading numbering this update is in, as GetBalances
+    /// returns it. It changes when the numbering restarts: drop an update of a
+    /// dropped epoch, and reload on any other epoch than the current one
+    /// (step 4). Compare it only for equality; its value has no order.
+    ///
+    /// Field 2: `trading_epoch`
+    #[serde(
+        rename = "tradingEpoch",
+        alias = "trading_epoch",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trading_epoch: u64,
+    /// TRADING only. This update's place in its epoch, from 1, with no gap.
+    ///
+    /// Field 3: `trading_sequence`
+    #[serde(
+        rename = "tradingSequence",
+        alias = "trading_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trading_sequence: u64,
+    /// TRADING only. True when the account's Trading values are a consistent
+    /// snapshot after this update; false while the same step continues in the
+    /// next update.
+    ///
+    /// Field 4: `complete`
+    #[serde(
+        rename = "complete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub complete: bool,
+    /// The assets this update changed, each at most once. A TRADING update sets
+    /// trading, reserved and available; a FUNDING update sets funding and
+    /// funding_revision. The other kind's fields are unset.
+    ///
+    /// Field 5: `balances`
+    #[serde(
+        rename = "balances",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub balances: ::buffa::alloc::vec::Vec<AssetBalance>,
+    /// TRADING only. The Trading transfer legs this update applied, oldest
+    /// first. Each sets asset_id, amount_e18, transfer_code, account_code,
+    /// ts_us, ts_ns, balance_after_e18, is_debit and transfer_id; link_id,
+    /// flow_id, source and destination are unset here and are published on the
+    /// transfer stream and by ListTransfers. After a move, a transfer's legs
+    /// can arrive again in the new epoch: (transfer_id, is_debit) identifies a
+    /// leg.
+    ///
+    /// Field 6: `transfers`
+    #[serde(
+        rename = "transfers",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub transfers: ::buffa::alloc::vec::Vec<TransferRow>,
+    /// TRADING only. Every Trading transfer of the account whose ts_ns is at or
+    /// below this value is applied in this update's balances, whether or not its
+    /// leg was received. It is a receipt within trading_epoch. While a transfer
+    /// of the account could not be applied, this value stays below it, until a
+    /// later balance of that asset includes it; it never passes a transfer that
+    /// is not applied. Nanoseconds since epoch (UTC).
+    ///
+    /// Field 7: `trading_applied_through_ts_ns`
+    #[serde(
+        rename = "tradingAppliedThroughTsNs",
+        alias = "trading_applied_through_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trading_applied_through_ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BalanceUpdate {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BalanceUpdate")
+            .field("account", &self.account)
+            .field("trading_epoch", &self.trading_epoch)
+            .field("trading_sequence", &self.trading_sequence)
+            .field("complete", &self.complete)
+            .field("balances", &self.balances)
+            .field("transfers", &self.transfers)
+            .field("trading_applied_through_ts_ns", &self.trading_applied_through_ts_ns)
+            .finish()
+    }
+}
+impl BalanceUpdate {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.BalanceUpdate";
+}
+::buffa::impl_default_instance!(BalanceUpdate);
+impl ::buffa::MessageName for BalanceUpdate {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "BalanceUpdate";
+    const FULL_NAME: &'static str = "ledger.read.v1.BalanceUpdate";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.BalanceUpdate";
+}
+impl ::buffa::Message for BalanceUpdate {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.account.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.trading_epoch != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.trading_epoch) as u32;
+        }
+        if self.trading_sequence != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.trading_sequence) as u32;
+        }
+        if self.complete {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        for v in &self.balances {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.transfers {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.trading_applied_through_ts_ns != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(
+                        self.trading_applied_through_ts_ns,
+                    ) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.account.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.trading_epoch != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.trading_epoch, buf);
+        }
+        if self.trading_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.trading_sequence, buf);
+        }
+        if self.complete {
+            ::buffa::types::put_bool_field(4u32, self.complete, buf);
+        }
+        for v in &self.balances {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        for v in &self.transfers {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.trading_applied_through_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(
+                7u32,
+                self.trading_applied_through_ts_ns,
+                buf,
+            );
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.account = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trading_epoch = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trading_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.complete = ::buffa::types::decode_bool(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.balances.push(elem);
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.transfers.push(elem);
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trading_applied_through_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.account = ::buffa::EnumValue::from(0);
+        self.trading_epoch = 0u64;
+        self.trading_sequence = 0u64;
+        self.complete = false;
+        self.balances.clear();
+        self.transfers.clear();
+        self.trading_applied_through_ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BalanceUpdate {
+    const PROTO_FQN: &'static str = "ledger.read.v1.BalanceUpdate";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BalanceUpdate {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BALANCE_UPDATE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.BalanceUpdate",
+    to_json: ::buffa::type_registry::any_to_json::<BalanceUpdate>,
+    from_json: ::buffa::type_registry::any_from_json::<BalanceUpdate>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -5707,6 +6171,18 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub transfer_id: ::buffa::alloc::string::String,
+    /// Exact transfer timestamp in nanoseconds since epoch (UTC); ts_us is this
+    /// value divided by 1,000, rounded down. Compare it with a balance update's
+    /// trading_applied_through_ts_ns.
+    ///
+    /// Field 16: `ts_ns`
+    #[serde(
+        rename = "tsNs",
+        alias = "ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub ts_ns: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5726,6 +6202,7 @@ impl ::core::fmt::Debug for TransferRow {
             .field("source", &self.source)
             .field("destination", &self.destination)
             .field("transfer_id", &self.transfer_id)
+            .field("ts_ns", &self.ts_ns)
             .finish()
     }
 }
@@ -5816,6 +6293,9 @@ impl ::buffa::Message for TransferRow {
         if !self.transfer_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.transfer_id) as u32;
         }
+        if self.ts_ns != 0u64 {
+            size += 2u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5871,6 +6351,9 @@ impl ::buffa::Message for TransferRow {
         }
         if !self.transfer_id.is_empty() {
             ::buffa::types::put_string_field(15u32, &self.transfer_id, buf);
+        }
+        if self.ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(16u32, self.ts_ns, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5989,6 +6472,13 @@ impl ::buffa::Message for TransferRow {
                 )?;
                 ::buffa::types::merge_string(&mut self.transfer_id, buf)?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6009,6 +6499,7 @@ impl ::buffa::Message for TransferRow {
         self.source = ::buffa::MessageField::none();
         self.destination = ::buffa::MessageField::none();
         self.transfer_id.clear();
+        self.ts_ns = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9491,13 +9982,9 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// Opaque monotonic revision for the atomic trading, reserved, and available
-            /// values. Higher means newer; zero means no trading state has been observed.
-            ///
-            /// Field 6: `trading_revision`
-            pub trading_revision: u64,
             /// Opaque monotonic revision for the funding value. Higher means newer; zero
-            /// means no funding state has been observed.
+            /// means no funding state has been observed. Trading values have no
+            /// revision: their position is (trading_epoch, trading_sequence).
             ///
             /// Field 7: `funding_revision`
             pub funding_revision: u64,
@@ -9641,13 +10128,6 @@ pub mod __buffa {
                             }
                         }
                     }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trading_revision = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -9717,7 +10197,6 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    trading_revision: self.trading_revision,
                     funding_revision: self.funding_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -9769,12 +10248,6 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
-                }
-                if self.trading_revision != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(self.trading_revision)
-                                as u32;
                 }
                 if self.funding_revision != 0u64 {
                     size
@@ -9828,9 +10301,6 @@ pub mod __buffa {
                     );
                     self.available.write_to(__cache, buf);
                 }
-                if self.trading_revision != 0u64 {
-                    ::buffa::types::put_uint64_field(6u32, self.trading_revision, buf);
-                }
                 if self.funding_revision != 0u64 {
                     ::buffa::types::put_uint64_field(7u32, self.funding_revision, buf);
                 }
@@ -9883,13 +10353,6 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("available", __v)?;
                     }
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trading_revision) {
-                    __map
-                        .serialize_entry(
-                            "tradingRevision",
-                            &::buffa::json_helpers::ProtoJson(&self.trading_revision),
-                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.funding_revision) {
                     __map
@@ -10053,16 +10516,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().available
             }
-            /// Opaque monotonic revision for the atomic trading, reserved, and available
-            /// values. Higher means newer; zero means no trading state has been observed.
-            ///
-            /// Field 6: `trading_revision`
-            #[must_use]
-            pub fn trading_revision(&self) -> u64 {
-                self.0.reborrow().trading_revision
-            }
             /// Opaque monotonic revision for the funding value. Higher means newer; zero
-            /// means no funding state has been observed.
+            /// means no funding state has been observed. Trading values have no
+            /// revision: their position is (trading_epoch, trading_sequence).
             ///
             /// Field 7: `funding_revision`
             #[must_use]
@@ -10100,6 +10556,14 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetBalancesResponse is the account's balances with the position of its
+        /// Trading values.
+        ///
+        /// The Trading values of every asset are one atomic cut: all are taken at the
+        /// single position (trading_epoch, trading_sequence) the response names, never
+        /// a mix of two positions, and never at a position older than one the balance
+        /// stream already published. The Funding values carry their own
+        /// funding_revision and are not part of that position.
         #[derive(Clone, Debug, Default)]
         pub struct GetBalancesResponseView<'a> {
             /// One entry for every supported unified asset, including assets with zero
@@ -10111,6 +10575,27 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::AssetBalanceView<'a>,
             >,
+            /// The Trading numbering the balances' Trading values are in. It changes
+            /// when the numbering restarts: then reload. Compare it only for equality;
+            /// its value has no order. Zero, with trading_sequence zero, when the
+            /// account has no Trading balances yet.
+            ///
+            /// Field 2: `trading_epoch`
+            pub trading_epoch: u64,
+            /// The Trading sequence the balances' Trading values are at, within
+            /// trading_epoch: apply the balance stream's Trading updates from
+            /// trading_sequence + 1 on (see BalanceUpdate).
+            ///
+            /// Field 3: `trading_sequence`
+            pub trading_sequence: u64,
+            /// Every Trading transfer of the account whose ts_ns is at or below this
+            /// value is applied in these balances, a receipt within trading_epoch.
+            /// While a transfer of the account could not be applied, this value stays
+            /// below it, until a later balance of that asset includes it; it never
+            /// passes a transfer that is not applied. Nanoseconds since epoch (UTC).
+            ///
+            /// Field 4: `trading_applied_through_ts_ns`
+            pub trading_applied_through_ts_ns: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetBalancesResponseView<'a> {
@@ -10144,6 +10629,29 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trading_epoch = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trading_sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trading_applied_through_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -10193,6 +10701,9 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    trading_epoch: self.trading_epoch,
+                    trading_sequence: self.trading_sequence,
+                    trading_applied_through_ts_ns: self.trading_applied_through_ts_ns,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -10215,6 +10726,25 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.trading_epoch != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.trading_epoch)
+                                as u32;
+                }
+                if self.trading_sequence != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.trading_sequence)
+                                as u32;
+                }
+                if self.trading_applied_through_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.trading_applied_through_ts_ns,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -10233,6 +10763,19 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if self.trading_epoch != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.trading_epoch, buf);
+                }
+                if self.trading_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.trading_sequence, buf);
+                }
+                if self.trading_applied_through_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        4u32,
+                        self.trading_applied_through_ts_ns,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -10257,6 +10800,31 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !self.balances.is_empty() {
                     __map.serialize_entry("balances", &*self.balances)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trading_epoch) {
+                    __map
+                        .serialize_entry(
+                            "tradingEpoch",
+                            &::buffa::json_helpers::ProtoJson(&self.trading_epoch),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trading_sequence) {
+                    __map
+                        .serialize_entry(
+                            "tradingSequence",
+                            &::buffa::json_helpers::ProtoJson(&self.trading_sequence),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.trading_applied_through_ts_ns,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "tradingAppliedThroughTsNs",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.trading_applied_through_ts_ns,
+                            ),
+                        )?;
                 }
                 __map.end()
             }
@@ -10368,6 +10936,36 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().balances
             }
+            /// The Trading numbering the balances' Trading values are in. It changes
+            /// when the numbering restarts: then reload. Compare it only for equality;
+            /// its value has no order. Zero, with trading_sequence zero, when the
+            /// account has no Trading balances yet.
+            ///
+            /// Field 2: `trading_epoch`
+            #[must_use]
+            pub fn trading_epoch(&self) -> u64 {
+                self.0.reborrow().trading_epoch
+            }
+            /// The Trading sequence the balances' Trading values are at, within
+            /// trading_epoch: apply the balance stream's Trading updates from
+            /// trading_sequence + 1 on (see BalanceUpdate).
+            ///
+            /// Field 3: `trading_sequence`
+            #[must_use]
+            pub fn trading_sequence(&self) -> u64 {
+                self.0.reborrow().trading_sequence
+            }
+            /// Every Trading transfer of the account whose ts_ns is at or below this
+            /// value is applied in these balances, a receipt within trading_epoch.
+            /// While a transfer of the account could not be applied, this value stays
+            /// below it, until a later balance of that asset includes it; it never
+            /// passes a transfer that is not applied. Nanoseconds since epoch (UTC).
+            ///
+            /// Field 4: `trading_applied_through_ts_ns`
+            #[must_use]
+            pub fn trading_applied_through_ts_ns(&self) -> u64 {
+                self.0.reborrow().trading_applied_through_ts_ns
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetBalancesResponseView<'static>>>
         for GetBalancesResponseOwnedView {
@@ -10394,6 +10992,641 @@ pub mod __buffa {
             type ViewHandle = GetBalancesResponseOwnedView;
         }
         impl ::serde::Serialize for GetBalancesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BalanceUpdate is one publication on an account's balance stream.
+        ///
+        /// A TRADING update is one step of the account's Trading balances, at a
+        /// position (trading_epoch, trading_sequence). Within an epoch the sequence
+        /// runs 1, 2, 3 with no gap. A new epoch starts again at 1, and its updates
+        /// up to its first complete one carry every asset the account holds in
+        /// Trading.
+        ///
+        /// A FUNDING update carries one asset's Funding balance. It is not sequenced:
+        /// a higher funding_revision is newer. Its trading_epoch and trading_sequence
+        /// are unset: tell the two kinds apart by account, never by a zero epoch.
+        ///
+        /// Keep the balances exact as follows:
+        ///
+        /// 1. Subscribe to the stream and buffer its updates.
+        /// 2. Call GetBalances and apply its balances. Its position (E, Q) is
+        /// ```text
+        /// (trading_epoch, trading_sequence). If it answers unavailable, retry it
+        /// with a backoff.
+        /// ```
+        /// 3. Drop buffered and later TRADING updates of epoch E with a sequence at or
+        /// ```text
+        /// below Q; a reconnect can repeat one. Apply E's sequences Q + 1, Q + 2,
+        /// and so on, in order.
+        /// ```
+        /// 4. Keep a dropped set of epochs: every epoch you held before E, and every
+        /// ```text
+        /// epoch other than E of an update received before the GetBalances call
+        /// that answered E began. GetBalances never answers a dropped epoch again,
+        /// so drop a TRADING update of a dropped epoch without reloading: after a
+        /// move, the earlier epoch's late updates can still arrive. Reload, from
+        /// step 2, when:
+        /// - a TRADING update's epoch is neither E nor dropped, including one
+        ///  buffered while the call ran: the numbering restarted;
+        /// - its sequence skips a number: an update was missed;
+        /// - after an incomplete update of E, E's next sequence does not arrive
+        ///  within 2 seconds. FUNDING updates, repeats and updates of dropped
+        ///  epochs do not stop the timer;
+        /// - the subscription reports that missed publications could not be
+        ///  recovered.
+        /// ```
+        /// 5. Apply a FUNDING update when its funding_revision is higher than the one
+        /// ```text
+        /// held for its asset.
+        /// ```
+        ///
+        /// GetBalances reflects every balance update published before the call began,
+        /// so a reload covers anything the subscription missed in the answer's epoch,
+        /// even a final update of an idle account, and an earlier epoch's Trading
+        /// transfers as below. Show Trading values after an update with complete set:
+        /// in between, the same step continues in the next update.
+        ///
+        /// After a move, a new epoch's Trading values can be older than the previous
+        /// epoch's last ones: its owner may not have applied the latest transfers yet.
+        /// Until its trading_applied_through_ts_ns reaches the last one you saw, the
+        /// epoch is catching up, and its later updates apply those transfers.
+        /// GetBalances waits, or fails with UNAVAILABLE, rather than answer such a
+        /// cut below a Trading transfer the stream published in an earlier epoch,
+        /// including one you never received. Right after a server restart it may not
+        /// know every such transfer, so still count a transfer as applied only by a
+        /// receipt in the current epoch: its leg, or a trading_applied_through_ts_ns
+        /// at or past its ts_ns.
+        #[derive(Clone, Debug, Default)]
+        pub struct BalanceUpdateView<'a> {
+            /// TRADING or FUNDING: which balances this update carries.
+            ///
+            /// Field 1: `account`
+            pub account: ::buffa::EnumValue<super::super::super::super::v1::AccountCode>,
+            /// TRADING only. The Trading numbering this update is in, as GetBalances
+            /// returns it. It changes when the numbering restarts: drop an update of a
+            /// dropped epoch, and reload on any other epoch than the current one
+            /// (step 4). Compare it only for equality; its value has no order.
+            ///
+            /// Field 2: `trading_epoch`
+            pub trading_epoch: u64,
+            /// TRADING only. This update's place in its epoch, from 1, with no gap.
+            ///
+            /// Field 3: `trading_sequence`
+            pub trading_sequence: u64,
+            /// TRADING only. True when the account's Trading values are a consistent
+            /// snapshot after this update; false while the same step continues in the
+            /// next update.
+            ///
+            /// Field 4: `complete`
+            pub complete: bool,
+            /// The assets this update changed, each at most once. A TRADING update sets
+            /// trading, reserved and available; a FUNDING update sets funding and
+            /// funding_revision. The other kind's fields are unset.
+            ///
+            /// Field 5: `balances`
+            pub balances: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AssetBalanceView<'a>,
+            >,
+            /// TRADING only. The Trading transfer legs this update applied, oldest
+            /// first. Each sets asset_id, amount_e18, transfer_code, account_code,
+            /// ts_us, ts_ns, balance_after_e18, is_debit and transfer_id; link_id,
+            /// flow_id, source and destination are unset here and are published on the
+            /// transfer stream and by ListTransfers. After a move, a transfer's legs
+            /// can arrive again in the new epoch: (transfer_id, is_debit) identifies a
+            /// leg.
+            ///
+            /// Field 6: `transfers`
+            pub transfers: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::TransferRowView<'a>,
+            >,
+            /// TRADING only. Every Trading transfer of the account whose ts_ns is at or
+            /// below this value is applied in this update's balances, whether or not its
+            /// leg was received. It is a receipt within trading_epoch. While a transfer
+            /// of the account could not be applied, this value stays below it, until a
+            /// later balance of that asset includes it; it never passes a transfer that
+            /// is not applied. Nanoseconds since epoch (UTC).
+            ///
+            /// Field 7: `trading_applied_through_ts_ns`
+            pub trading_applied_through_ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BalanceUpdateView<'a> {
+            type Owned = super::super::BalanceUpdate;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.account = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trading_epoch = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trading_sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.complete = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trading_applied_through_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.balances
+                            .push(
+                                <super::super::__buffa::view::AssetBalanceView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.transfers
+                            .push(
+                                <super::super::__buffa::view::TransferRowView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BalanceUpdate,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BalanceUpdate,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BalanceUpdate {
+                    account: self.account,
+                    trading_epoch: self.trading_epoch,
+                    trading_sequence: self.trading_sequence,
+                    complete: self.complete,
+                    balances: self
+                        .balances
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    transfers: self
+                        .transfers
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    trading_applied_through_ts_ns: self.trading_applied_through_ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BalanceUpdateView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.account.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.trading_epoch != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.trading_epoch)
+                                as u32;
+                }
+                if self.trading_sequence != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.trading_sequence)
+                                as u32;
+                }
+                if self.complete {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                for v in &self.balances {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.transfers {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.trading_applied_through_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.trading_applied_through_ts_ns,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.account.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.trading_epoch != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.trading_epoch, buf);
+                }
+                if self.trading_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.trading_sequence, buf);
+                }
+                if self.complete {
+                    ::buffa::types::put_bool_field(4u32, self.complete, buf);
+                }
+                for v in &self.balances {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.transfers {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.trading_applied_through_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        7u32,
+                        self.trading_applied_through_ts_ns,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BalanceUpdateView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.account,
+                ) {
+                    __map.serialize_entry("account", &self.account)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trading_epoch) {
+                    __map
+                        .serialize_entry(
+                            "tradingEpoch",
+                            &::buffa::json_helpers::ProtoJson(&self.trading_epoch),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trading_sequence) {
+                    __map
+                        .serialize_entry(
+                            "tradingSequence",
+                            &::buffa::json_helpers::ProtoJson(&self.trading_sequence),
+                        )?;
+                }
+                if self.complete {
+                    __map.serialize_entry("complete", &self.complete)?;
+                }
+                if !self.balances.is_empty() {
+                    __map.serialize_entry("balances", &*self.balances)?;
+                }
+                if !self.transfers.is_empty() {
+                    __map.serialize_entry("transfers", &*self.transfers)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.trading_applied_through_ts_ns,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "tradingAppliedThroughTsNs",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.trading_applied_through_ts_ns,
+                            ),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BalanceUpdateView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "BalanceUpdate";
+            const FULL_NAME: &'static str = "ledger.read.v1.BalanceUpdate";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.BalanceUpdate";
+        }
+        ::buffa::impl_default_view_instance!(BalanceUpdateView);
+        ::buffa::impl_view_reborrow!(BalanceUpdateView);
+        /** Self-contained, `'static` owned view of a `BalanceUpdate` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BalanceUpdateView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BalanceUpdateView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BalanceUpdateOwnedView(
+            ::buffa::OwnedView<BalanceUpdateView<'static>>,
+        );
+        impl BalanceUpdateOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BalanceUpdateOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BalanceUpdateOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BalanceUpdate,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BalanceUpdateOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`BalanceUpdateView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BalanceUpdateView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BalanceUpdate,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// TRADING or FUNDING: which balances this update carries.
+            ///
+            /// Field 1: `account`
+            #[must_use]
+            pub fn account(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::v1::AccountCode> {
+                self.0.reborrow().account
+            }
+            /// TRADING only. The Trading numbering this update is in, as GetBalances
+            /// returns it. It changes when the numbering restarts: drop an update of a
+            /// dropped epoch, and reload on any other epoch than the current one
+            /// (step 4). Compare it only for equality; its value has no order.
+            ///
+            /// Field 2: `trading_epoch`
+            #[must_use]
+            pub fn trading_epoch(&self) -> u64 {
+                self.0.reborrow().trading_epoch
+            }
+            /// TRADING only. This update's place in its epoch, from 1, with no gap.
+            ///
+            /// Field 3: `trading_sequence`
+            #[must_use]
+            pub fn trading_sequence(&self) -> u64 {
+                self.0.reborrow().trading_sequence
+            }
+            /// TRADING only. True when the account's Trading values are a consistent
+            /// snapshot after this update; false while the same step continues in the
+            /// next update.
+            ///
+            /// Field 4: `complete`
+            #[must_use]
+            pub fn complete(&self) -> bool {
+                self.0.reborrow().complete
+            }
+            /// The assets this update changed, each at most once. A TRADING update sets
+            /// trading, reserved and available; a FUNDING update sets funding and
+            /// funding_revision. The other kind's fields are unset.
+            ///
+            /// Field 5: `balances`
+            #[must_use]
+            pub fn balances(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AssetBalanceView<'_>,
+            > {
+                &self.0.reborrow().balances
+            }
+            /// TRADING only. The Trading transfer legs this update applied, oldest
+            /// first. Each sets asset_id, amount_e18, transfer_code, account_code,
+            /// ts_us, ts_ns, balance_after_e18, is_debit and transfer_id; link_id,
+            /// flow_id, source and destination are unset here and are published on the
+            /// transfer stream and by ListTransfers. After a move, a transfer's legs
+            /// can arrive again in the new epoch: (transfer_id, is_debit) identifies a
+            /// leg.
+            ///
+            /// Field 6: `transfers`
+            #[must_use]
+            pub fn transfers(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::TransferRowView<'_>,
+            > {
+                &self.0.reborrow().transfers
+            }
+            /// TRADING only. Every Trading transfer of the account whose ts_ns is at or
+            /// below this value is applied in this update's balances, whether or not its
+            /// leg was received. It is a receipt within trading_epoch. While a transfer
+            /// of the account could not be applied, this value stays below it, until a
+            /// later balance of that asset includes it; it never passes a transfer that
+            /// is not applied. Nanoseconds since epoch (UTC).
+            ///
+            /// Field 7: `trading_applied_through_ts_ns`
+            #[must_use]
+            pub fn trading_applied_through_ts_ns(&self) -> u64 {
+                self.0.reborrow().trading_applied_through_ts_ns
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<BalanceUpdateView<'static>>>
+        for BalanceUpdateOwnedView {
+            fn from(inner: ::buffa::OwnedView<BalanceUpdateView<'static>>) -> Self {
+                BalanceUpdateOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BalanceUpdateOwnedView>
+        for ::buffa::OwnedView<BalanceUpdateView<'static>> {
+            fn from(wrapper: BalanceUpdateOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<BalanceUpdateView<'static>>>
+        for BalanceUpdateOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<BalanceUpdateView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BalanceUpdate {
+            type View<'a> = BalanceUpdateView<'a>;
+            type ViewHandle = BalanceUpdateOwnedView;
+        }
+        impl ::serde::Serialize for BalanceUpdateOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -17472,6 +18705,12 @@ pub mod __buffa {
             ///
             /// Field 15: `transfer_id`
             pub transfer_id: &'a str,
+            /// Exact transfer timestamp in nanoseconds since epoch (UTC); ts_us is this
+            /// value divided by 1,000, rounded down. Compare it with a balance update's
+            /// trading_applied_through_ts_ns.
+            ///
+            /// Field 16: `ts_ns`
+            pub ts_ns: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TransferRowView<'a> {
@@ -17665,6 +18904,13 @@ pub mod __buffa {
                         )?;
                         view.transfer_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -17734,6 +18980,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     transfer_id: self.transfer_id.to_string(),
+                    ts_ns: self.ts_ns,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -17819,6 +19066,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.transfer_id)
                                 as u32;
                 }
+                if self.ts_ns != 0u64 {
+                    size += 2u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -17891,6 +19141,9 @@ pub mod __buffa {
                 }
                 if !self.transfer_id.is_empty() {
                     ::buffa::types::put_string_field(15u32, &self.transfer_id, buf);
+                }
+                if self.ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(16u32, self.ts_ns, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -17981,6 +19234,13 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.transfer_id) {
                     __map.serialize_entry("transferId", self.transfer_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "tsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.ts_ns),
+                        )?;
                 }
                 __map.end()
             }
@@ -18188,6 +19448,15 @@ pub mod __buffa {
             #[must_use]
             pub fn transfer_id(&self) -> &'_ str {
                 self.0.reborrow().transfer_id
+            }
+            /// Exact transfer timestamp in nanoseconds since epoch (UTC); ts_us is this
+            /// value divided by 1,000, rounded down. Compare it with a balance update's
+            /// trading_applied_through_ts_ns.
+            ///
+            /// Field 16: `ts_ns`
+            #[must_use]
+            pub fn ts_ns(&self) -> u64 {
+                self.0.reborrow().ts_ns
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TransferRowView<'static>>>
@@ -23764,6 +25033,7 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_BALANCES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ASSET_BALANCE_JSON_ANY);
         reg.register_json_any(super::__GET_BALANCES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__BALANCE_UPDATE_JSON_ANY);
         reg.register_json_any(super::__GET_BALANCE_HISTORY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__BALANCE_SERIES_JSON_ANY);
         reg.register_json_any(super::__GET_BALANCE_HISTORY_RESPONSE_JSON_ANY);
@@ -23818,6 +25088,10 @@ pub use self::__buffa::view::AssetBalanceOwnedView;
 pub use self::__buffa::view::GetBalancesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetBalancesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BalanceUpdateView;
+#[doc(inline)]
+pub use self::__buffa::view::BalanceUpdateOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetBalanceHistoryRequestView;
 #[doc(inline)]

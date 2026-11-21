@@ -56,7 +56,7 @@
     },
     {
       "id": "address_book",
-      "label": "Address book (list/view/create/update/subscribe)",
+      "label": "Address book (list/view/subscribe/create/update)",
       "supported": true
     },
     {
@@ -82,6 +82,11 @@
     {
       "id": "trading_rate_limits",
       "label": "Trading rate limits",
+      "supported": true
+    },
+    {
+      "id": "profit_and_loss",
+      "label": "Profit and loss + trading statistics",
       "supported": true
     },
     {
@@ -130,13 +135,13 @@
       "supported": true
     },
     {
-      "id": "statement_exports",
-      "label": "Statement export files",
+      "id": "transfer_history",
+      "label": "Transfer history",
       "supported": true
     },
     {
-      "id": "transfer_history",
-      "label": "Transfer history",
+      "id": "statement_exports",
+      "label": "Statement export files",
       "supported": true
     },
     {
@@ -187,7 +192,8 @@
     {
       "id": "resolve",
       "label": "Account resolve / lookup",
-      "supported": false
+      "supported": false,
+      "note": "JWT/session only; not available with API-key auth."
     }
   ],
   "unmappedWrappedServices": []

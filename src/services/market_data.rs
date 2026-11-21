@@ -272,14 +272,16 @@ impl MarketDataService {
 
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
     ///
-    /// The columnar reply carries no closed flag, so [`Candle::is_closed`] is
-    /// derived from the request. With `include_incomplete` false every row is
-    /// closed and reads `true`. With `include_incomplete` true, on a first page
-    /// (no `page_token`), the newest primary row reads `false`, meaning "not
-    /// known to be closed": it may be the open bucket, or a closed one when no
-    /// open candle was in range; earlier rows read `true`. A continuation page
-    /// (a `page_token` set) holds only older, closed candles, so every row
-    /// reads `true`. Reference rows are always closed buckets and read `true`.
+    /// Each primary row's [`Candle::is_closed`] is the server's `is_closed`
+    /// flag, as [`Self::get_candles`] reports it: with `include_incomplete`
+    /// the current open candle is appended last on the first page and is the
+    /// only row that reads `false`; it does not count toward `limit`.
+    /// Reference rows are always closed buckets and read `true`.
+    ///
+    /// From a server that predates the flag (an empty `is_closed` column),
+    /// every row reads `true` except, on a first page (no `page_token`) read
+    /// with `include_incomplete`, the newest primary row, which reads `false`,
+    /// meaning "not known to be closed".
     pub async fn get_candles_columns(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
         check_limit(
             "get_candles_columns",
@@ -306,6 +308,8 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().get_candles_columns(req))
             .await?
             .into_owned();
+        // A server that predates the `is_closed` column leaves it empty.
+        let flags_provided = !resp.is_closed.is_empty();
         let mut result = candles_columns_from_proto(
             &resp,
             volume_scale,
@@ -313,7 +317,10 @@ impl MarketDataService {
                 .catalogs
                 .reference_price_scale_for_symbol_id(base.symbol_id),
         )?;
-        if may_hold_open_candle && let Some(newest) = result.candles.last_mut() {
+        if may_hold_open_candle
+            && !flags_provided
+            && let Some(newest) = result.candles.last_mut()
+        {
             // The open candle, when one is in range, comes last in the
             // oldest-first primary series, unflagged.
             newest.is_closed = false;

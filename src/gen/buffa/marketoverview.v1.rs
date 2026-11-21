@@ -1179,6 +1179,21 @@ pub struct MarketOverview {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub index_price_ticks: i64,
+    /// The pair's live price band, as GetPriceBand returns it, present only
+    /// while a band was confirmed current within the last 5 seconds. Absent
+    /// means no fresh band is known, not that the pair has no band. This is a
+    /// convenience copy: the market overview stream sends a row again when its
+    /// band changes, appears or lapses, not on each confirmation, so a copy whose
+    /// valid_until_ts_ns has passed is unknown. Check order prices against
+    /// GetPriceBand or the price band stream.
+    ///
+    /// Field 18: `price_band`
+    #[serde(
+        rename = "priceBand",
+        alias = "price_band",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub price_band: ::buffa::MessageField<super::super::marketdata::v1::LivePriceBand>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1202,6 +1217,7 @@ impl ::core::fmt::Debug for MarketOverview {
             .field("best_ask_qty_scaled", &self.best_ask_qty_scaled)
             .field("sparklines", &self.sparklines)
             .field("index_price_ticks", &self.index_price_ticks)
+            .field("price_band", &self.price_band)
             .finish()
     }
 }
@@ -1316,6 +1332,14 @@ impl ::buffa::Message for MarketOverview {
         if let Some(v) = self.volume_24h_usd_scaled {
             size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
+        if self.price_band.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.price_band.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1374,6 +1398,10 @@ impl ::buffa::Message for MarketOverview {
         }
         if let Some(v) = self.volume_24h_usd_scaled {
             ::buffa::types::put_int64_field(17u32, v, buf);
+        }
+        if self.price_band.is_set() {
+            ::buffa::types::put_len_delimited_header(18u32, __cache.consume_next(), buf);
+            self.price_band.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1508,6 +1536,17 @@ impl ::buffa::Message for MarketOverview {
                     ::buffa::types::decode_int64(buf)?,
                 );
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.price_band.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1532,6 +1571,7 @@ impl ::buffa::Message for MarketOverview {
         self.listed_ts_ns = 0u64;
         self.index_price_ticks = 0i64;
         self.volume_24h_usd_scaled = ::core::option::Option::None;
+        self.price_band = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4969,6 +5009,20 @@ pub mod __buffa {
             ///
             /// Field 16: `index_price_ticks`
             pub index_price_ticks: i64,
+            /// The pair's live price band, as GetPriceBand returns it, present only
+            /// while a band was confirmed current within the last 5 seconds. Absent
+            /// means no fresh band is known, not that the pair has no band. This is a
+            /// convenience copy: the market overview stream sends a row again when its
+            /// band changes, appears or lapses, not on each confirmation, so a copy whose
+            /// valid_until_ts_ns has passed is unknown. Check order prices against
+            /// GetPriceBand or the price band stream.
+            ///
+            /// Field 18: `price_band`
+            pub price_band: ::buffa::MessageFieldView<
+                super::super::super::super::marketdata::v1::__buffa::view::LivePriceBandView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for MarketOverviewView<'a> {
@@ -5117,6 +5171,31 @@ pub mod __buffa {
                         )?;
                         view.index_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
                     }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.price_band.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.price_band = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::marketdata::v1::__buffa::view::LivePriceBandView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     13u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -5181,6 +5260,14 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     index_price_ticks: self.index_price_ticks,
+                    price_band: match self.price_band.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::marketdata::v1::LivePriceBand,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -5283,6 +5370,14 @@ pub mod __buffa {
                 if let Some(v) = self.volume_24h_usd_scaled {
                     size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
+                if self.price_band.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.price_band.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -5354,6 +5449,14 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.volume_24h_usd_scaled {
                     ::buffa::types::put_int64_field(17u32, v, buf);
+                }
+                if self.price_band.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        18u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.price_band.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -5489,6 +5592,14 @@ pub mod __buffa {
                             "indexPriceTicks",
                             &::buffa::json_helpers::ProtoJson(&self.index_price_ticks),
                         )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .price_band
+                        .as_option()
+                    {
+                        __map.serialize_entry("priceBand", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -5718,6 +5829,25 @@ pub mod __buffa {
             #[must_use]
             pub fn index_price_ticks(&self) -> i64 {
                 self.0.reborrow().index_price_ticks
+            }
+            /// The pair's live price band, as GetPriceBand returns it, present only
+            /// while a band was confirmed current within the last 5 seconds. Absent
+            /// means no fresh band is known, not that the pair has no band. This is a
+            /// convenience copy: the market overview stream sends a row again when its
+            /// band changes, appears or lapses, not on each confirmation, so a copy whose
+            /// valid_until_ts_ns has passed is unknown. Check order prices against
+            /// GetPriceBand or the price band stream.
+            ///
+            /// Field 18: `price_band`
+            #[must_use]
+            pub fn price_band(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::marketdata::v1::__buffa::view::LivePriceBandView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().price_band
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<MarketOverviewView<'static>>>
