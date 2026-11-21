@@ -2654,14 +2654,20 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// GetBrokerStats reads the broker's QuickSwap activity in a window.
-    /// Per UTC day or month: QuickSwaps created by status, deposits credited
-    /// and payouts delivered per asset, and the service, broker, affiliate and
-    /// referral fees charged per asset.
+    /// GetBrokerStats reads the broker's QuickSwap activity in a window, in
+    /// columns per UTC hour, day or month.
+    /// QuickSwaps created by status, deposits credited, payouts delivered and
+    /// fees charged, as exact amounts per asset and USD values, for the broker
+    /// as a whole and, with a breakdown, for every route, vault, source asset
+    /// or destination asset with activity in the window. Per-bucket columns go
+    /// to the totals, the 10 groups with the most deposited USD, an optional
+    /// drill-down group and the rest summed as others.
     /// Errors:
+    /// - INVALID_ARGUMENT: a malformed request, a window too long for its
+    /// period, a drill-down that is not a group of the breakdown, or a
+    /// vault_account_id that is not a public sub-account ID.
     /// - NOT_FOUND: BROKER_NOT_FOUND.
-    /// - INTERNAL: STATS_INCOMPLETE, with the swap_id of a QuickSwap whose
-    /// records the stats cannot read.
+    /// - UNAVAILABLE: the statistics are temporarily unavailable; retry.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -6995,6 +7001,18 @@ pub type OwnedListReferralLedgerResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<GetReferralStatsRequestView<'static>>`.
+pub type OwnedGetReferralStatsRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetReferralStatsResponseView<'static>>`.
+pub type OwnedGetReferralStatsResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<
     crate::proto::swap::quickswap::v1::EnrollReferralPartnerResponse,
 >
@@ -7183,6 +7201,28 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetReferralStatsResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetReferralStatsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME: &str = "swap.quickswap.v1.QuickSwapReferralService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `EnrollReferralPartner` RPC.
@@ -7248,6 +7288,15 @@ pub const QUICK_SWAP_REFERRAL_SERVICE_LIST_REFERRAL_LEDGER_SPEC: ::connectrpc::S
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetReferralStats` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRAL_STATS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapReferralService/GetReferralStats",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// QuickSwapReferralService is a referral partner's own record, over
 /// ConnectRPC. A referral partner shares a link with their code; QuickSwaps
 /// made through it on Polyester's own QuickSwap app give the user a discount
@@ -7272,8 +7321,15 @@ pub const QUICK_SWAP_REFERRAL_SERVICE_LIST_REFERRAL_LEDGER_SPEC: ::connectrpc::S
 /// any sub-account's, with AutoWithdrawService and the withdraw whitelist.
 /// ListReferralLedger lists each commission credit with its QuickSwap and
 /// each auto-withdraw payout from that sub-account.
+/// GetReferralStats reads the activity of the QuickSwaps the partner
+/// referred and its commission over time, in GetBrokerStats' columns, with
+/// a breakdown by route, source or destination asset. It shows the
+/// partner's commission only, never the other fees of those QuickSwaps.
 /// Every RPC is rate limited per account: over the limit it fails with
 /// RESOURCE_EXHAUSTED, a RateLimitDetail and a Retry-After header.
+/// GetReferralStats instead shares GetBrokerStats' budget, the caller's read
+/// rate: over it the call fails with RESOURCE_EXHAUSTED / BROKER_LIMIT and a
+/// Retry-After header.
 ///
 /// # Implementing handlers
 ///
@@ -7526,6 +7582,43 @@ pub trait QuickSwapReferralService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// GetReferralStats reads the activity of the QuickSwaps the caller
+    /// referred and the commission they credited it, over time, with an
+    /// optional breakdown by route, source asset or destination asset.
+    /// A QuickSwap counts in the bucket it was created in, with its current
+    /// status. A commission counts in the bucket it was credited in on the
+    /// totals series, and in its QuickSwap's bucket on a group. The window's
+    /// totals over ReferralPartner.created_at to now are the lifetime totals.
+    /// Times are minute-granular (see GetReferralStatsRequest). A disabled
+    /// partner still reads its stats.
+    /// Errors:
+    /// - NOT_FOUND: REFERRAL_PARTNER_NOT_FOUND.
+    /// - INVALID_ARGUMENT: the window, breakdown or drill-down.
+    /// - RESOURCE_EXHAUSTED: BROKER_LIMIT, with a Retry-After header: the
+    /// caller's read rate, shared with GetBrokerStats, is spent.
+    /// - UNAVAILABLE: the stats cannot be read; retry the same request.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_referral_stats<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::GetReferralStatsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::GetReferralStatsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -7761,6 +7854,35 @@ impl<S: QuickSwapReferralService> QuickSwapReferralServiceExt for S {
                 },
             )
             .with_spec(QUICK_SWAP_REFERRAL_SERVICE_LIST_REFERRAL_LEDGER_SPEC)
+            .route_view(
+                QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME,
+                "GetReferralStats",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::GetReferralStatsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_referral_stats(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::GetReferralStatsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRAL_STATS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -7864,6 +7986,12 @@ for QuickSwapReferralServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(QUICK_SWAP_REFERRAL_SERVICE_LIST_REFERRAL_LEDGER_SPEC),
+                )
+            }
+            "GetReferralStats" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRAL_STATS_SPEC),
                 )
             }
             _ => None,
@@ -8026,6 +8154,27 @@ for QuickSwapReferralServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::swap::quickswap::v1::ListReferralLedgerResponse,
+                        >(format)
+                })
+            }
+            "GetReferralStats" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::GetReferralStatsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::GetReferralStatsRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_referral_stats(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::GetReferralStatsResponse,
                         >(format)
                 })
             }
@@ -8444,6 +8593,51 @@ where
                 &self.config,
                 QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME,
                 "ListReferralLedger",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetReferralStats RPC. Sends a request to /swap.quickswap.v1.QuickSwapReferralService/GetReferralStats.
+    pub async fn get_referral_stats(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetReferralStatsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_referral_stats_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetReferralStats RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_referral_stats_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetReferralStatsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetReferralStatsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME,
+                "GetReferralStats",
                 request,
                 options,
             )

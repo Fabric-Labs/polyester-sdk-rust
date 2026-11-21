@@ -5384,7 +5384,8 @@ pub struct GetCandlesColumnsResponse {
     )]
     pub volume: ::buffa::alloc::vec::Vec<i64>,
     /// Reference candle series in columnar form (same ordering as ts_sec: oldest-first).
-    /// Only populated when request.include_reference=true.
+    /// Only populated when request.include_reference=true. Reference rows are
+    /// always closed buckets, also with include_incomplete=true.
     ///
     /// Field 9: `reference_ts_sec`
     #[serde(
@@ -5465,6 +5466,19 @@ pub struct GetCandlesColumnsResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub quote_volume: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Closed-bucket flags, oldest-first and aligned with ts_sec: true when the
+    /// bucket is closed; with include_incomplete=false every row is closed. With
+    /// include_incomplete=true, only the current open candle, appended last, is
+    /// false.
+    ///
+    /// Field 17: `is_closed`
+    #[serde(
+        rename = "isClosed",
+        alias = "is_closed",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub is_closed: ::buffa::alloc::vec::Vec<bool>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5488,6 +5502,7 @@ impl ::core::fmt::Debug for GetCandlesColumnsResponse {
             .field("reference_volume", &self.reference_volume)
             .field("next_page_token", &self.next_page_token)
             .field("quote_volume", &self.quote_volume)
+            .field("is_closed", &self.is_closed)
             .finish()
     }
 }
@@ -5640,6 +5655,12 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
         }
         for v in &self.quote_volume {
             size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if !self.is_closed.is_empty() {
+            let payload: u32 = self.is_closed.len() as u32
+                * ::buffa::types::BOOL_ENCODED_LEN as u32;
+            size
+                += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -5797,6 +5818,14 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
         }
         for v in &self.quote_volume {
             ::buffa::types::put_string_field(16u32, v, buf);
+        }
+        if !self.is_closed.is_empty() {
+            let payload: u32 = self.is_closed.len() as u32
+                * ::buffa::types::BOOL_ENCODED_LEN as u32;
+            ::buffa::types::put_len_delimited_header(17u32, payload, buf);
+            for &v in &self.is_closed {
+                ::buffa::types::encode_bool(v, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6207,6 +6236,36 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
                 )?;
                 self.quote_volume.push(::buffa::types::decode_string(buf)?);
             }
+            17u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.is_closed.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.is_closed.push(::buffa::types::decode_bool(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.is_closed.push(::buffa::types::decode_bool(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6231,6 +6290,7 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
         self.reference_volume.clear();
         self.next_page_token.clear();
         self.quote_volume.clear();
+        self.is_closed.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9882,7 +9942,7 @@ pub struct GetOrderbookHeatmapRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub interval: ::buffa::EnumValue<HeatmapInterval>,
-    /// Top-N levels per side included in each bucket. Every tier except
+    /// Top-N levels per side that the returned chain replays. Every tier except
     /// DEPTH_5000, which is refused with INVALID_ARGUMENT.
     ///
     /// Field 3: `depth`
@@ -10639,7 +10699,8 @@ pub const __HEATMAP_DELTA_LEVELS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     from_json: ::buffa::type_registry::any_from_json::<HeatmapDeltaLevels>,
     is_wkt: false,
 };
-/// HeatmapKeyframe is a full-book snapshot anchor.
+/// HeatmapKeyframe is the order book at one time, limited to the requested
+/// depth: the top-N levels per side.
 /// Best bid, best ask and mid preserve the raw prices where available. For older
 /// historical buckets without recorded raw prices, they use the reconstructed
 /// price bins instead.
@@ -10687,7 +10748,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub mid_ticks: i64,
-    /// Complete bid-side levels at the snapshot.
+    /// Top-N bid levels at the keyframe time.
     ///
     /// Field 5: `bids`
     #[serde(
@@ -10695,7 +10756,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub bids: ::buffa::MessageField<HeatmapLevels>,
-    /// Complete ask-side levels at the snapshot.
+    /// Top-N ask levels at the keyframe time.
     ///
     /// Field 6: `asks`
     #[serde(
@@ -10936,7 +10997,12 @@ pub const __HEATMAP_KEYFRAME_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     from_json: ::buffa::type_registry::any_from_json::<HeatmapKeyframe>,
     is_wkt: false,
 };
-/// HeatmapDeltaBucket is one sparse update bucket containing both sides.
+/// HeatmapDeltaBucket is one bucket's changes to the top-N view of both sides.
+/// A level that enters the top N during the bucket appears with its quantity,
+/// even when the bucket did not change it, for example after a better level
+/// was deleted. A level that leaves the top N appears with quantity zero, even
+/// when it still rests deeper in the book. Changes deeper than the top N are
+/// omitted.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10951,7 +11017,7 @@ pub struct HeatmapDeltaBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Sparse bid-side level changes in this bucket.
+    /// Changes to the top-N bid levels in this bucket.
     ///
     /// Field 2: `bids`
     #[serde(
@@ -10959,7 +11025,7 @@ pub struct HeatmapDeltaBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub bids: ::buffa::MessageField<HeatmapDeltaLevels>,
-    /// Sparse ask-side level changes in this bucket.
+    /// Changes to the top-N ask levels in this bucket.
     ///
     /// Field 3: `asks`
     #[serde(
@@ -11209,7 +11275,17 @@ pub const __HEATMAP_DELTA_BUCKET_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     is_wkt: false,
 };
 /// HeatmapLiveBucket is the canonical live payload for real-time heatmap updates.
-/// It represents the latest state of one bucket (open or finalized).
+/// It represents the latest state of one bucket (open or finalized). A bucket
+/// can be published again after it was finalized, when later updates for it
+/// arrive: the new payload holds every update of the bucket and a higher
+/// book_seq_end. Keep the payload with the highest book_seq_end per ts_sec.
+/// Finalized buckets are delivered at least once: the same finalized payload
+/// can arrive more than once, for example after a service restart; keep the
+/// highest book_seq_end per ts_sec. Updates of a bucket still open are best
+/// effort; a later update or the final payload supersedes them. A market's
+/// buckets are published here only once the service projects the market
+/// live: a bucket that holds only earlier updates is history, available
+/// through GetOrderbookHeatmap and never published live.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -11244,7 +11320,8 @@ pub struct HeatmapLiveBucket {
     )]
     pub ts_sec: u64,
     /// True when this bucket is finalized; false for provisional updates to an
-    /// open bucket.
+    /// open bucket. A finalized bucket can still be republished with a higher
+    /// book_seq_end.
     ///
     /// Field 4: `is_final`
     #[serde(
@@ -11627,13 +11704,26 @@ pub const __HEATMAP_LIVE_BUCKET_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     is_wkt: false,
 };
 /// HeatmapDeltaChain is the historical payload for all intervals.
-/// Reconstruct by applying deltas over base_keyframe.
-/// Deltas are ordered oldest-first by ts_sec.
+/// Reconstruct by applying deltas over base_keyframe, oldest first: set each
+/// listed level's quantity, and delete it when the quantity is zero. After each
+/// bucket the result is exactly the top-N levels per side of the requested
+/// depth and quantity mode, the same at every page limit. No further clipping
+/// is needed.
+/// - CLOSE: the order book at the bucket's close. It equals the base_keyframe
+///   of a chain anchored at that bucket.
+/// - PEAK: each price's highest quantity during the bucket, among the prices
+///   that held liquidity during it.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct HeatmapDeltaChain {
-    /// Full-book snapshot from which to apply the returned deltas.
+    /// Top-N order book from which to apply the returned deltas, from strictly
+    /// before the first of them. In CLOSE mode it holds closing quantities. In
+    /// PEAK mode it is only the starting point of the replay, not a bucket view:
+    /// its quantities may differ between page limits, so do not render it as a
+    /// bucket. A base advanced through stored buckets holds the peaks of its last
+    /// bucket, and a base taken from a stored keyframe holds that keyframe's
+    /// recorded peaks.
     ///
     /// Field 1: `base_keyframe`
     #[serde(
@@ -20098,7 +20188,8 @@ pub mod __buffa {
             /// Field 8: `volume`
             pub volume: ::buffa::RepeatedView<'a, i64>,
             /// Reference candle series in columnar form (same ordering as ts_sec: oldest-first).
-            /// Only populated when request.include_reference=true.
+            /// Only populated when request.include_reference=true. Reference rows are
+            /// always closed buckets, also with include_incomplete=true.
             ///
             /// Field 9: `reference_ts_sec`
             pub reference_ts_sec: ::buffa::RepeatedView<'a, u64>,
@@ -20131,6 +20222,13 @@ pub mod __buffa {
             ///
             /// Field 16: `quote_volume`
             pub quote_volume: ::buffa::RepeatedView<'a, &'a str>,
+            /// Closed-bucket flags, oldest-first and aligned with ts_sec: true when the
+            /// bucket is closed; with include_incomplete=false every row is closed. With
+            /// include_incomplete=true, only the current open candle, appended last, is
+            /// false.
+            ///
+            /// Field 17: `is_closed`
+            pub is_closed: ::buffa::RepeatedView<'a, bool>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetCandlesColumnsResponseView<'a> {
@@ -20479,6 +20577,30 @@ pub mod __buffa {
                         )?;
                         view.quote_volume.push(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    17u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.is_closed
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.is_closed
+                                    .push(::buffa::types::decode_bool(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.is_closed.push(::buffa::types::decode_bool(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -20528,6 +20650,7 @@ pub mod __buffa {
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
+                    is_closed: self.is_closed.to_vec(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -20681,6 +20804,13 @@ pub mod __buffa {
                 }
                 for v in &self.quote_volume {
                     size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if !self.is_closed.is_empty() {
+                    let payload: u32 = self.is_closed.len() as u32
+                        * ::buffa::types::BOOL_ENCODED_LEN as u32;
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -20840,6 +20970,14 @@ pub mod __buffa {
                 for v in &self.quote_volume {
                     ::buffa::types::put_string_field(16u32, v, buf);
                 }
+                if !self.is_closed.is_empty() {
+                    let payload: u32 = self.is_closed.len() as u32
+                        * ::buffa::types::BOOL_ENCODED_LEN as u32;
+                    ::buffa::types::put_len_delimited_header(17u32, payload, buf);
+                    for &v in &self.is_closed {
+                        ::buffa::types::encode_bool(v, buf);
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -20962,6 +21100,9 @@ pub mod __buffa {
                 }
                 if !self.quote_volume.is_empty() {
                     __map.serialize_entry("quoteVolume", &*self.quote_volume)?;
+                }
+                if !self.is_closed.is_empty() {
+                    __map.serialize_entry("isClosed", &*self.is_closed)?;
                 }
                 __map.end()
             }
@@ -21126,7 +21267,8 @@ pub mod __buffa {
                 &self.0.reborrow().volume
             }
             /// Reference candle series in columnar form (same ordering as ts_sec: oldest-first).
-            /// Only populated when request.include_reference=true.
+            /// Only populated when request.include_reference=true. Reference rows are
+            /// always closed buckets, also with include_incomplete=true.
             ///
             /// Field 9: `reference_ts_sec`
             #[must_use]
@@ -21182,6 +21324,16 @@ pub mod __buffa {
             #[must_use]
             pub fn quote_volume(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
                 &self.0.reborrow().quote_volume
+            }
+            /// Closed-bucket flags, oldest-first and aligned with ts_sec: true when the
+            /// bucket is closed; with include_incomplete=false every row is closed. With
+            /// include_incomplete=true, only the current open candle, appended last, is
+            /// false.
+            ///
+            /// Field 17: `is_closed`
+            #[must_use]
+            pub fn is_closed(&self) -> &::buffa::RepeatedView<'_, bool> {
+                &self.0.reborrow().is_closed
             }
         }
         impl ::core::convert::From<
@@ -26844,7 +26996,7 @@ pub mod __buffa {
             ///
             /// Field 2: `interval`
             pub interval: ::buffa::EnumValue<super::super::HeatmapInterval>,
-            /// Top-N levels per side included in each bucket. Every tier except
+            /// Top-N levels per side that the returned chain replays. Every tier except
             /// DEPTH_5000, which is refused with INVALID_ARGUMENT.
             ///
             /// Field 3: `depth`
@@ -27297,7 +27449,7 @@ pub mod __buffa {
             pub fn interval(&self) -> ::buffa::EnumValue<super::super::HeatmapInterval> {
                 self.0.reborrow().interval
             }
-            /// Top-N levels per side included in each bucket. Every tier except
+            /// Top-N levels per side that the returned chain replays. Every tier except
             /// DEPTH_5000, which is refused with INVALID_ARGUMENT.
             ///
             /// Field 3: `depth`
@@ -28133,7 +28285,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// HeatmapKeyframe is a full-book snapshot anchor.
+        /// HeatmapKeyframe is the order book at one time, limited to the requested
+        /// depth: the top-N levels per side.
         /// Best bid, best ask and mid preserve the raw prices where available. For older
         /// historical buckets without recorded raw prices, they use the reconstructed
         /// price bins instead.
@@ -28155,13 +28308,13 @@ pub mod __buffa {
             ///
             /// Field 4: `mid_ticks`
             pub mid_ticks: i64,
-            /// Complete bid-side levels at the snapshot.
+            /// Top-N bid levels at the keyframe time.
             ///
             /// Field 5: `bids`
             pub bids: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapLevelsView<'a>,
             >,
-            /// Complete ask-side levels at the snapshot.
+            /// Top-N ask levels at the keyframe time.
             ///
             /// Field 6: `asks`
             pub asks: ::buffa::MessageFieldView<
@@ -28627,7 +28780,7 @@ pub mod __buffa {
             pub fn mid_ticks(&self) -> i64 {
                 self.0.reborrow().mid_ticks
             }
-            /// Complete bid-side levels at the snapshot.
+            /// Top-N bid levels at the keyframe time.
             ///
             /// Field 5: `bids`
             #[must_use]
@@ -28638,7 +28791,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().bids
             }
-            /// Complete ask-side levels at the snapshot.
+            /// Top-N ask levels at the keyframe time.
             ///
             /// Field 6: `asks`
             #[must_use]
@@ -28687,20 +28840,25 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// HeatmapDeltaBucket is one sparse update bucket containing both sides.
+        /// HeatmapDeltaBucket is one bucket's changes to the top-N view of both sides.
+        /// A level that enters the top N during the bucket appears with its quantity,
+        /// even when the bucket did not change it, for example after a better level
+        /// was deleted. A level that leaves the top N appears with quantity zero, even
+        /// when it still rests deeper in the book. Changes deeper than the top N are
+        /// omitted.
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapDeltaBucketView<'a> {
             /// Bucket start timestamp (seconds since epoch, UTC), aligned to `interval`.
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
-            /// Sparse bid-side level changes in this bucket.
+            /// Changes to the top-N bid levels in this bucket.
             ///
             /// Field 2: `bids`
             pub bids: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapDeltaLevelsView<'a>,
             >,
-            /// Sparse ask-side level changes in this bucket.
+            /// Changes to the top-N ask levels in this bucket.
             ///
             /// Field 3: `asks`
             pub asks: ::buffa::MessageFieldView<
@@ -29135,7 +29293,7 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// Sparse bid-side level changes in this bucket.
+            /// Changes to the top-N bid levels in this bucket.
             ///
             /// Field 2: `bids`
             #[must_use]
@@ -29146,7 +29304,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().bids
             }
-            /// Sparse ask-side level changes in this bucket.
+            /// Changes to the top-N ask levels in this bucket.
             ///
             /// Field 3: `asks`
             #[must_use]
@@ -29210,7 +29368,17 @@ pub mod __buffa {
             }
         }
         /// HeatmapLiveBucket is the canonical live payload for real-time heatmap updates.
-        /// It represents the latest state of one bucket (open or finalized).
+        /// It represents the latest state of one bucket (open or finalized). A bucket
+        /// can be published again after it was finalized, when later updates for it
+        /// arrive: the new payload holds every update of the bucket and a higher
+        /// book_seq_end. Keep the payload with the highest book_seq_end per ts_sec.
+        /// Finalized buckets are delivered at least once: the same finalized payload
+        /// can arrive more than once, for example after a service restart; keep the
+        /// highest book_seq_end per ts_sec. Updates of a bucket still open are best
+        /// effort; a later update or the final payload supersedes them. A market's
+        /// buckets are published here only once the service projects the market
+        /// live: a bucket that holds only earlier updates is history, available
+        /// through GetOrderbookHeatmap and never published live.
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapLiveBucketView<'a> {
             /// Numeric spot market identifier.
@@ -29226,7 +29394,8 @@ pub mod __buffa {
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
             /// True when this bucket is finalized; false for provisional updates to an
-            /// open bucket.
+            /// open bucket. A finalized bucket can still be republished with a higher
+            /// book_seq_end.
             ///
             /// Field 4: `is_final`
             pub is_final: bool,
@@ -29822,7 +29991,8 @@ pub mod __buffa {
                 self.0.reborrow().ts_sec
             }
             /// True when this bucket is finalized; false for provisional updates to an
-            /// open bucket.
+            /// open bucket. A finalized bucket can still be republished with a higher
+            /// book_seq_end.
             ///
             /// Field 4: `is_final`
             #[must_use]
@@ -29921,11 +30091,24 @@ pub mod __buffa {
             }
         }
         /// HeatmapDeltaChain is the historical payload for all intervals.
-        /// Reconstruct by applying deltas over base_keyframe.
-        /// Deltas are ordered oldest-first by ts_sec.
+        /// Reconstruct by applying deltas over base_keyframe, oldest first: set each
+        /// listed level's quantity, and delete it when the quantity is zero. After each
+        /// bucket the result is exactly the top-N levels per side of the requested
+        /// depth and quantity mode, the same at every page limit. No further clipping
+        /// is needed.
+        /// - CLOSE: the order book at the bucket's close. It equals the base_keyframe
+        ///   of a chain anchored at that bucket.
+        /// - PEAK: each price's highest quantity during the bucket, among the prices
+        ///   that held liquidity during it.
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapDeltaChainView<'a> {
-            /// Full-book snapshot from which to apply the returned deltas.
+            /// Top-N order book from which to apply the returned deltas, from strictly
+            /// before the first of them. In CLOSE mode it holds closing quantities. In
+            /// PEAK mode it is only the starting point of the replay, not a bucket view:
+            /// its quantities may differ between page limits, so do not render it as a
+            /// bucket. A base advanced through stored buckets holds the peaks of its last
+            /// bucket, and a base taken from a stored keyframe holds that keyframe's
+            /// recorded peaks.
             ///
             /// Field 1: `base_keyframe`
             pub base_keyframe: ::buffa::MessageFieldView<
@@ -30238,7 +30421,13 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Full-book snapshot from which to apply the returned deltas.
+            /// Top-N order book from which to apply the returned deltas, from strictly
+            /// before the first of them. In CLOSE mode it holds closing quantities. In
+            /// PEAK mode it is only the starting point of the replay, not a bucket view:
+            /// its quantities may differ between page limits, so do not render it as a
+            /// bucket. A base advanced through stored buckets holds the peaks of its last
+            /// bucket, and a base taken from a stored keyframe holds that keyframe's
+            /// recorded peaks.
             ///
             /// Field 1: `base_keyframe`
             #[must_use]

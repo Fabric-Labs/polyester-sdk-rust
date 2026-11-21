@@ -439,6 +439,12 @@ pub trait LedgerReadService: Send + Sync + 'static {
     > + Send;
     /// Retrieve the latest balances for an account.
     /// Supports optional subaccount scoping and returns asset symbols with decimal amounts on REST.
+    /// The answer reflects every balance update published before the call
+    /// began (across an ownership move, its earlier Trading transfers: see
+    /// BalanceUpdate), and its Trading values are one atomic cut at the
+    /// position it returns. When it cannot answer so yet, the call fails with UNAVAILABLE
+    /// (503); retry it with a short backoff. Each call costs 1 unit of the
+    /// trading_read rate-limit class, whatever the number of assets.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
