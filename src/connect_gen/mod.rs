@@ -21,6 +21,7 @@ pub mod marketoverview;
 pub mod notifications;
 pub mod orderbook;
 pub mod orders;
+pub mod pnl;
 pub mod ratelimit;
 pub mod rewards;
 pub mod strategies;

@@ -21,6 +21,7 @@ pub mod marketoverview;
 pub mod notifications;
 pub mod orderbook;
 pub mod orders;
+pub mod pnl;
 pub mod polyester;
 pub mod privatews;
 pub mod ratelimit;

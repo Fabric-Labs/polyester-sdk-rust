@@ -134,7 +134,7 @@ type PublicationDecoder =
 fn publication_decoders() -> Vec<(&'static str, PublicationDecoder)> {
     use polyester::codecs::decode::{
         account_identity_from_bytes, address_book_invalidation_from_bytes, api_key_from_bytes,
-        api_policy_from_bytes, asset_balance_from_bytes, candle_point_from_bytes,
+        api_policy_from_bytes, balance_update_from_bytes, candle_point_from_bytes,
         flow_detail_from_bytes, flow_summary_from_bytes, heatmap_live_bucket_from_bytes,
         ledger_transfer_batch_from_bytes, market_overview_batch_from_bytes,
         market_trade_batch_from_bytes, orderbook_delta_from_bytes, subaccount_from_bytes,
@@ -153,7 +153,7 @@ fn publication_decoders() -> Vec<(&'static str, PublicationDecoder)> {
 
     vec![
         decoder!("user_trade_batch", user_trade_batch_from_bytes),
-        decoder!("asset_balance", asset_balance_from_bytes),
+        decoder!("balance_update", balance_update_from_bytes),
         decoder!("ledger_transfer_batch", ledger_transfer_batch_from_bytes),
         decoder!("trigger", trigger_from_bytes),
         decoder!("trigger_event_batch", trigger_event_batch_from_bytes),
@@ -6164,9 +6164,12 @@ async fn l2_subaccount_get_requests_and_parses_balances_only_when_asked() {
                         ..Default::default()
                     }
                     .into(),
-                    trading_revision: 3,
+                    funding_revision: 3,
                     ..Default::default()
                 }],
+                trading_epoch: 9,
+                trading_sequence: 4,
+                trading_applied_through_ts_ns: 1_767_225_600_123_456_789,
                 ..Default::default()
             }
             .into();
@@ -6194,7 +6197,13 @@ async fn l2_subaccount_get_requests_and_parses_balances_only_when_asked() {
     assert_eq!(format_ledger_u128(&row.trading, 18).unwrap(), "1.5");
     assert_eq!(format_ledger_u128(&row.available, 18).unwrap(), "1.5");
     assert_eq!((row.funding.as_str(), row.reserved.as_str()), ("0", "0"));
-    assert_eq!((row.trading_revision, row.funding_revision), (3, 0));
+    assert_eq!(row.funding_revision, 3);
+    assert_eq!(balances.trading_epoch.get(), 9);
+    assert_eq!(balances.trading_sequence, 4);
+    assert_eq!(
+        balances.trading_applied_through_ts_ns,
+        1_767_225_600_123_456_789
+    );
     assert_eq!(with.subaccount.unwrap().label, "desk");
 
     let without = client
