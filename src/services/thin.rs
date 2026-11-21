@@ -716,9 +716,7 @@ impl SubAccountsService {
         };
         let mut result = get_subaccount_from_proto(&resp)?;
         result.balances = if opts.include_balances {
-            Some(result.balances.unwrap_or(crate::models::BalancesList {
-                balances: Vec::new(),
-            }))
+            Some(result.balances.unwrap_or_default())
         } else {
             None
         };

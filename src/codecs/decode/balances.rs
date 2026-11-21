@@ -5,14 +5,15 @@ use crate::codecs::decode::money::decode_asset_amount_u128;
 use crate::codecs::scalars::{LEDGER_SCALE, format_uint64_id, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
-    AssetBalance, BalanceHistory, BalanceHistorySeries, BalancesList, LedgerTransfer, TransferSide,
-    TransfersList,
+    AssetBalance, BalanceHistory, BalanceHistorySeries, BalanceUpdate, BalanceUpdateAccount,
+    BalanceUpdateAsset, BalancesList, LedgerTransfer, TradingEpoch, TransferSide, TransfersList,
 };
 use crate::proto::ledger::read::v1::{
-    AssetBalance as ProtoAssetBalance, BalanceRange, GetBalanceHistoryResponse,
-    GetBalancesResponse, ListTransfersResponse, TransferRow, TransferSide as ProtoTransferSide,
-    TransferSideKind,
+    AssetBalance as ProtoAssetBalance, BalanceRange, BalanceUpdate as ProtoBalanceUpdate,
+    GetBalanceHistoryResponse, GetBalancesResponse, ListTransfersResponse, TransferRow,
+    TransferSide as ProtoTransferSide, TransferSideKind,
 };
+use crate::proto::ledger::v1::AccountCode;
 use crate::proto::polyester::r#type::v1::U128;
 use crate::types::QuantityDomain;
 
@@ -43,7 +44,6 @@ pub fn asset_balance_from_proto(msg: &ProtoAssetBalance) -> AssetBalance {
         funding: u128_field(msg.funding.as_option()),
         reserved: u128_field(msg.reserved.as_option()),
         available: u128_field(msg.available.as_option()),
-        trading_revision: msg.trading_revision,
         funding_revision: msg.funding_revision,
     }
 }
@@ -51,6 +51,48 @@ pub fn asset_balance_from_proto(msg: &ProtoAssetBalance) -> AssetBalance {
 pub fn balances_list_from_proto(msg: &GetBalancesResponse) -> BalancesList {
     BalancesList {
         balances: msg.balances.iter().map(asset_balance_from_proto).collect(),
+        trading_epoch: TradingEpoch::new(msg.trading_epoch),
+        trading_sequence: msg.trading_sequence,
+        trading_applied_through_ts_ns: msg.trading_applied_through_ts_ns,
+    }
+}
+
+fn optional_u128(msg: Option<&U128>) -> Option<String> {
+    msg.map(|u| u128_to_str(u.hi, u.lo))
+}
+
+fn balance_update_asset_from_proto(msg: &ProtoAssetBalance) -> BalanceUpdateAsset {
+    BalanceUpdateAsset {
+        asset_id: msg.asset_id,
+        trading: optional_u128(msg.trading.as_option()),
+        reserved: optional_u128(msg.reserved.as_option()),
+        available: optional_u128(msg.available.as_option()),
+        funding: optional_u128(msg.funding.as_option()),
+        funding_revision: msg.funding_revision,
+    }
+}
+
+/// Decode one balance stream publication as it is, with no buffering or
+/// reordering: an unknown `account` value is kept as
+/// [`BalanceUpdateAccount::Unknown`] instead of failing the stream.
+pub fn balance_update_from_proto(msg: &ProtoBalanceUpdate) -> BalanceUpdate {
+    let account = match msg.account.as_known() {
+        Some(AccountCode::TRADING) => BalanceUpdateAccount::Trading,
+        Some(AccountCode::FUNDING) => BalanceUpdateAccount::Funding,
+        _ => BalanceUpdateAccount::Unknown(msg.account.to_i32()),
+    };
+    BalanceUpdate {
+        account,
+        trading_epoch: TradingEpoch::new(msg.trading_epoch),
+        trading_sequence: msg.trading_sequence,
+        complete: msg.complete,
+        balances: msg
+            .balances
+            .iter()
+            .map(balance_update_asset_from_proto)
+            .collect(),
+        transfers: msg.transfers.iter().map(transfer_row_from_proto).collect(),
+        trading_applied_through_ts_ns: msg.trading_applied_through_ts_ns,
     }
 }
 
@@ -201,6 +243,7 @@ pub fn transfer_row_from_proto(msg: &TransferRow) -> LedgerTransfer {
         transfer_type: msg.transfer_code.to_i32(),
         account_code: msg.account_code.to_i32(),
         timestamp: msg.ts_us as i64,
+        ts_ns: msg.ts_ns,
         tx_id: msg.flow_id.clone(),
         is_debit: msg.is_debit,
         source: transfer_side_from_proto(msg.source.as_option()),
@@ -250,18 +293,24 @@ mod tests {
                     ..Default::default()
                 }
                 .into(),
-                trading_revision: u64::MAX - 2,
                 funding_revision: u64::MAX - 1,
                 ..Default::default()
             }],
+            trading_epoch: u64::MAX,
+            trading_sequence: u64::MAX - 2,
+            trading_applied_through_ts_ns: u64::MAX - 3,
             ..Default::default()
         };
         let list = balances_list_from_proto(&msg);
         assert_eq!(list.balances.len(), 1);
         assert_eq!(list.balances[0].asset_id, 7);
         assert_eq!(list.balances[0].trading, "500");
-        assert_eq!(list.balances[0].trading_revision, u64::MAX - 2);
         assert_eq!(list.balances[0].funding_revision, u64::MAX - 1);
+        // The position keeps every bit of its unsigned 64-bit values.
+        assert_eq!(list.trading_epoch, TradingEpoch::new(u64::MAX));
+        assert_eq!(list.trading_epoch.get(), u64::MAX);
+        assert_eq!(list.trading_sequence, u64::MAX - 2);
+        assert_eq!(list.trading_applied_through_ts_ns, u64::MAX - 3);
 
         // M5: 1e18 ledger integer must stay as the scaled string (not re-scaled to "1").
         let one_e18 = GetBalancesResponse {
@@ -279,6 +328,105 @@ mod tests {
         };
         let list = balances_list_from_proto(&one_e18);
         assert_eq!(list.balances[0].trading, "1000000000000000000");
+    }
+
+    #[test]
+    fn balances_list_without_a_position_reads_zero() {
+        let list = balances_list_from_proto(&GetBalancesResponse::default());
+        assert!(list.balances.is_empty());
+        assert_eq!(list.trading_epoch, TradingEpoch::default());
+        assert_eq!(
+            (list.trading_sequence, list.trading_applied_through_ts_ns),
+            (0, 0)
+        );
+    }
+
+    /// A TRADING update keeps its position, its Trading fields and its
+    /// transfer legs; the Funding fields it leaves unset read `None`, not 0.
+    #[test]
+    fn trading_balance_update_keeps_position_fields_and_legs() {
+        let msg = ProtoBalanceUpdate {
+            account: AccountCode::TRADING.into(),
+            trading_epoch: 4_294_967_303,
+            trading_sequence: 43,
+            complete: true,
+            trading_applied_through_ts_ns: 1_767_225_600_123_456_789,
+            balances: vec![ProtoAssetBalance {
+                asset_id: 2,
+                trading: u128(250).into(),
+                reserved: U128::default().into(),
+                available: u128(250).into(),
+                ..Default::default()
+            }],
+            transfers: vec![TransferRow {
+                asset_id: 2,
+                amount_e18: u128(25).into(),
+                transfer_id: "340282366920938463463374607431768211455".into(),
+                ts_us: 1_767_225_600_123_456,
+                ts_ns: 1_767_225_600_123_456_789,
+                is_debit: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let update = balance_update_from_proto(&msg);
+        assert_eq!(update.account, BalanceUpdateAccount::Trading);
+        assert_eq!(update.trading_epoch.get(), 4_294_967_303);
+        assert_eq!(update.trading_sequence, 43);
+        assert!(update.complete);
+        assert_eq!(
+            update.trading_applied_through_ts_ns,
+            1_767_225_600_123_456_789
+        );
+        assert_eq!(
+            update.balances,
+            vec![BalanceUpdateAsset {
+                asset_id: 2,
+                trading: Some("250".into()),
+                reserved: Some("0".into()),
+                available: Some("250".into()),
+                funding: None,
+                funding_revision: 0,
+            }]
+        );
+        let leg = &update.transfers[0];
+        assert_eq!(leg.ts_ns, 1_767_225_600_123_456_789);
+        assert_eq!(leg.timestamp, 1_767_225_600_123_456);
+        assert_eq!(leg.transfer_id, "340282366920938463463374607431768211455");
+        assert!(leg.is_debit);
+    }
+
+    /// A FUNDING update has no position: its Trading fields read `None`.
+    /// An account value this SDK does not know is kept, not refused.
+    #[test]
+    fn funding_and_unknown_balance_updates_decode() {
+        let funding = balance_update_from_proto(&ProtoBalanceUpdate {
+            account: AccountCode::FUNDING.into(),
+            balances: vec![ProtoAssetBalance {
+                asset_id: 1,
+                funding: u128(1_000_500_000_000_000_000_000).into(),
+                funding_revision: 81,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(funding.account, BalanceUpdateAccount::Funding);
+        assert_eq!(funding.trading_epoch, TradingEpoch::default());
+        assert_eq!(funding.trading_sequence, 0);
+        assert!(funding.transfers.is_empty());
+        let asset = &funding.balances[0];
+        assert_eq!(asset.funding.as_deref(), Some("1000500000000000000000"));
+        assert_eq!(asset.funding_revision, 81);
+        assert_eq!(
+            (&asset.trading, &asset.reserved, &asset.available),
+            (&None, &None, &None)
+        );
+
+        let unknown = balance_update_from_proto(&ProtoBalanceUpdate {
+            account: buffa::EnumValue::from(999),
+            ..Default::default()
+        });
+        assert_eq!(unknown.account, BalanceUpdateAccount::Unknown(999));
     }
 
     fn u128(value: u128) -> U128 {
