@@ -22,6 +22,7 @@ use crate::services::{
 };
 use crate::transport::{
     Config as TransportConfig, DEFAULT_API_URL, DEFAULT_WS_URL, Factory, WireFormat,
+    validate_http_url, validate_ws_url,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -195,7 +196,16 @@ fn catalog_timeout(config: &Config) -> Result<Duration> {
     }
 }
 
-fn resolve_environment(config: &Config) -> Result<(PolyesterEnvironment, String, String)> {
+/// The environment a client uses, the API and websocket URLs it connects to,
+/// and whether those URLs may be plaintext on a remote host.
+struct ResolvedEnvironment {
+    environment: PolyesterEnvironment,
+    api_url: String,
+    ws_url: String,
+    allow_insecure_http: bool,
+}
+
+fn resolve_environment(config: &Config) -> Result<ResolvedEnvironment> {
     let resolved = match &config.environment {
         Some(env) => parse_polyester_environment(env)?,
         None => POLYESTER_DEVNET_ENVIRONMENT.clone(),
@@ -214,13 +224,36 @@ fn resolve_environment(config: &Config) -> Result<(PolyesterEnvironment, String,
     } else {
         config.ws_url.clone()
     };
-    Ok((resolved, api_url, ws_url))
+    // An environment created with the plaintext opt-in keeps it, and its own
+    // URLs connect with it. A URL the config overrides gets only the config's
+    // `allow_insecure_http`, checked here since the transport sees one flag.
+    let allow_insecure_http = config.allow_insecure_http
+        || (resolved.allow_insecure && {
+            if api_url != resolved.api_url {
+                validate_http_url(&api_url, false)?;
+            }
+            if ws_url != resolved.websocket_url {
+                validate_ws_url(&ws_url, false)?;
+            }
+            true
+        });
+    Ok(ResolvedEnvironment {
+        environment: resolved,
+        api_url,
+        ws_url,
+        allow_insecure_http,
+    })
 }
 
 impl Client {
     pub fn new(config: Config) -> Result<Self> {
         let hydrate_catalogs_enabled = config.hydrate_catalogs;
-        let (environment, api_url, ws_url) = resolve_environment(&config)?;
+        let ResolvedEnvironment {
+            environment,
+            api_url,
+            ws_url,
+            allow_insecure_http,
+        } = resolve_environment(&config)?;
         let credentials = Credentials::load(
             config.api_key_id.as_deref(),
             config.api_private_key.as_deref(),
@@ -232,7 +265,7 @@ impl Client {
             ws_url: ws_url.clone(),
             timeout: config.timeout,
             wire_format: config.wire_format,
-            allow_insecure_http: config.allow_insecure_http,
+            allow_insecure_http,
             recv_window_ms: config.recv_window_ms,
         };
         let factory = Factory::new(transport_cfg, credentials.clone())?;
@@ -245,7 +278,7 @@ impl Client {
             None,
             config.timeout,
         )
-        .allow_insecure_http(config.allow_insecure_http);
+        .allow_insecure_http(allow_insecure_http);
 
         let catalog_ready = Arc::new(OnceCell::new());
         let catalog_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
@@ -342,7 +375,12 @@ impl Client {
             config.ws_url = url;
         }
         config.allow_insecure_http = crate::transport::env_allow_insecure_http();
-        let (environment, api_url, ws_url) = resolve_environment(&config)?;
+        let ResolvedEnvironment {
+            environment,
+            api_url,
+            ws_url,
+            allow_insecure_http,
+        } = resolve_environment(&config)?;
         // Force from_env credential loading
         let credentials = Credentials::load(None, None, true)?;
         let transport_cfg = TransportConfig {
@@ -350,7 +388,7 @@ impl Client {
             ws_url: ws_url.clone(),
             timeout: config.timeout,
             wire_format: config.wire_format,
-            allow_insecure_http: config.allow_insecure_http,
+            allow_insecure_http,
             recv_window_ms: config.recv_window_ms,
         };
         let factory = Factory::new(transport_cfg, credentials.clone())?;
@@ -362,7 +400,7 @@ impl Client {
             None,
             config.timeout,
         )
-        .allow_insecure_http(config.allow_insecure_http);
+        .allow_insecure_http(allow_insecure_http);
         let catalog_ready = Arc::new(OnceCell::new());
         let catalog_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
         let catalog_last_error = Arc::new(std::sync::Mutex::new(None));
@@ -975,6 +1013,106 @@ mod tests {
             ..Default::default()
         })
         .expect("insecure opt-in");
+    }
+
+    /// Devnet with plaintext API and websocket URLs on a private, non-loopback
+    /// host, as a VPC endpoint whose TLS terminates elsewhere has.
+    fn plaintext_vpc_params(allow_insecure: bool) -> crate::CreatePolyesterEnvironmentParams {
+        let d = crate::POLYESTER_DEVNET_ENVIRONMENT.clone();
+        crate::CreatePolyesterEnvironmentParams {
+            name: d.name,
+            api_url: "http://10.0.0.5:8080".into(),
+            websocket_url: "ws://10.0.0.5:8080".into(),
+            rpc_url: d.rpc_url,
+            chain_id: d.chain_id,
+            chain_name: d.chain_name,
+            explorer_url: d.explorer_url,
+            account_abstraction: d.account_abstraction,
+            contracts: d.contracts,
+            allow_insecure,
+        }
+    }
+
+    #[test]
+    fn client_accepts_environment_created_with_allow_insecure() {
+        let env = crate::create_polyester_environment(plaintext_vpc_params(true)).expect("env");
+        assert!(env.allow_insecure, "the environment keeps the opt-in");
+        let client = Client::new(Config {
+            environment: Some(env.clone()),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .expect("client for an environment created with allow_insecure");
+        assert_eq!(client.api_url, "http://10.0.0.5:8080");
+        assert_eq!(client.ws_url, "ws://10.0.0.5:8080");
+        assert!(client.environment.allow_insecure);
+
+        // A copy keeps the opt-in of the environment it copies.
+        let moved = env
+            .with_urls(
+                Some("http://10.0.0.6:8080"),
+                Some("ws://10.0.0.6:8080"),
+                None,
+            )
+            .expect("with_urls on an opted-in environment");
+        assert!(moved.allow_insecure);
+        Client::new(Config {
+            environment: Some(moved),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .expect("client for the with_urls copy");
+    }
+
+    #[test]
+    fn client_refuses_remote_plaintext_environment_without_opt_in() {
+        let err = crate::create_polyester_environment(plaintext_vpc_params(false))
+            .expect_err("remote plaintext without the opt-in");
+        assert!(matches!(err, Error::Validation(_)), "{err}");
+        assert!(
+            crate::POLYESTER_DEVNET_ENVIRONMENT
+                .with_urls(Some("http://10.0.0.5:8080"), None, None)
+                .is_err()
+        );
+
+        // Built without the opt-in, by setting the URLs on the struct.
+        let mut env = crate::POLYESTER_DEVNET_ENVIRONMENT.clone();
+        env.api_url = "http://10.0.0.5:8080".into();
+        env.websocket_url = "ws://10.0.0.5:8080".into();
+        let err = match Client::new(Config {
+            environment: Some(env),
+            hydrate_catalogs: false,
+            ..Default::default()
+        }) {
+            Ok(_) => panic!("remote plaintext environment without the opt-in"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, Error::Validation(_)), "{err}");
+    }
+
+    #[test]
+    fn environment_opt_in_does_not_cover_config_url_overrides() {
+        let env = crate::create_polyester_environment(plaintext_vpc_params(true)).expect("env");
+        let err = match Client::new(Config {
+            environment: Some(env.clone()),
+            api_url: "http://api.example.test".into(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        }) {
+            Ok(_) => panic!("plaintext api_url override without allow_insecure_http"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, Error::Validation(_)), "{err}");
+        let err = match Client::new(Config {
+            environment: Some(env),
+            ws_url: "ws://api.example.test".into(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        }) {
+            Ok(_) => panic!("plaintext ws_url override without allow_insecure_http"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, Error::Validation(_)), "{err}");
     }
 
     #[test]
