@@ -1,10 +1,10 @@
 //! ERC-4337 EntryPoint v0.7 Safe UserOperation helpers (Pimlico-compatible).
 
 use alloy_primitives::{Address, B256, Bytes, U256, keccak256};
-use alloy_sol_types::{SolCall, SolStruct, eip712_domain, sol};
+use alloy_sol_types::{SolCall, SolStruct, SolValue, eip712_domain, sol};
 use k256::ecdsa::SigningKey;
 use serde_json::{Value, json};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::chain::calldata::ChainCall;
 use crate::chain::environment::{POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment};
@@ -190,6 +190,61 @@ fn decode_hex_bytes(value: &str) -> Result<Vec<u8>> {
         return Ok(Vec::new());
     }
     hex::decode(hex).map_err(|e| Error::transport(format!("invalid hex bytes: {e}")))
+}
+
+/// Whether `error` is a JSON-RPC error answer whose code proves a refusal
+/// (see [`Error::JsonRpc`]). An HTTP error, a timeout, a malformed answer, or
+/// an error object whose code is not a refusal code proves nothing about the
+/// call's outcome.
+fn is_jsonrpc_refusal(error: &Error) -> bool {
+    matches!(error, Error::JsonRpc { method, code, .. }
+        if crate::errors::is_jsonrpc_refusal_code(method, *code))
+}
+
+fn outcome_unknown(user_operation_hash: &str, source: Error) -> Error {
+    Error::UserOperationOutcomeUnknown {
+        user_operation_hash: user_operation_hash.to_owned(),
+        source: Box::new(source),
+    }
+}
+
+/// EntryPoint v0.7 `getUserOpHash` of a UserOperation, as a 0x hex string.
+#[allow(clippy::too_many_arguments)]
+fn user_operation_hash(
+    environment: &PolyesterChainEnvironment,
+    sender: &str,
+    nonce: U256,
+    init_code: &[u8],
+    call_data: &[u8],
+    call_gas_limit: u64,
+    verification_gas_limit: u64,
+    pre_verification_gas: u64,
+    max_fee_per_gas: u64,
+    max_priority_fee_per_gas: u64,
+    paymaster_and_data: &[u8],
+) -> Result<String> {
+    let word = |hi: u64, lo: u64| B256::from((U256::from(hi) << 128) | U256::from(lo));
+    let packed = (
+        parse_address(sender)?,
+        nonce,
+        keccak256(init_code),
+        keccak256(call_data),
+        word(verification_gas_limit, call_gas_limit),
+        U256::from(pre_verification_gas),
+        word(max_priority_fee_per_gas, max_fee_per_gas),
+        keccak256(paymaster_and_data),
+    )
+        .abi_encode();
+    let entry_point = parse_address(&environment.account_abstraction.entry_point.address)?;
+    let hash = keccak256(
+        (
+            keccak256(packed),
+            entry_point,
+            U256::from(environment.chain_id),
+        )
+            .abi_encode(),
+    );
+    Ok(encode_hex(hash.as_slice()))
 }
 
 /// EIP-712 SafeOp signature packed as uint48/uint48/bytes (single EOA owner).
@@ -529,35 +584,97 @@ impl PolyesterSmartAccount {
             final_op["paymasterData"] = json!(encode_hex(&pm_data_bytes));
         }
 
-        let user_op_hash = self
+        // The hash is known before sending: once the send is attempted, every
+        // failure names it, so the caller waits on it instead of signing again.
+        let computed_hash = user_operation_hash(
+            &self.environment,
+            &self.address,
+            nonce,
+            &init_code,
+            &call_data,
+            call_gas,
+            verification_gas,
+            pre_verification,
+            max_fee,
+            max_prio,
+            &paymaster_and_data,
+        )?;
+        let accepted = match self
             .bundler
             .request("eth_sendUserOperation", json!([final_op, entry_point]))
-            .await?;
-        let hash = user_op_hash
+            .await
+        {
+            Ok(accepted) => accepted,
+            // The bundler refused it: nothing was accepted.
+            Err(error) if is_jsonrpc_refusal(&error) => return Err(error),
+            Err(error) => return Err(outcome_unknown(&computed_hash, error)),
+        };
+        // The computed hash is the operation's identity: an answer that names
+        // another one (or none) does not say what the bundler holds.
+        if !accepted
             .as_str()
-            .ok_or_else(|| Error::transport("eth_sendUserOperation returned non-string"))?
-            .to_string();
-        if !wait {
-            return Ok(SendCallsResult::Hash(hash));
+            .is_some_and(|hash| hash.eq_ignore_ascii_case(&computed_hash))
+        {
+            let answered: String = accepted.to_string().chars().take(80).collect();
+            return Err(outcome_unknown(
+                &computed_hash,
+                Error::transport(format!(
+                    "eth_sendUserOperation answered {answered}, not the operation's hash {computed_hash}"
+                )),
+            ));
         }
-        Ok(SendCallsResult::Receipt(
-            self.wait_for_receipt(&hash, receipt_timeout, Duration::from_secs(1))
-                .await?,
-        ))
+        if !wait {
+            return Ok(SendCallsResult::Hash(computed_hash));
+        }
+        match self
+            .wait_for_receipt(&computed_hash, receipt_timeout, Duration::from_secs(1))
+            .await
+        {
+            Ok(receipt) => Ok(SendCallsResult::Receipt(receipt)),
+            Err(error) => Err(outcome_unknown(&computed_hash, error)),
+        }
     }
 
+    /// Poll the bundler for a UserOperation's receipt until `timeout` passes.
+    ///
+    /// `timeout` bounds the whole wait: every request and every pause ends by
+    /// then. A poll that fails without a JSON-RPC refusal (an HTTP error such
+    /// as 503, a timeout or a transport error) is retried until the deadline,
+    /// and the deadline's error names the last such failure. Fails at once
+    /// when the bundler reports the operation rejected. An error means no
+    /// receipt was read in time, not that the operation will not execute.
     pub async fn wait_for_receipt(
         &self,
         user_operation_hash: &str,
         timeout: Duration,
         poll_interval: Duration,
     ) -> Result<UserOperationReceipt> {
-        let deadline = Instant::now() + timeout;
-        while Instant::now() < deadline {
-            let raw = self
-                .bundler
-                .request("eth_getUserOperationReceipt", json!([user_operation_hash]))
-                .await?;
+        let deadline = tokio::time::Instant::now() + timeout;
+        let pause =
+            || tokio::time::sleep_until(deadline.min(tokio::time::Instant::now() + poll_interval));
+        let mut last_error: Option<Error> = None;
+        while tokio::time::Instant::now() < deadline {
+            let receipt = tokio::time::timeout_at(
+                deadline,
+                self.bundler
+                    .request("eth_getUserOperationReceipt", json!([user_operation_hash])),
+            )
+            .await
+            .unwrap_or_else(|_| {
+                Err(Error::transport(
+                    "jsonrpc timeout calling eth_getUserOperationReceipt",
+                ))
+            });
+            let raw = match receipt {
+                Ok(raw) => raw,
+                Err(error) if is_jsonrpc_refusal(&error) => return Err(error),
+                Err(error) => {
+                    last_error = Some(error);
+                    pause().await;
+                    continue;
+                }
+            };
+            last_error = None;
             if !raw.is_null() {
                 let receipt = raw.get("receipt").cloned().unwrap_or(Value::Null);
                 let success = raw
@@ -585,24 +702,33 @@ impl PolyesterSmartAccount {
                     raw,
                 });
             }
-            if let Ok(status) = self
-                .bundler
-                .request(
+            if let Ok(Ok(status)) = tokio::time::timeout_at(
+                deadline,
+                self.bundler.request(
                     "pimlico_getUserOperationStatus",
                     json!([user_operation_hash]),
-                )
-                .await
+                ),
+            )
+            .await
                 && status.get("status").and_then(|v| v.as_str()) == Some("rejected")
             {
                 return Err(Error::transport(format!(
                     "bundler rejected UserOperation {user_operation_hash}: {status}"
                 )));
             }
-            tokio::time::sleep(poll_interval).await;
+            pause().await;
         }
-        Err(Error::transport(format!(
-            "timed out waiting for UserOperation receipt {user_operation_hash}"
-        )))
+        let error = Error::transport(format!(
+            "timed out waiting for UserOperation receipt {user_operation_hash}{}",
+            last_error
+                .as_ref()
+                .map(|error| format!(": {error}"))
+                .unwrap_or_default()
+        ));
+        Err(match last_error.and_then(|error| error.answer().cloned()) {
+            Some(answer) => error.with_answer(answer),
+            None => error,
+        })
     }
 }
 
@@ -672,6 +798,52 @@ mod tests {
     fn gas_buffer_applies_percent_when_larger() {
         // 20% of 1_000_000 = 200_000 > 50_000
         assert_eq!(add_user_operation_gas_buffer(1_000_000), 1_200_000);
+    }
+
+    #[test]
+    fn user_operation_hash_matches_entry_point_v07() {
+        // Reference values: viem getUserOperationHash, entryPointVersion "0.7".
+        let mut environment = POLYESTER_DEVNET_ENVIRONMENT.clone();
+        environment.chain_id = 31337;
+        environment.account_abstraction.entry_point.address =
+            "0x0000000071727De22E5E9d8BAf0edAc6f37da032".into();
+        let nonce = (U256::from(123_456_789u64) << 64) | U256::from(7u64);
+        let factory_init_code = [vec![0x22; 20], vec![0xde, 0xad, 0xbe, 0xef]].concat();
+        let paymaster_and_data = pack_paymaster_and_data(
+            Some("0x3333333333333333333333333333333333333333"),
+            60_000,
+            100_000,
+            &[0x12, 0x34],
+        )
+        .unwrap();
+        for (init_code, paymaster_and_data, expected) in [
+            (
+                factory_init_code.as_slice(),
+                paymaster_and_data.as_slice(),
+                "0xec0c13a94cb1a6c84a85cf970fe0ce14164dbb8c24db022e46315ed4631aa9cd",
+            ),
+            (
+                &[][..],
+                &[][..],
+                "0x3a04aade54da78403e340bc7112c76296af9658ec85525ceb7ad9f18021e6c85",
+            ),
+        ] {
+            let hash = user_operation_hash(
+                &environment,
+                "0x1111111111111111111111111111111111111111",
+                nonce,
+                init_code,
+                &[0xab, 0xcd, 0xef, 0x01],
+                100_000,
+                200_000,
+                50_000,
+                3_000_000_000,
+                1_000_000_000,
+                paymaster_and_data,
+            )
+            .unwrap();
+            assert_eq!(hash, expected);
+        }
     }
 
     #[test]
