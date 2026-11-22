@@ -357,7 +357,12 @@ string or fragment. `ws_url` / `POLYESTER_WS_URL` must be `wss://` or `ws://`.
 Remote plaintext (`http://` / `ws://` to a non-loopback host) is rejected
 unless `Config::allow_insecure_http` is set, or `from_env` sees
 `POLYESTER_ALLOW_INSECURE_HTTP=1`. Loopback plaintext stays allowed for local
-tests.
+tests. An environment created with
+`CreatePolyesterEnvironmentParams::allow_insecure` (for a private endpoint
+whose TLS terminates elsewhere) keeps that opt-in in
+`PolyesterEnvironment::allow_insecure`, and `with_urls` copies it, so the
+client connects to that environment's own API and websocket URLs without
+`allow_insecure_http`. An `api_url` or `ws_url` set on `Config` still needs it.
 
 ### Choosing the account
 
