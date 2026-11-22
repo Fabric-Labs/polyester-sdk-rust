@@ -311,3 +311,44 @@ fn golden_vectors_cover_both_recovery_ids_and_published_anchors() {
         "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
     );
 }
+
+/// k256 0.14 reduces a prehash modulo the group order n before RFC 6979
+/// seeds the nonce, as RFC 6979 specifies; k256 0.13 seeded with the
+/// unreduced value. So for a prehash >= n (a keccak256 SafeOp hash is one
+/// with probability about 2^-128) the deterministic signature differs from
+/// earlier releases. Both are valid: each signature here verifies and
+/// recovers to the signer's key at the boundary.
+#[test]
+fn prehashes_at_the_group_order_sign_verifiably() {
+    use crate::k256::ecdsa::signature::hazmat::PrehashVerifier;
+    use crate::k256::ecdsa::{SigningKey, VerifyingKey};
+
+    const HALF_ORDER: &str = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0";
+    let signing_key = SigningKey::from_slice(&bytes(&SECP256K1_KEYS[0][2..])).unwrap(); // scalar 1
+    let verifying_key = signing_key.verifying_key();
+    for (name, prehash) in [
+        (
+            "n - 1",
+            "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
+        ),
+        (
+            "n",
+            "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+        ),
+        (
+            "n + 1",
+            "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364142",
+        ),
+    ] {
+        let prehash = bytes(prehash);
+        let (signature, recovery_id) = signing_key.sign_prehash_recoverable(&prehash);
+        verifying_key
+            .verify_prehash(&prehash, &signature)
+            .unwrap_or_else(|err| panic!("prehash {name}: {err}"));
+        let recovered = VerifyingKey::recover_from_prehash(&prehash, &signature, recovery_id)
+            .unwrap_or_else(|err| panic!("prehash {name}: {err}"));
+        assert_eq!(&recovered, verifying_key, "prehash {name}");
+        let s = hex::encode(&signature.to_bytes()[32..]);
+        assert!(s.as_str() <= HALF_ORDER, "prehash {name}: high s {s}");
+    }
+}
