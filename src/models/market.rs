@@ -8,7 +8,11 @@ use serde_json::Value;
 pub struct GetCandlesOpts {
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
-    /// Candle interval alias (`"1m"`, `"MIN_1"`, …). Default `"1m"` when empty.
+    /// Candle interval: a label (`"1s"`, `"1m"`, `"3m"`, `"5m"`, `"15m"`,
+    /// `"30m"`, `"1h"`, `"2h"`, `"4h"`, `"6h"`, `"8h"`, `"12h"`, `"1d"`,
+    /// `"3d"`, `"1w"`, `"1mo"`) or a `Timeframe` enum name (`"MIN_1"`, …),
+    /// exactly as written: `"1M"` is refused, not read as one minute. Default
+    /// `"1m"` when empty.
     pub timeframe: String,
     pub limit: Option<u32>,
     /// Inclusive lower bound (unix seconds UTC).

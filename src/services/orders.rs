@@ -1743,6 +1743,10 @@ impl OrdersService {
     /// `timeout_sec` is 10 to 120, or 0 to disarm the switch; any other value
     /// is a validation error before sending.
     ///
+    /// `None` arms the switch for every market; a blank `symbol` (empty or
+    /// whitespace-only) is a validation error before sending, never read as
+    /// every market.
+    ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value when retrying the same logical cancel-all-after.
     pub async fn cancel_all_after(
@@ -1785,6 +1789,10 @@ impl OrdersService {
                 Self::CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC,
             )));
         }
+        // A blank symbol would arm the switch for every market (and, with
+        // include_triggers, stop every trigger on every market when it
+        // fires): refused before any wait or request.
+        crate::catalogs::Manager::check_optional_symbol(opts.symbol.as_deref())?;
         if opts.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
@@ -1858,6 +1866,8 @@ impl OrdersService {
     pub async fn cancel_with(&self, params: CancelOrderParams) -> Result<OrderMutationResult> {
         // A targeted cancel without symbol metadata can route through the
         // order directory, so avoid waiting for catalogs in that case.
+        // A blank symbol is refused before any wait, as for every market filter.
+        crate::catalogs::Manager::check_optional_symbol(params.symbol.as_deref())?;
         if params.symbol_id.is_none() && params.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }

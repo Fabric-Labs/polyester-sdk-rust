@@ -485,6 +485,11 @@ pub struct CancelAllOrdersResult {
     /// when not provided, or `UNKNOWN(<number>)`. An empty listing on a retry
     /// does not mean nothing was canceled: read open orders for current state.
     pub listing_status: String,
+    /// When the server answered, in nanoseconds since the Unix epoch: the
+    /// contract's `ts_ns`, or `ts` when only that is sent; 0 when neither is.
+    /// A retry with the same `request_id` returns the original cancel-all's
+    /// time.
+    pub ts_ns: u64,
 }
 
 /// One order whose cancellation a cancel-all requested.
@@ -574,6 +579,10 @@ pub struct BatchCancelOrdersResult {
     pub results: Vec<BatchCancelResultItem>,
     pub accepted_count: u32,
     pub rejected_count: u32,
+    /// When the server answered the batch cancel, in nanoseconds since the
+    /// Unix epoch: the contract's `ts_ns`, or `ts` when only that is sent; 0
+    /// when neither is.
+    pub ts_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1042,6 +1051,10 @@ pub struct CancelAllAfterResult {
     /// The orders the armed switch cancels when it expires. `None` when the
     /// switch is disabled.
     pub effective_scope: Option<DeadManSwitchScope>,
+    /// When the server answered, in nanoseconds since the Unix epoch: the
+    /// contract's `ts_ns`, or `ts` when only that is sent; 0 when neither is.
+    /// Not the switch's expiry, which is `expires_at_ts_ns`.
+    pub ts_ns: u64,
 }
 
 /// The recorded scope of an armed dead-man switch. Expiry cancels working
