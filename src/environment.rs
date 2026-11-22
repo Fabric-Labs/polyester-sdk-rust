@@ -61,6 +61,11 @@ pub struct PolyesterEnvironment {
     pub explorer_url: String,
     pub account_abstraction: AccountAbstractionEnvironment,
     pub contracts: ContractsEnvironment,
+    /// The explicit opt-in to plaintext (`http://` or `ws://`) URLs on remote
+    /// hosts this environment was created with, so [`crate::Client::new`]
+    /// re-validates it, and connects to its URLs, with the same opt-in.
+    /// Loopback hosts never need it.
+    pub allow_insecure: bool,
 }
 
 /// Backward-compatible alias used by chain helpers.
@@ -78,6 +83,9 @@ pub struct CreatePolyesterEnvironmentParams {
     pub explorer_url: String,
     pub account_abstraction: AccountAbstractionEnvironment,
     pub contracts: ContractsEnvironment,
+    /// Accept plaintext (`http://` or `ws://`) URLs on remote hosts, for a
+    /// private endpoint whose TLS terminates elsewhere. The environment keeps
+    /// the opt-in.
     pub allow_insecure: bool,
 }
 
@@ -249,10 +257,12 @@ pub fn create_polyester_environment(
                 "contracts.zipper_endpoint_address",
             )?,
         },
+        allow_insecure: params.allow_insecure,
     })
 }
 
-/// Re-validate an environment supplied to a client constructor.
+/// Re-validate an environment supplied to a client constructor, with the
+/// plaintext opt-in it was created with.
 pub fn parse_polyester_environment(
     environment: &PolyesterEnvironment,
 ) -> Result<PolyesterEnvironment> {
@@ -266,12 +276,15 @@ pub fn parse_polyester_environment(
         explorer_url: environment.explorer_url.clone(),
         account_abstraction: environment.account_abstraction.clone(),
         contracts: environment.contracts.clone(),
-        allow_insecure: false,
+        allow_insecure: environment.allow_insecure,
     })
 }
 
 impl PolyesterEnvironment {
     /// Copy this environment with endpoint overrides (market-maker / VPC case).
+    /// The copy keeps this environment's plaintext opt-in; build an
+    /// environment with [`create_polyester_environment`] and `allow_insecure`
+    /// to add one.
     pub fn with_urls(
         &self,
         api_url: Option<&str>,
@@ -288,7 +301,7 @@ impl PolyesterEnvironment {
             explorer_url: self.explorer_url.clone(),
             account_abstraction: self.account_abstraction.clone(),
             contracts: self.contracts.clone(),
-            allow_insecure: false,
+            allow_insecure: self.allow_insecure,
         })
     }
 }
