@@ -339,7 +339,15 @@ async fn triggers_cancel_all_sends_a_supplied_request_id_as_given() {
 /// subscription.
 #[tokio::test]
 async fn candle_calls_refuse_an_unknown_timeframe_before_sending() {
-    for timeframe in ["1M", "buy", "sell", "min_1", "TIMEFRAME_UNSPECIFIED", " 1m"] {
+    for timeframe in [
+        "",
+        "1M",
+        "buy",
+        "sell",
+        "min_1",
+        "TIMEFRAME_UNSPECIFIED",
+        " 1m",
+    ] {
         let s = server(true).await;
         let md = &s.client.market_data;
         let opts = || GetCandlesOpts {

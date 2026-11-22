@@ -217,8 +217,11 @@ impl MarketDataService {
 
     /// Candle series for a symbol, ordered newest-first by `ts_sec`.
     ///
-    /// `interval` accepts values like `"1m"`, `"MIN_1"`, `"5m"`. When
-    /// incomplete candles are requested, the current open candle is prepended.
+    /// `interval` is a documented label or `Timeframe` enum name exactly as
+    /// written, such as `"1m"`, `"MIN_1"`, `"5m"` or `"1mo"`; anything else,
+    /// an empty string or `"1M"` included, is a validation error before any
+    /// catalog wait or request. When incomplete candles are requested, the
+    /// current open candle is prepended.
     pub async fn get_candles(
         &self,
         symbol: &str,
@@ -482,11 +485,9 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
 }
 
 /// The timeframe a candles call reads: [`GetCandlesOpts::timeframe`] exactly
-/// as written, or `"1m"` when it is left empty.
+/// as written. An empty one is refused like any other unknown label; leaving
+/// the field out through [`GetCandlesOpts::default`] asks for `"1m"`.
 fn candle_timeframe(opts: &GetCandlesOpts) -> Result<Timeframe> {
-    if opts.timeframe.is_empty() {
-        return Ok(Timeframe::Min1);
-    }
     parse_timeframe(&opts.timeframe)
 }
 

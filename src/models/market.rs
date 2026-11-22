@@ -4,15 +4,17 @@ use crate::types::{Price, Quantity};
 use serde_json::Value;
 
 /// Options for [`crate::services::MarketDataService::get_candles_with`].
-#[derive(Debug, Clone, Default)]
+///
+/// [`Default::default`] asks for one-minute candles (`timeframe` `"1m"`).
+#[derive(Debug, Clone)]
 pub struct GetCandlesOpts {
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
     /// Candle interval: a label (`"1s"`, `"1m"`, `"3m"`, `"5m"`, `"15m"`,
     /// `"30m"`, `"1h"`, `"2h"`, `"4h"`, `"6h"`, `"8h"`, `"12h"`, `"1d"`,
     /// `"3d"`, `"1w"`, `"1mo"`) or a `Timeframe` enum name (`"MIN_1"`, …),
-    /// exactly as written: `"1M"` is refused, not read as one minute. Default
-    /// `"1m"` when empty.
+    /// exactly as written: `"1M"` is refused, not read as one minute, and so
+    /// is an empty string. [`Default::default`] sets it to `"1m"`.
     pub timeframe: String,
     pub limit: Option<u32>,
     /// Inclusive lower bound (unix seconds UTC).
@@ -24,6 +26,22 @@ pub struct GetCandlesOpts {
     /// `reference_price_scale`; primary OHLC uses the fixed price scale 9.
     pub include_reference: bool,
     pub page_token: Option<String>,
+}
+
+impl Default for GetCandlesOpts {
+    fn default() -> Self {
+        Self {
+            symbol: None,
+            symbol_id: None,
+            timeframe: "1m".to_owned(),
+            limit: None,
+            start: None,
+            end: None,
+            include_incomplete: false,
+            include_reference: false,
+            page_token: None,
+        }
+    }
 }
 
 /// Options for [`crate::services::MarketDataService::get_trades_with`].
