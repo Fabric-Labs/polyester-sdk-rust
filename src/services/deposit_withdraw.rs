@@ -27,7 +27,6 @@ use crate::proto::chain::withdraw::v1::{
 use crate::proto::chain::zipper::v1::GetDepositWithdrawConfigRequest;
 use crate::types::{AssetAmount, QuantityDomain, resolve_asset_amount_scaled_with_input_scale};
 use buffa::Message;
-use rand_core::{OsRng, RngCore};
 
 /// Generate a cryptographically random withdrawal idempotency key.
 ///
@@ -35,8 +34,7 @@ use rand_core::{OsRng, RngCore};
 /// payload, and reuse it unchanged for every retry.
 pub fn new_trading_withdraw_idempotency_key() -> Result<String> {
     let mut random = [0_u8; 16];
-    OsRng
-        .try_fill_bytes(&mut random)
+    getrandom::fill(&mut random)
         .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
     Ok(format!("wd-{}", hex::encode(random)))
 }
@@ -48,8 +46,7 @@ pub fn new_trading_withdraw_idempotency_key() -> Result<String> {
 pub fn new_trading_withdraw_nonce() -> Result<u128> {
     for _ in 0..2 {
         let mut random = [0_u8; 16];
-        OsRng
-            .try_fill_bytes(&mut random)
+        getrandom::fill(&mut random)
             .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
         let nonce = u128::from_be_bytes(random);
         if nonce != 0 {

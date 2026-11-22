@@ -89,6 +89,11 @@ pub use errors::{
     AnswerMeta, CatalogLoadFailure, Error, Result, SubscriptionEndReason, TimestampWindow,
     auth_codes, order_codes, problem_codes,
 };
+/// The `k256` crate this SDK links, for the secp256k1 keys its API takes
+/// (`chain::sign_safe_user_operation` takes a `k256::ecdsa::SigningKey`).
+/// Build keys through `polyester::k256` and they always match this SDK's
+/// version, with no direct `k256` dependency to keep in step.
+pub use k256;
 pub use reconnect::ReconnectLimiter;
 pub use services::{
     PreparedTradingWithdraw, new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce,

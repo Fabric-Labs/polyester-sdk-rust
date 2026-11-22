@@ -9052,14 +9052,14 @@ async fn raw_zero_delta_subscription(
 /// delta lands before, during or after that read, and one long enough that it
 /// always arrives first. Set `POLYESTER_INTERLEAVING_SEED` to replay a run.
 fn first_snapshot_delays() -> Vec<Duration> {
-    use rand_core::RngCore;
+    use rand_core::Rng;
     let seed = std::env::var("POLYESTER_INTERLEAVING_SEED")
         .ok()
         .map(|raw| {
             raw.parse::<u64>()
                 .expect("POLYESTER_INTERLEAVING_SEED is a u64")
         })
-        .unwrap_or_else(|| rand_core::OsRng.next_u64());
+        .unwrap_or_else(|| rand_core::UnwrapErr(getrandom::SysRng).next_u64());
     println!("POLYESTER_INTERLEAVING_SEED={seed}");
     let mut state = seed;
     let mut drawn = || {

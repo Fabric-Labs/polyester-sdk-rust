@@ -340,7 +340,8 @@ impl Credentials {
     pub async fn sign_websocket_upgrade(&self, raw_url: &str) -> Result<BTreeMap<String, String>> {
         let ts = self.timestamp_allocator.next_async().await?.to_string();
         let mut nonce = [0u8; 16];
-        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut nonce);
+        getrandom::fill(&mut nonce)
+            .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
         self.signed_upgrade_headers(ts, raw_url, &hex::encode(nonce))
     }
 
@@ -523,8 +524,7 @@ pub fn request_url(api_base: &str, procedure: &str) -> String {
 /// Generate a fresh Ed25519 keypair (hex seed + public key).
 pub fn generate_ed25519_keypair() -> (String, String) {
     use ed25519_dalek::SigningKey;
-    use rand_core::OsRng;
-    let signing = SigningKey::generate(&mut OsRng);
+    let signing = SigningKey::generate(&mut rand_core::UnwrapErr(getrandom::SysRng));
     let seed = signing.to_bytes();
     let public = signing.verifying_key().to_bytes();
     (hex::encode(seed), hex::encode(public))
@@ -921,6 +921,48 @@ mod tests {
         assert_eq!(headers.get(HEADER_KEY_ID).unwrap(), "ak_test");
         assert_eq!(headers.get(HEADER_TIMESTAMP).unwrap(), "1");
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
+    }
+
+    /// The OS random source backs key generation and upgrade nonces: fresh
+    /// keypairs differ and match their seeds, and each upgrade carries its own
+    /// 16-byte nonce under a signature that covers it.
+    #[tokio::test]
+    async fn os_randomness_backs_keypairs_and_upgrade_nonces() {
+        use ed25519_dalek::{Signature, Verifier};
+
+        let (seed_a, public_a) = generate_ed25519_keypair();
+        let (seed_b, public_b) = generate_ed25519_keypair();
+        assert_ne!(seed_a, seed_b);
+        let seed: [u8; 32] = hex::decode(&seed_a).unwrap().try_into().unwrap();
+        let verifying = SigningKey::from_bytes(&seed).verifying_key();
+        assert_eq!(hex::encode(verifying.to_bytes()), public_a);
+        assert_ne!(public_a, public_b);
+
+        let creds = Credentials::new("ak_test", &seed_a).unwrap();
+        let url = "wss://ws.example.com/v1/stream";
+        let first = creds.sign_websocket_upgrade(url).await.unwrap();
+        let second = creds.sign_websocket_upgrade(url).await.unwrap();
+        let nonce = first.get(HEADER_NONCE).unwrap();
+        assert_eq!(nonce.len(), 32);
+        assert!(
+            nonce
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        );
+        assert_ne!(nonce, second.get(HEADER_NONCE).unwrap());
+
+        let mut canonical =
+            canonical_signing_bytes(first.get(HEADER_TIMESTAMP).unwrap(), None, "GET", url, b"")
+                .unwrap();
+        canonical.extend_from_slice(b"\nws-nonce:");
+        canonical.extend_from_slice(nonce.as_bytes());
+        let signature: [u8; 64] = hex::decode(first.get(HEADER_SIGNATURE).unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        verifying
+            .verify(&canonical, &Signature::from_bytes(&signature))
+            .unwrap();
     }
 
     #[test]

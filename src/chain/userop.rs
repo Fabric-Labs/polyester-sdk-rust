@@ -120,7 +120,7 @@ fn parse_address(value: &str) -> Result<Address> {
 fn address_from_signing_key(key: &SigningKey) -> Address {
     let vk = key.verifying_key();
     // SEC1 uncompressed encoding: 0x04 || x || y (65 bytes)
-    let encoded = vk.to_encoded_point(false);
+    let encoded = vk.to_sec1_point(false);
     let hash = keccak256(&encoded.as_bytes()[1..]);
     Address::from_slice(&hash[12..])
 }
@@ -248,6 +248,40 @@ fn user_operation_hash(
 }
 
 /// EIP-712 SafeOp signature packed as uint48/uint48/bytes (single EOA owner).
+///
+/// The owner key is a `k256` 0.14 [`SigningKey`]; build it through
+/// [`polyester::k256`](crate::k256) so its version always matches this SDK's.
+/// Signing is RFC 6979 deterministic, so the same key and SafeOp always give
+/// the same bytes.
+///
+/// ```
+/// use polyester::chain::{POLYESTER_DEVNET_ENVIRONMENT, sign_safe_user_operation};
+/// use polyester::k256::ecdsa::SigningKey;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut owner_key = [0u8; 32];
+/// owner_key[31] = 1; // load your owner EOA key here
+/// let signing_key = SigningKey::from_slice(&owner_key)?;
+/// let signature = sign_safe_user_operation(
+///     &signing_key,
+///     &POLYESTER_DEVNET_ENVIRONMENT,
+///     "0x0000000000000000000000000000000000000001", // the Safe
+///     alloy_primitives::U256::ZERO,                 // its EntryPoint nonce
+///     &[],                                          // initCode
+///     &[],                                          // callData
+///     0,
+///     0,
+///     0,
+///     0,
+///     0,
+///     &[], // paymasterAndData
+///     0,   // validAfter
+///     0,   // validUntil
+/// )?;
+/// assert_eq!(signature.len(), 12 + 65); // validAfter, validUntil, r, s, v
+/// # Ok(())
+/// # }
+/// ```
 #[allow(clippy::too_many_arguments)]
 pub fn sign_safe_user_operation(
     signing_key: &SigningKey,
@@ -299,9 +333,7 @@ pub fn sign_safe_user_operation(
         verifying_contract: module,
     };
     let hash: B256 = message.eip712_signing_hash(&domain);
-    let (sig, recid) = signing_key
-        .sign_prehash_recoverable(hash.as_slice())
-        .map_err(|e| Error::validation(format!("failed to sign SafeOp: {e}")))?;
+    let (sig, recid) = signing_key.sign_prehash_recoverable(hash.as_slice());
 
     let mut packed = Vec::with_capacity(12 + 65);
     packed.extend_from_slice(&u48_be_bytes(valid_after));

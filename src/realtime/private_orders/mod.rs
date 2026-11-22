@@ -20,7 +20,8 @@ use crate::proto::privatews::v1::{
 use crate::services::scale_order;
 use buffa::{Enumeration, Message as _};
 use futures_util::{SinkExt, StreamExt};
-use rand_core::{OsRng, RngCore};
+use getrandom::SysRng;
+use rand_core::{Rng, UnwrapErr};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -508,7 +509,7 @@ fn decode(msg: &ServerMessage) -> Result<Decoded> {
 impl Actor {
     fn new(transport: Arc<dyn Transport>, commands: mpsc::UnboundedReceiver<Command>) -> Self {
         let (internal_tx, internal_rx) = mpsc::unbounded_channel();
-        let mut jitter = OsRng.next_u64();
+        let mut jitter = UnwrapErr(SysRng).next_u64();
         if jitter == 0 {
             jitter = 0x9e37_79b9_7f4a_7c15;
         }

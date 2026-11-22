@@ -869,7 +869,7 @@ async fn token_renewal_interleaves_with_reconnects() {
         Err(_) => {
             let count = std::env::var("RENEWAL_SEEDS")
                 .map_or(64, |count| count.parse().expect("RENEWAL_SEEDS is a count"));
-            let mut seeds = SplitMix(OsRng.next_u64());
+            let mut seeds = SplitMix(UnwrapErr(SysRng).next_u64());
             (0..count).map(|_| seeds.next()).collect()
         }
     };
