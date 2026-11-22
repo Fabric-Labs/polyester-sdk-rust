@@ -1851,6 +1851,23 @@ an ERC-7769 rejection (-32500 to -32505, -32507, -32508). For those,
 Receipt polls that fail with an HTTP error such as 503 or a timeout are retried,
 and every request and pause ends by the wait's deadline.
 
+To sign a SafeOp yourself, `polyester::chain::sign_safe_user_operation` takes
+the owner key as a `k256` 0.14 `SigningKey`. Build it through the SDK's
+re-export, `polyester::k256`, so it always matches the SDK's `k256` version
+without a direct dependency:
+
+```rust
+use polyester::k256::ecdsa::SigningKey;
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let owner_key = [1u8; 32]; // load your owner EOA key here
+let signing_key = SigningKey::from_slice(&owner_key)?;
+let owner_public_key = signing_key.verifying_key().to_sec1_point(false);
+assert_eq!(owner_public_key.as_bytes().len(), 65);
+# Ok(())
+# }
+```
+
 Realtime queues fail with `Error::QueueOverflow` instead of silently dropping;
 managed streams rebuild snapshots after reconnect and expose
 `on_reconnect` / `on_snapshot_refresh` hooks. Subscribe methods return only

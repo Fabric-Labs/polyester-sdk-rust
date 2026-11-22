@@ -45,7 +45,6 @@ use crate::types::{
     Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
 };
 use buffa_types::google::protobuf::Timestamp;
-use rand_core::{OsRng, RngCore};
 use std::collections::HashSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -1189,8 +1188,7 @@ impl OrdersService {
     /// that omits `request_id` mints a *new* id and is not an idempotent replay.
     fn new_mutation_request_id(prefix: &str) -> Result<String> {
         let mut random = [0_u8; 6];
-        OsRng
-            .try_fill_bytes(&mut random)
+        getrandom::fill(&mut random)
             .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
         Ok(format!("{prefix}-{}", hex::encode(random)))
     }

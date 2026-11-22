@@ -15,7 +15,8 @@ pub use snapshot_then_stream::{SnapshotErrorFn, SnapshotThenStream, SnapshotThen
 use crate::auth::Credentials;
 use crate::errors::{Error, Result, SubscriptionEndReason};
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
-use rand_core::{OsRng, RngCore};
+use getrandom::SysRng;
+use rand_core::{Rng, UnwrapErr};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
@@ -212,8 +213,7 @@ pub(crate) struct ReconnectBackoff {
 
 impl ReconnectBackoff {
     pub(crate) fn new() -> Self {
-        let mut rng = OsRng;
-        Self::with_seed(rng.next_u64())
+        Self::with_seed(UnwrapErr(SysRng).next_u64())
     }
 
     fn with_seed(seed: u64) -> Self {

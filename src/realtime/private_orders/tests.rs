@@ -1440,14 +1440,14 @@ fn event_kind(event: &PrivateOrdersEvent) -> &'static str {
 /// `POLYESTER_INTERLEAVINGS` to run more schedules.
 #[tokio::test(start_paused = true)]
 async fn a_consumer_joining_during_a_disconnection_gets_connected_first() {
-    use rand_core::RngCore;
+    use rand_core::Rng;
     let base = std::env::var("POLYESTER_INTERLEAVING_SEED")
         .ok()
         .map(|raw| {
             raw.parse::<u64>()
                 .expect("POLYESTER_INTERLEAVING_SEED is a u64")
         })
-        .unwrap_or_else(|| rand_core::OsRng.next_u64());
+        .unwrap_or_else(|| rand_core::UnwrapErr(getrandom::SysRng).next_u64());
     let count = std::env::var("POLYESTER_INTERLEAVINGS")
         .ok()
         .map(|raw| {

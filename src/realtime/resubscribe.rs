@@ -9,7 +9,8 @@ use super::{Client, auth, lock_unpoisoned};
 use crate::codecs::scalars::id_to_u64;
 use crate::errors::{Error, Result, SubscriptionEndReason};
 use buffa::Message;
-use rand_core::{OsRng, RngCore};
+use getrandom::SysRng;
+use rand_core::{Rng, UnwrapErr};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -128,7 +129,7 @@ impl ResubscribeAttempt {
     fn next_delay(&mut self) -> Duration {
         let half = self.backoff_cap / 2;
         let spread = u64::try_from(half.as_nanos()).unwrap_or(u64::MAX).max(1);
-        let delay = half + Duration::from_nanos(OsRng.next_u64() % spread);
+        let delay = half + Duration::from_nanos(UnwrapErr(SysRng).next_u64() % spread);
         self.backoff_cap = self.backoff_cap.saturating_mul(2);
         delay
     }
