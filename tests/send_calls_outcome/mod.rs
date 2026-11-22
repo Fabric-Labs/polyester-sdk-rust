@@ -12,7 +12,7 @@ use alloy_primitives::{Address, B256, U256, keccak256};
 use alloy_sol_types::SolValue;
 use polyester::Error;
 use polyester::chain::{
-    ChainCall, POLYESTER_DEVNET_ENVIRONMENT, PolyesterSmartAccount, SendCallsResult,
+    ChainCall, JsonRpcClient, POLYESTER_DEVNET_ENVIRONMENT, PolyesterSmartAccount, SendCallsResult,
 };
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -104,6 +104,10 @@ struct State {
     /// Receipt and status reads are answered this late.
     receipt_delay: Duration,
     status_delay: Duration,
+    /// Receipt reads send their headers this late, then never their body.
+    receipt_headers_then_stall: Option<Duration>,
+    /// When the last eth_sendUserOperation arrived.
+    send_at: Option<Instant>,
 }
 
 struct Bundler {
@@ -118,6 +122,20 @@ impl Bundler {
         let chain_id = POLYESTER_DEVNET_ENVIRONMENT.chain_id;
         let http = MockHttpServer::spawn(move |request| {
             let body: Value = serde_json::from_slice(&request.body).expect("json-rpc request");
+            let stall = shared.lock().unwrap().receipt_headers_then_stall;
+            if let Some(delay) = stall
+                && body["method"] == "eth_getUserOperationReceipt"
+            {
+                return HttpScript::DelayedHeadersThenStall {
+                    delay,
+                    status: 200,
+                    headers: vec![
+                        ("Content-Type".into(), "application/json".into()),
+                        ("Content-Length".into(), "100".into()),
+                    ],
+                    stall: Duration::from_secs(3),
+                };
+            }
             let (status, answer, delay) = handle(&shared, chain_id, &body);
             match answer {
                 None => HttpScript::Json {
@@ -189,6 +207,7 @@ fn handle(state: &Mutex<State>, chain_id: u64, body: &Value) -> (u16, Option<Val
             "paymasterData": "0x1234",
         })),
         "eth_sendUserOperation" => {
+            state.send_at = Some(Instant::now());
             if let Some(error) = &state.send_error {
                 return (200, Some(json!({ "error": error })), Duration::ZERO);
             }
@@ -477,6 +496,40 @@ async fn receipt_answered_after_the_deadline_is_not_returned() {
 }
 
 #[tokio::test]
+async fn receipt_body_withheld_after_its_headers_ends_with_the_wait() {
+    // The receipt read's headers arrive before the deadline and its body never
+    // does: the read still ends by the deadline, not a timeout later.
+    let bundler = Bundler::spawn().await;
+    bundler.set(|s| s.receipt_headers_then_stall = Some(Duration::from_millis(350)));
+    let account = bundler.account(Duration::from_secs(5));
+    let error = send(&account, Duration::from_millis(650))
+        .await
+        .unwrap_err();
+    // The receipt wait starts once the send is answered.
+    let sent = bundler.state.lock().unwrap().send_at.expect("send");
+    assert!(
+        sent.elapsed() < Duration::from_millis(900),
+        "send_calls took {:?} after the send on a 650ms receipt budget",
+        sent.elapsed()
+    );
+    let hash = assert_unknown_with_hash(&error, &bundler);
+
+    let started = Instant::now();
+    account
+        .wait_for_receipt(&hash, Duration::from_millis(650), Duration::from_millis(50))
+        .await
+        .unwrap_err();
+    assert!(
+        started.elapsed() < Duration::from_millis(900),
+        "wait_for_receipt took {:?} on a 650ms budget",
+        started.elapsed()
+    );
+
+    bundler.set(|s| s.receipt_headers_then_stall = None);
+    recover_by_waiting(&account, &bundler, &hash).await;
+}
+
+#[tokio::test]
 async fn stalled_status_read_ends_with_the_wait() {
     let bundler = Bundler::spawn().await;
     let account = bundler.account(Duration::from_secs(2));
@@ -525,4 +578,57 @@ fn json_rpc_error_answers_are_unknown_unless_their_code_proves_a_refusal() {
         assert!(answer(code).mutation_outcome_unknown(), "{code}");
         assert!(!answer(code).is_retryable(), "{code}");
     }
+    // The ERC-7769 codes are eth_sendUserOperation's: answered to another
+    // method, such as a transaction submission, they prove nothing. The
+    // JSON-RPC 2.0 request errors prove a refusal for any method.
+    let other = |code: i64| Error::JsonRpc {
+        method: "eth_sendRawTransaction".into(),
+        code,
+        message: "refused".into(),
+    };
+    for code in [-32500, -32501, -32505, -32507, -32508] {
+        assert!(!answer(code).mutation_outcome_unknown(), "{code}");
+        assert!(other(code).mutation_outcome_unknown(), "{code}");
+    }
+    for code in [-32700, -32600, -32601, -32602] {
+        assert!(!other(code).mutation_outcome_unknown(), "{code}");
+    }
+}
+
+#[tokio::test]
+async fn erc_7769_code_from_an_unrelated_method_is_unknown() {
+    // The same well-formed -32500 answer, through the public JsonRpcClient:
+    // a definite refusal for eth_sendUserOperation, unknown for another method.
+    let http = MockHttpServer::spawn(|request| {
+        let body: Value = serde_json::from_slice(&request.body).expect("json-rpc request");
+        HttpScript::Json {
+            status: 200,
+            body: serde_json::to_vec(&json!({
+                "jsonrpc": "2.0",
+                "id": body["id"],
+                "error": {"code": -32500, "message": "rejected"},
+            }))
+            .unwrap(),
+        }
+    })
+    .await;
+    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2)).expect("rpc");
+    let send = rpc
+        .request("eth_sendUserOperation", json!([]))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(send, Error::JsonRpc { code: -32500, .. }),
+        "{send:?}"
+    );
+    assert!(!send.mutation_outcome_unknown(), "{send:?}");
+    let other = rpc
+        .request("eth_sendRawTransaction", json!(["0x"]))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(other, Error::JsonRpc { code: -32500, .. }),
+        "{other:?}"
+    );
+    assert!(other.mutation_outcome_unknown(), "{other:?}");
 }

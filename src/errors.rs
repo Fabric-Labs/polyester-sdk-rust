@@ -127,15 +127,14 @@ pub struct AnswerMeta {
     pub retry_after: Option<f64>,
 }
 
-/// Whether a JSON-RPC error answer's `code` proves the call was refused: a
-/// JSON-RPC 2.0 request error (parse error, invalid request, method not found,
-/// invalid params) or an ERC-7769 `eth_sendUserOperation` rejection. Any other
-/// code proves nothing about the call's outcome.
-pub(crate) fn is_jsonrpc_refusal_code(code: i64) -> bool {
-    matches!(
-        code,
-        -32700 | -32600 | -32601 | -32602 | -32505..=-32500 | -32507 | -32508
-    )
+/// Whether a JSON-RPC error answer's `code` proves the call to `method` was
+/// refused: a JSON-RPC 2.0 request error (parse error, invalid request, method
+/// not found, invalid params) for any method, or an ERC-7769 rejection for
+/// `eth_sendUserOperation`, the method that defines those codes. Any other code
+/// proves nothing about the call's outcome.
+pub(crate) fn is_jsonrpc_refusal_code(method: &str, code: i64) -> bool {
+    matches!(code, -32700 | -32600 | -32601 | -32602)
+        || (method == "eth_sendUserOperation" && matches!(code, -32505..=-32500 | -32507 | -32508))
 }
 
 /// Polyester SDK error.
@@ -196,15 +195,17 @@ pub enum Error {
     /// A JSON-RPC endpoint (the chain RPC, the bundler or the paymaster)
     /// answered a call with a well-formed error object, an integer code and a
     /// string message: `method` is the call, `code` and `message` the
-    /// endpoint's own. Any other error object is an [`Error::Transport`]. Only a code that proves a refusal makes
+    /// endpoint's own. Any other error object is an [`Error::Transport`].
+    ///
+    /// Only a code that proves the call was refused makes
     /// [`Self::mutation_outcome_unknown`] false: a JSON-RPC 2.0 request error
-    /// (`-32700`, `-32600`, `-32601`, `-32602`) or an ERC-7769
-    /// `eth_sendUserOperation` rejection (`-32500` to `-32505`, `-32507`,
-    /// `-32508`). Any other code, such as an internal error (`-32603`), a
-    /// server error (`-32000` to `-32099`) or an application code, proves
-    /// nothing, and its outcome is unknown;
-    /// [`crate::chain::PolyesterSmartAccount::send_calls`] returns it as
-    /// [`Error::UserOperationOutcomeUnknown`]. Not retryable.
+    /// (`-32700`, `-32600`, `-32601`, `-32602`) for any method, or, for
+    /// `eth_sendUserOperation` only, an ERC-7769 rejection (`-32500` to
+    /// `-32505`, `-32507`, `-32508`). Any other code, such as an internal error
+    /// (`-32603`), a server error (`-32000` to `-32099`), an application code,
+    /// or an ERC-7769 code answered to another method, proves nothing, and its
+    /// outcome is unknown; [`crate::chain::PolyesterSmartAccount::send_calls`]
+    /// returns it as [`Error::UserOperationOutcomeUnknown`]. Not retryable.
     #[error("jsonrpc {method}: {message} (code {code})")]
     JsonRpc {
         method: String,
@@ -1497,7 +1498,7 @@ impl Error {
             Self::Api { code, .. } => {
                 is_outcome_unknown_code(code) || code == alert_codes::SERVICE_UNAVAILABLE
             }
-            Self::JsonRpc { code, .. } => !is_jsonrpc_refusal_code(*code),
+            Self::JsonRpc { method, code, .. } => !is_jsonrpc_refusal_code(method, *code),
             Self::TradeSession(trade) => trade.mutation_outcome_unknown(),
             _ => false,
         }

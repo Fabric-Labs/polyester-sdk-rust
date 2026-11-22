@@ -120,6 +120,13 @@ pub enum HttpScript {
         headers: Vec<(String, String)>,
         stall: Duration,
     },
+    /// `HeadersThenStall`, with the headers sent after `delay`.
+    DelayedHeadersThenStall {
+        delay: Duration,
+        status: u16,
+        headers: Vec<(String, String)>,
+        stall: Duration,
+    },
     /// Chunked transfer that keeps sending until `total_bytes` then stops.
     ChunkedBody {
         status: u16,
@@ -273,6 +280,26 @@ impl MockHttpServer {
                             head.push_str("Connection: close\r\n\r\n");
                             let _ = stream.write_all(head.as_bytes()).await;
                             let _ = stream.write_all(&body).await;
+                        }
+                        HttpScript::DelayedHeadersThenStall {
+                            delay,
+                            status,
+                            headers,
+                            stall,
+                        } => {
+                            tokio::time::sleep(delay).await;
+                            let mut head = format!("HTTP/1.1 {status} OK\r\n");
+                            for (k, v) in headers {
+                                head.push_str(&format!("{k}: {v}\r\n"));
+                            }
+                            head.push_str("\r\n");
+                            let _ = stream.write_all(head.as_bytes()).await;
+                            let _ = stream.flush().await;
+                            let mut peek = [0u8; 1];
+                            tokio::select! {
+                                _ = tokio::time::sleep(stall) => {}
+                                _ = stream.read(&mut peek) => {}
+                            }
                         }
                         HttpScript::HeadersThenStall {
                             status,

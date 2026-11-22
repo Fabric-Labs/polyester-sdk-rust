@@ -197,7 +197,8 @@ fn decode_hex_bytes(value: &str) -> Result<Vec<u8>> {
 /// an error object whose code is not a refusal code proves nothing about the
 /// call's outcome.
 fn is_jsonrpc_refusal(error: &Error) -> bool {
-    matches!(error, Error::JsonRpc { code, .. } if crate::errors::is_jsonrpc_refusal_code(*code))
+    matches!(error, Error::JsonRpc { method, code, .. }
+        if crate::errors::is_jsonrpc_refusal_code(method, *code))
 }
 
 fn outcome_unknown(user_operation_hash: &str, source: Error) -> Error {
