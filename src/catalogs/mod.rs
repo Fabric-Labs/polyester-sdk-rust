@@ -647,9 +647,12 @@ impl Manager {
         self.require_market(&canonical)
     }
 
-    /// Optional Connect symbol filter. Empty/omitted stays `0` (all symbols).
-    /// A supplied display symbol is resolved and fails closed.
+    /// Optional Connect symbol filter. Omitted (`None`) stays `0` (all
+    /// symbols). A supplied display symbol is resolved and fails closed; a
+    /// blank one is refused (see [`Self::check_optional_symbol`]), never read
+    /// as every market.
     pub fn optional_symbol_id(&self, symbol: Option<&str>, symbol_id: Option<u32>) -> Result<u32> {
+        Self::check_optional_symbol(symbol)?;
         match (Self::normalize_raw_symbol_filter(symbol), symbol_id) {
             (None, None) => Ok(0),
             (_, Some(0)) => Err(Error::validation(
@@ -661,6 +664,19 @@ impl Manager {
             (None, Some(symbol_id)) => Ok(symbol_id),
             (Some(symbol), None) => self.require_symbol_id(&symbol),
         }
+    }
+
+    /// Refuse a supplied but blank (empty or whitespace-only) market name for
+    /// an optional market filter: it would resolve to no market and so match
+    /// every market. Leave it `None` for every market. It needs no catalogs,
+    /// so a call checks it before waiting for them.
+    pub(crate) fn check_optional_symbol(symbol: Option<&str>) -> Result<()> {
+        if symbol.is_some_and(|symbol| symbol.trim().is_empty()) {
+            return Err(Error::validation(
+                "symbol must not be blank; leave it None to match every market",
+            ));
+        }
+        Ok(())
     }
 
     /// Refuse a market name given with a market ID when the two name different
@@ -1419,6 +1435,16 @@ mod tests {
             1
         );
         assert!(mgr.optional_symbol_id(Some("NOPE-USDT"), None).is_err());
+        // A blank name is refused, never read as every market, also beside
+        // a symbol ID; only an omitted one means every market.
+        for blank in ["", "   ", " \t"] {
+            for symbol_id in [None, Some(1)] {
+                assert!(matches!(
+                    mgr.optional_symbol_id(Some(blank), symbol_id),
+                    Err(Error::Validation(_))
+                ));
+            }
+        }
         assert!(mgr.required_symbol_id(None, None, "modify").is_err());
         assert!(mgr.resolve_symbol_ids(Some(&["NOPE-USDT".into()])).is_err());
         assert_eq!(

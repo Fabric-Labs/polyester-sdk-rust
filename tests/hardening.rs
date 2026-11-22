@@ -51,6 +51,8 @@ mod market_data;
 mod market_tif;
 #[path = "modify_zero_values/mod.rs"]
 mod modify_zero_values;
+#[path = "optional_market_filters/mod.rs"]
+mod optional_market_filters;
 #[path = "order_by_symbol_id/mod.rs"]
 mod order_by_symbol_id;
 #[path = "order_read_scales/mod.rs"]

@@ -9,7 +9,7 @@ use polyester::proto::chain::zipper::v1::{
     AssetConfig as ZipperAsset, GetDepositWithdrawConfigResponse,
 };
 use polyester::proto::marketdata::v1::{
-    AssetConfig, CandlePoint, GetCandlesResponse, GetOrderbookHeatmapRequest,
+    AssetConfig, CandlePoint, GetCandlesRequest, GetCandlesResponse, GetOrderbookHeatmapRequest,
     GetOrderbookHeatmapResponse, GetSpotConfigResponse, HeatmapInterval, HeatmapLiveBucket,
     PairConfig, PairMarketdataConfig, Timeframe,
 };
@@ -526,6 +526,54 @@ async fn candles_client(rows: Vec<CandlePoint>) -> (MockHttpServer, Client) {
     .unwrap();
     client.wait_for_catalogs().await.unwrap();
     (http, client)
+}
+
+// Options left at their default ask for one-minute candles: the default is a
+// real "1m", which the strict parser reads, while an explicitly empty
+// timeframe is refused before anything is sent.
+#[tokio::test]
+async fn default_candle_options_ask_for_one_minute_candles() {
+    assert_eq!(GetCandlesOpts::default().timeframe, "1m");
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let seen = sent.clone();
+    let http = MockHttpServer::spawn(move |request| match request.path.as_str() {
+        SPOT_CONFIG => connect_proto_ok(&spot_config()),
+        ZIPPER_CONFIG => connect_proto_ok(&zipper_config()),
+        CANDLES => {
+            seen.lock()
+                .unwrap()
+                .push(GetCandlesRequest::decode_from_slice(&request.body).unwrap());
+            connect_proto_ok(&GetCandlesResponse {
+                symbol_id: 1,
+                timeframe: Timeframe::Min1.into(),
+                candles: vec![candle_point(60, true)],
+                ..Default::default()
+            })
+        }
+        _ => HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: "ws://127.0.0.1:9".into(),
+        hydrate_catalogs: true,
+        timeout: Duration::from_secs(2),
+        ..Default::default()
+    })
+    .unwrap();
+    client.wait_for_catalogs().await.unwrap();
+    let got = client
+        .market_data
+        .get_candles_with(GetCandlesOpts {
+            symbol: Some("BTC-USDT".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(got.candles.len(), 1);
+    let sent = sent.lock().unwrap().clone();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].timeframe.as_known(), Some(Timeframe::Min1));
 }
 
 // A candle row says whether its bucket is closed, as the server sends it: the

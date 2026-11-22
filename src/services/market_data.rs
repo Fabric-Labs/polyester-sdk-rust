@@ -217,8 +217,11 @@ impl MarketDataService {
 
     /// Candle series for a symbol, ordered newest-first by `ts_sec`.
     ///
-    /// `interval` accepts values like `"1m"`, `"MIN_1"`, `"5m"`. When
-    /// incomplete candles are requested, the current open candle is prepended.
+    /// `interval` is a documented label or `Timeframe` enum name exactly as
+    /// written, such as `"1m"`, `"MIN_1"`, `"5m"` or `"1mo"`; anything else,
+    /// an empty string or `"1M"` included, is a validation error before any
+    /// catalog wait or request. When incomplete candles are requested, the
+    /// current open candle is prepended.
     pub async fn get_candles(
         &self,
         symbol: &str,
@@ -236,6 +239,8 @@ impl MarketDataService {
 
     pub async fn get_candles_with(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
         check_limit("get_candles", opts.limit.unwrap_or(0), CANDLES_LIMIT_MAX)?;
+        // An unknown timeframe is refused before the catalog wait or any request.
+        candle_timeframe(&opts)?;
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let (req, volume_scale) = self.build_candles_request(&opts)?;
@@ -288,6 +293,8 @@ impl MarketDataService {
             opts.limit.unwrap_or(0),
             CANDLES_LIMIT_MAX,
         )?;
+        // An unknown timeframe is refused before the catalog wait or any request.
+        candle_timeframe(&opts)?;
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let (base, volume_scale) = self.build_candles_request(&opts)?;
@@ -331,12 +338,7 @@ impl MarketDataService {
     fn build_candles_request(&self, opts: &GetCandlesOpts) -> Result<(GetCandlesRequest, u32)> {
         let symbol_id =
             self.resolve_symbol_id(opts.symbol.as_deref(), opts.symbol_id, "get_candles")?;
-        let timeframe_label = if opts.timeframe.is_empty() {
-            "1m"
-        } else {
-            opts.timeframe.as_str()
-        };
-        let timeframe = parse_timeframe(timeframe_label)?;
+        let timeframe = candle_timeframe(opts)?;
         let volume_scale = self.require_market_data_volume_scale(symbol_id, "get_candles")?;
         if opts.include_reference
             && self
@@ -399,6 +401,8 @@ impl MarketDataService {
         symbol: &str,
         timeframe: &str,
     ) -> Result<crate::realtime::TypedSubscription<Candle>> {
+        // An unknown timeframe is refused before the catalog wait or subscribing.
+        let resolved = parse_timeframe(timeframe)?;
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
@@ -411,7 +415,6 @@ impl MarketDataService {
                 ))
             })?;
         // Live Centrifugo channels use human labels (`1m`), not REST enum names (`MIN_1`).
-        let resolved = parse_timeframe(timeframe)?;
         let channel_tf = crate::codecs::decode::timeframe_label(resolved);
         if channel_tf.is_empty() {
             return Err(Error::validation(format!(
@@ -442,32 +445,50 @@ impl MarketDataService {
     }
 }
 
+/// Every accepted candle timeframe, exactly as written: a documented label
+/// (`"1s"`, `"1m"`, `"3m"`, … `"1w"`, `"1mo"`) or a `Timeframe` enum name
+/// (`"SEC_1"`, `"MIN_1"`, … `"MONTH_1"`). The Go and Python SDKs accept the
+/// same set.
+const CANDLE_TIMEFRAMES: [(&str, &str, Timeframe); 16] = [
+    ("1s", "SEC_1", Timeframe::Sec1),
+    ("1m", "MIN_1", Timeframe::Min1),
+    ("3m", "MIN_3", Timeframe::Min3),
+    ("5m", "MIN_5", Timeframe::Min5),
+    ("15m", "MIN_15", Timeframe::Min15),
+    ("30m", "MIN_30", Timeframe::Min30),
+    ("1h", "HOUR_1", Timeframe::Hour1),
+    ("2h", "HOUR_2", Timeframe::Hour2),
+    ("4h", "HOUR_4", Timeframe::Hour4),
+    ("6h", "HOUR_6", Timeframe::Hour6),
+    ("8h", "HOUR_8", Timeframe::Hour8),
+    ("12h", "HOUR_12", Timeframe::Hour12),
+    ("1d", "DAY_1", Timeframe::Day1),
+    ("3d", "DAY_3", Timeframe::Day3),
+    ("1w", "WEEK_1", Timeframe::Week1),
+    ("1mo", "MONTH_1", Timeframe::Month1),
+];
+
+/// Reads a candle timeframe exactly as written (see [`CANDLE_TIMEFRAMES`]).
+/// No other case, spelling or padding is read, so `"1M"` is never taken for
+/// `"1m"` (one minute) nor for `"1mo"` (one month); anything else is a
+/// validation error.
 fn parse_timeframe(interval: &str) -> Result<Timeframe> {
-    let key = interval.trim().to_ascii_lowercase().replace('_', "");
-    let tf = match key.as_str() {
-        "1s" | "sec1" => Timeframe::Sec1,
-        "1m" | "min1" => Timeframe::Min1,
-        "3m" | "min3" => Timeframe::Min3,
-        "5m" | "min5" => Timeframe::Min5,
-        "15m" | "min15" => Timeframe::Min15,
-        "30m" | "min30" => Timeframe::Min30,
-        "1h" | "hour1" => Timeframe::Hour1,
-        "2h" | "hour2" => Timeframe::Hour2,
-        "4h" | "hour4" => Timeframe::Hour4,
-        "6h" | "hour6" => Timeframe::Hour6,
-        "8h" | "hour8" => Timeframe::Hour8,
-        "12h" | "hour12" => Timeframe::Hour12,
-        "1d" | "day1" => Timeframe::Day1,
-        "3d" | "day3" => Timeframe::Day3,
-        "1w" | "week1" => Timeframe::Week1,
-        "1mo" | "month1" => Timeframe::Month1,
-        _ => {
-            return Err(Error::validation(format!(
-                "unsupported candle interval {interval:?}"
-            )));
-        }
-    };
-    Ok(tf)
+    CANDLE_TIMEFRAMES
+        .iter()
+        .find(|(label, name, _)| interval == *label || interval == *name)
+        .map(|(_, _, timeframe)| *timeframe)
+        .ok_or_else(|| {
+            Error::validation(format!(
+                "unsupported candle interval {interval:?}; use a label such as \"1m\", \"1h\", \"1d\" or \"1mo\" (one month), or an enum name such as \"MIN_1\""
+            ))
+        })
+}
+
+/// The timeframe a candles call reads: [`GetCandlesOpts::timeframe`] exactly
+/// as written. An empty one is refused like any other unknown label; leaving
+/// the field out through [`GetCandlesOpts::default`] asks for `"1m"`.
+fn candle_timeframe(opts: &GetCandlesOpts) -> Result<Timeframe> {
+    parse_timeframe(&opts.timeframe)
 }
 
 fn newest_candle(result: CandlesResult) -> Option<Candle> {
@@ -1468,9 +1489,99 @@ mod tests {
         }
     }
 
+    /// Exactly the documented labels and the enum names are accepted, the
+    /// same set the Go and Python SDKs accept. Another case or spelling of a
+    /// label (`"1M"` is neither one minute nor one month), an enum name in
+    /// another case or without its underscore, the unspecified value, padding
+    /// and side names are refused.
+    #[test]
+    fn candle_timeframes_accept_only_the_documented_set() {
+        let accepted = [
+            ("1s", Timeframe::Sec1, "1s"),
+            ("SEC_1", Timeframe::Sec1, "1s"),
+            ("1m", Timeframe::Min1, "1m"),
+            ("MIN_1", Timeframe::Min1, "1m"),
+            ("3m", Timeframe::Min3, "3m"),
+            ("MIN_3", Timeframe::Min3, "3m"),
+            ("5m", Timeframe::Min5, "5m"),
+            ("MIN_5", Timeframe::Min5, "5m"),
+            ("15m", Timeframe::Min15, "15m"),
+            ("MIN_15", Timeframe::Min15, "15m"),
+            ("30m", Timeframe::Min30, "30m"),
+            ("MIN_30", Timeframe::Min30, "30m"),
+            ("1h", Timeframe::Hour1, "1h"),
+            ("HOUR_1", Timeframe::Hour1, "1h"),
+            ("2h", Timeframe::Hour2, "2h"),
+            ("HOUR_2", Timeframe::Hour2, "2h"),
+            ("4h", Timeframe::Hour4, "4h"),
+            ("HOUR_4", Timeframe::Hour4, "4h"),
+            ("6h", Timeframe::Hour6, "6h"),
+            ("HOUR_6", Timeframe::Hour6, "6h"),
+            ("8h", Timeframe::Hour8, "8h"),
+            ("HOUR_8", Timeframe::Hour8, "8h"),
+            ("12h", Timeframe::Hour12, "12h"),
+            ("HOUR_12", Timeframe::Hour12, "12h"),
+            ("1d", Timeframe::Day1, "1d"),
+            ("DAY_1", Timeframe::Day1, "1d"),
+            ("3d", Timeframe::Day3, "3d"),
+            ("DAY_3", Timeframe::Day3, "3d"),
+            ("1w", Timeframe::Week1, "1w"),
+            ("WEEK_1", Timeframe::Week1, "1w"),
+            ("1mo", Timeframe::Month1, "1mo"),
+            ("MONTH_1", Timeframe::Month1, "1mo"),
+        ];
+        assert_eq!(accepted.len(), CANDLE_TIMEFRAMES.len() * 2);
+        for (label, timeframe, channel) in accepted {
+            assert_eq!(parse_timeframe(label).unwrap(), timeframe, "{label}");
+            assert_eq!(
+                MarketDataService::candle_channel_timeframe(label).unwrap(),
+                channel,
+                "{label}"
+            );
+        }
+        for label in [
+            "1M",
+            "1H",
+            "1D",
+            "1S",
+            "1W",
+            "1MO",
+            "1Mo",
+            "15M",
+            "min_1",
+            "min1",
+            "MIN1",
+            "Min_1",
+            "month_1",
+            "month1",
+            "sec1",
+            "TIMEFRAME_UNSPECIFIED",
+            "BUY",
+            "SELL",
+            "buy",
+            "sell",
+            " 1m",
+            "1m ",
+            "",
+            "1",
+            "60",
+            "1min",
+            "1month",
+        ] {
+            assert!(
+                matches!(parse_timeframe(label), Err(Error::Validation(_))),
+                "{label:?} accepted"
+            );
+            assert!(
+                MarketDataService::candle_channel_timeframe(label).is_err(),
+                "{label:?} accepted"
+            );
+        }
+    }
+
     #[test]
     fn candle_channel_normalizes_aliases_to_human_label() {
-        for alias in ["1m", "MIN_1", "min1", "Min_1"] {
+        for alias in ["1m", "MIN_1"] {
             assert_eq!(
                 MarketDataService::candle_channel_timeframe(alias).unwrap(),
                 "1m",
