@@ -1801,6 +1801,44 @@ let result = account.send_calls(&[call], true, Duration::from_secs(60)).await?;
 # }
 ```
 
+A UserOperation can execute even when `send_calls` returns an error: the
+bundler may have accepted it before the error. Once the SDK has attempted the
+send, any failure (a timeout, an HTTP error such as 504, or no receipt by the
+receipt timeout) is `Error::UserOperationOutcomeUnknown`, which carries the
+operation's hash (`Error::user_operation_hash`) and for which
+`mutation_outcome_unknown()` is true. Never call `send_calls` again for the same
+calls: that signs a second operation, and both execute. Wait on the hash
+instead:
+
+```rust,no_run
+# async fn _readme(
+#     account: polyester::chain::PolyesterSmartAccount,
+#     withdraw: polyester::chain::ChainCall,
+# ) -> Result<(), Box<dyn std::error::Error>> {
+use std::time::Duration;
+
+match account.send_calls(&[withdraw], true, Duration::from_secs(60)).await {
+    Ok(result) => println!("{result:?}"),
+    Err(error) => match error.user_operation_hash() {
+        // Same operation, no second signature. An error here means it is still pending.
+        Some(hash) => {
+            let receipt = account
+                .wait_for_receipt(hash, Duration::from_secs(120), Duration::from_secs(1))
+                .await?;
+            println!("{receipt:?}");
+        }
+        None => return Err(error.into()),
+    },
+}
+# Ok(())
+# }
+```
+
+A JSON-RPC refusal of the send (`Error::JsonRpc`, for example a validation
+error) means the bundler accepted nothing, and the calls can be sent again.
+Receipt polls that fail with an HTTP error such as 503 or a timeout are retried
+until the wait's deadline.
+
 Realtime queues fail with `Error::QueueOverflow` instead of silently dropping;
 managed streams rebuild snapshots after reconnect and expose
 `on_reconnect` / `on_snapshot_refresh` hooks. Subscribe methods return only

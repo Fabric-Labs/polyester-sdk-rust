@@ -182,6 +182,41 @@ pub enum Error {
         /// and the delay it asked for. See [`Error::answer`].
         answer: Option<Box<AnswerMeta>>,
     },
+    /// A JSON-RPC endpoint (the chain RPC, the bundler or the paymaster)
+    /// answered a call with an error object: `method` is the call, `code` and
+    /// `message` the endpoint's own. The endpoint answered, so
+    /// [`Self::mutation_outcome_unknown`] is false. For
+    /// `eth_sendUserOperation` it is the bundler's refusal and nothing was
+    /// accepted, except an internal or server error (`-32603`, `-32000` to
+    /// `-32099`), which
+    /// [`crate::chain::PolyesterSmartAccount::send_calls`] returns as
+    /// [`Error::UserOperationOutcomeUnknown`]. Not retryable.
+    #[error("jsonrpc {method}: {message} (code {code})")]
+    JsonRpc {
+        method: String,
+        code: i64,
+        message: String,
+    },
+    /// A UserOperation was handed to the bundler, but its outcome is unknown:
+    /// [`crate::chain::PolyesterSmartAccount::send_calls`] returns it for any
+    /// failure once `eth_sendUserOperation` was attempted (a transport error,
+    /// a timeout or an HTTP error on the send, or a receipt wait that did not
+    /// end with a receipt). The bundler may hold the operation, and it may
+    /// still execute. [`Self::mutation_outcome_unknown`] is true and
+    /// [`Self::is_retryable`] false; [`Self::answer`] reads the failed answer,
+    /// if any, and `source` is the failure.
+    ///
+    /// Recover with
+    /// [`crate::chain::PolyesterSmartAccount::wait_for_receipt`] on
+    /// `user_operation_hash`. Never call `send_calls` again for the same
+    /// calls: that signs a second operation, which executes too.
+    #[error(
+        "UserOperation {user_operation_hash} outcome unknown: {source}; wait for its receipt instead of sending it again"
+    )]
+    UserOperationOutcomeUnknown {
+        user_operation_hash: String,
+        source: Box<Error>,
+    },
     /// A successful RPC returned a payload that violates the documented
     /// response contract.
     ///
@@ -1172,6 +1207,22 @@ impl Error {
                 message: text(message),
                 answer,
             },
+            Self::JsonRpc {
+                method,
+                code,
+                message,
+            } => Self::JsonRpc {
+                method,
+                code,
+                message: text(message),
+            },
+            Self::UserOperationOutcomeUnknown {
+                user_operation_hash,
+                source,
+            } => Self::UserOperationOutcomeUnknown {
+                user_operation_hash,
+                source: Box::new(source.redacted()),
+            },
             Self::ResponseContract { context, message } => Self::ResponseContract {
                 context: text(context),
                 message: text(message),
@@ -1339,6 +1390,20 @@ impl Error {
         }
     }
 
+    /// The hash of the UserOperation an [`Error::UserOperationOutcomeUnknown`]
+    /// names: wait on it with
+    /// [`crate::chain::PolyesterSmartAccount::wait_for_receipt`] instead of
+    /// sending the calls again. `None` for any other error.
+    pub fn user_operation_hash(&self) -> Option<&str> {
+        match self {
+            Self::UserOperationOutcomeUnknown {
+                user_operation_hash,
+                ..
+            } => Some(user_operation_hash),
+            _ => None,
+        }
+    }
+
     pub fn validation(msg: impl Into<String>) -> Self {
         Self::Validation(msg.into())
     }
@@ -1410,6 +1475,7 @@ impl Error {
     pub fn mutation_outcome_unknown(&self) -> bool {
         match self {
             Self::Transport { .. }
+            | Self::UserOperationOutcomeUnknown { .. }
             | Self::ResponseContract { .. }
             | Self::Server { .. }
             | Self::GatewayTimeout { .. }
@@ -1445,6 +1511,7 @@ impl Error {
             | Self::ApiKeyRejected { answer, .. }
             | Self::SessionRequired { answer, .. }
             | Self::Realtime { answer, .. } => answer.as_deref(),
+            Self::UserOperationOutcomeUnknown { source, .. } => source.answer(),
             Self::TradeSession(crate::tradews::TradeError::Upgrade { answer, .. }) => {
                 answer.as_deref()
             }

@@ -85,6 +85,8 @@ mod readable_error_bodies;
 mod recv_window_replay;
 #[path = "request_size_rate_limit/mod.rs"]
 mod request_size_rate_limit;
+#[path = "send_calls_outcome/mod.rs"]
+mod send_calls_outcome;
 #[path = "signed_redirects/mod.rs"]
 mod signed_redirects;
 #[path = "subaccount_get_expansions/mod.rs"]

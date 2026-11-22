@@ -218,7 +218,15 @@ pub fn parse_jsonrpc_result(body: &Value, expected_id: u64, method: &str) -> Res
                 .get("message")
                 .and_then(|m| m.as_str())
                 .unwrap_or("jsonrpc error");
-            Err(Error::transport(format!("jsonrpc {method}: {message}")))
+            // The endpoint's answer: with a code, it says what happened.
+            match err.get("code").and_then(Value::as_i64) {
+                Some(code) => Err(Error::JsonRpc {
+                    method: method.to_owned(),
+                    code,
+                    message: message.to_owned(),
+                }),
+                None => Err(Error::transport(format!("jsonrpc {method}: {message}"))),
+            }
         }
         (true, Some(_)) => Err(Error::transport(format!(
             "jsonrpc {method}: response must not include both result and error"
