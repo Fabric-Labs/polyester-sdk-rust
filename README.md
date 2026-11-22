@@ -155,8 +155,8 @@ crates.io: https://crates.io/crates/polyester-sdk
 polyester-sdk = "0.32.0"
 ```
 
-Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
-`realtime` / `chain` Cargo features are empty compatibility flags.
+Realtime (Centrifugo) and on-chain Funding helpers are always included. The crate has no
+Cargo features.
 
 To pin a git tag instead of crates.io:
 

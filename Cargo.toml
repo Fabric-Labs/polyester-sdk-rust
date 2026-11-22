@@ -40,19 +40,15 @@ path = "tests/a7_strict_live.rs"
 name = "price_fixtures"
 path = "tests/price_fixtures.rs"
 
-[features]
-# Always-on stubs so existing `features = ["realtime"]` / `["chain"]` keep working.
-realtime = []
-chain = []
-
 [dependencies]
 buffa = { version = "0.8.1", features = ["json"] }
-buffa-descriptor = "0.8.1"
 buffa-types = { version = "0.8", features = ["json"] }
-connectrpc = { version = "0.8", features = ["client", "client-tls"] }
+# Without default features: no zstd (the C library), only gzip and identity.
+# `json` backs `WireFormat::Json`.
+connectrpc = { version = "0.8.2", default-features = false, features = ["client", "client-tls", "gzip", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
 http = "1"
 tower = { version = "0.5", features = ["util"] }
 bytes = "1"
@@ -64,17 +60,17 @@ hex = "0.4"
 bs58 = "0.5"
 rust_decimal = { version = "1", default-features = false, features = ["std", "serde"] }
 tracing = "0.1"
-url = "2"
+url = "2.5.9"
 percent-encoding = "2"
 http-body = "1"
 http-body-util = "0.1"
-webpki-roots = "0.26"
+webpki-roots = "1.0.10"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 base64 = "0.22"
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "tokio"] }
-hyper-rustls = { version = "0.27", features = ["http1", "native-tokio", "ring", "tls12"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "ring", "tls12"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 tokio-rustls = { version = "0.26", default-features = false }
 alloy-primitives = { version = "1" }
