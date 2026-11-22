@@ -127,6 +127,17 @@ pub struct AnswerMeta {
     pub retry_after: Option<f64>,
 }
 
+/// Whether a JSON-RPC error answer's `code` proves the call was refused: a
+/// JSON-RPC 2.0 request error (parse error, invalid request, method not found,
+/// invalid params) or an ERC-7769 `eth_sendUserOperation` rejection. Any other
+/// code proves nothing about the call's outcome.
+pub(crate) fn is_jsonrpc_refusal_code(code: i64) -> bool {
+    matches!(
+        code,
+        -32700 | -32600 | -32601 | -32602 | -32505..=-32500 | -32507 | -32508
+    )
+}
+
 /// Polyester SDK error.
 #[derive(Debug, Clone, Error)]
 pub enum Error {
@@ -183,13 +194,16 @@ pub enum Error {
         answer: Option<Box<AnswerMeta>>,
     },
     /// A JSON-RPC endpoint (the chain RPC, the bundler or the paymaster)
-    /// answered a call with an error object: `method` is the call, `code` and
-    /// `message` the endpoint's own. The endpoint answered, so
-    /// [`Self::mutation_outcome_unknown`] is false. For
-    /// `eth_sendUserOperation` it is the bundler's refusal and nothing was
-    /// accepted, except an internal or server error (`-32603`, `-32000` to
-    /// `-32099`), which
-    /// [`crate::chain::PolyesterSmartAccount::send_calls`] returns as
+    /// answered a call with a well-formed error object, an integer code and a
+    /// string message: `method` is the call, `code` and `message` the
+    /// endpoint's own. Any other error object is an [`Error::Transport`]. Only a code that proves a refusal makes
+    /// [`Self::mutation_outcome_unknown`] false: a JSON-RPC 2.0 request error
+    /// (`-32700`, `-32600`, `-32601`, `-32602`) or an ERC-7769
+    /// `eth_sendUserOperation` rejection (`-32500` to `-32505`, `-32507`,
+    /// `-32508`). Any other code, such as an internal error (`-32603`), a
+    /// server error (`-32000` to `-32099`) or an application code, proves
+    /// nothing, and its outcome is unknown;
+    /// [`crate::chain::PolyesterSmartAccount::send_calls`] returns it as
     /// [`Error::UserOperationOutcomeUnknown`]. Not retryable.
     #[error("jsonrpc {method}: {message} (code {code})")]
     JsonRpc {
@@ -1483,6 +1497,7 @@ impl Error {
             Self::Api { code, .. } => {
                 is_outcome_unknown_code(code) || code == alert_codes::SERVICE_UNAVAILABLE
             }
+            Self::JsonRpc { code, .. } => !is_jsonrpc_refusal_code(*code),
             Self::TradeSession(trade) => trade.mutation_outcome_unknown(),
             _ => false,
         }

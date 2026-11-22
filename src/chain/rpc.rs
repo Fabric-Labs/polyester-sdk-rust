@@ -214,18 +214,21 @@ pub fn parse_jsonrpc_result(body: &Value, expected_id: u64, method: &str) -> Res
                     "jsonrpc {method}: error must be an object"
                 )));
             }
-            let message = err
-                .get("message")
-                .and_then(|m| m.as_str())
-                .unwrap_or("jsonrpc error");
-            // The endpoint's answer: with a code, it says what happened.
-            match err.get("code").and_then(Value::as_i64) {
-                Some(code) => Err(Error::JsonRpc {
+            // Only a well-formed error object, an integer code and a string
+            // message, says what happened; any other proves nothing.
+            match (
+                err.get("code").and_then(Value::as_i64),
+                err.get("message").and_then(Value::as_str),
+            ) {
+                (Some(code), Some(message)) => Err(Error::JsonRpc {
                     method: method.to_owned(),
                     code,
                     message: message.to_owned(),
                 }),
-                None => Err(Error::transport(format!("jsonrpc {method}: {message}"))),
+                (_, message) => Err(Error::transport(format!(
+                    "jsonrpc {method}: malformed error object (want an integer code and a string message): {}",
+                    message.unwrap_or("no message")
+                ))),
             }
         }
         (true, Some(_)) => Err(Error::transport(format!(

@@ -1807,10 +1807,11 @@ let result = account.send_calls(&[call], true, Duration::from_secs(60)).await?;
 ```
 
 A UserOperation can execute even when `send_calls` returns an error: the
-bundler may have accepted it before the error. Once the SDK has attempted the
-send, any failure (a timeout, an HTTP error such as 504, or no receipt by the
-receipt timeout) is `Error::UserOperationOutcomeUnknown`, which carries the
-operation's hash (`Error::user_operation_hash`) and for which
+bundler may have accepted it before the error. The SDK computes the operation's
+hash before sending it. Once it has attempted the send, any failure (a timeout,
+an HTTP error such as 504, an answer that does not name that hash, or no receipt
+by the receipt timeout) is `Error::UserOperationOutcomeUnknown`, which carries
+the hash (`Error::user_operation_hash`) and for which
 `mutation_outcome_unknown()` is true. Never call `send_calls` again for the same
 calls: that signs a second operation, and both execute. Wait on the hash
 instead:
@@ -1825,7 +1826,9 @@ use std::time::Duration;
 match account.send_calls(&[withdraw], true, Duration::from_secs(60)).await {
     Ok(result) => println!("{result:?}"),
     Err(error) => match error.user_operation_hash() {
-        // Same operation, no second signature. An error here means it is still pending.
+        // Same operation, no second signature. An error from this wait means no
+        // receipt was read in time: the operation may still execute, so wait on
+        // the same hash again later instead of sending the calls again.
         Some(hash) => {
             let receipt = account
                 .wait_for_receipt(hash, Duration::from_secs(120), Duration::from_secs(1))
@@ -1839,10 +1842,14 @@ match account.send_calls(&[withdraw], true, Duration::from_secs(60)).await {
 # }
 ```
 
-A JSON-RPC refusal of the send (`Error::JsonRpc`, for example a validation
-error) means the bundler accepted nothing, and the calls can be sent again.
-Receipt polls that fail with an HTTP error such as 503 or a timeout are retried
-until the wait's deadline.
+Only a JSON-RPC refusal of the send (`Error::JsonRpc`) whose code proves the
+bundler refused the operation, in a well-formed error object (an integer code
+and a string message), means nothing was accepted, and the calls can be
+sent again: an invalid request or parameters (-32700, -32600, -32601, -32602) or
+an ERC-7769 rejection (-32500 to -32505, -32507, -32508). For those,
+`mutation_outcome_unknown()` is false; any other code is an unknown outcome.
+Receipt polls that fail with an HTTP error such as 503 or a timeout are retried,
+and every request and pause ends by the wait's deadline.
 
 Realtime queues fail with `Error::QueueOverflow` instead of silently dropping;
 managed streams rebuild snapshots after reconnect and expose

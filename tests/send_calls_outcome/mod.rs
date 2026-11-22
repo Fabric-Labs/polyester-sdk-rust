@@ -95,6 +95,15 @@ struct State {
     send_status: Option<u16>,
     /// A definite refusal: the send is answered with this error, not stored.
     send_error: Option<Value>,
+    /// The send is stored, then answered with this JSON-RPC error (HTTP 200).
+    stored_send_error: Option<Value>,
+    /// The send is stored, then answered with this result instead of its hash.
+    send_reply: Option<Value>,
+    /// Receipt reads answer null while true.
+    receipt_missing: bool,
+    /// Receipt and status reads are answered this late.
+    receipt_delay: Duration,
+    status_delay: Duration,
 }
 
 struct Bundler {
@@ -188,6 +197,12 @@ fn handle(state: &Mutex<State>, chain_id: u64, body: &Value) -> (u16, Option<Val
             if let Some(status) = state.send_status {
                 return (status, None, Duration::ZERO);
             }
+            if let Some(error) = &state.stored_send_error {
+                return (200, Some(json!({ "error": error })), Duration::ZERO);
+            }
+            if let Some(reply) = &state.send_reply {
+                return (200, Some(json!({ "result": reply })), Duration::ZERO);
+            }
             (200, Some(json!({ "result": hash })), state.send_delay)
         }
         "eth_getUserOperationReceipt" => {
@@ -196,17 +211,24 @@ fn handle(state: &Mutex<State>, chain_id: u64, body: &Value) -> (u16, Option<Val
                 return (503, None, Duration::ZERO);
             }
             let hash = params[0].as_str().unwrap_or_default();
-            if state.operations.iter().any(|held| held == hash) {
-                ok(json!({
+            let result = if !state.receipt_missing
+                && state.operations.iter().any(|held| held == hash)
+            {
+                json!({
                     "userOpHash": hash,
                     "success": true,
                     "receipt": {"transactionHash": format!("0x{}", "ab".repeat(32)), "status": "0x1"},
-                }))
+                })
             } else {
-                ok(Value::Null)
-            }
+                Value::Null
+            };
+            (200, Some(json!({ "result": result })), state.receipt_delay)
         }
-        "pimlico_getUserOperationStatus" => ok(json!({"status": "not_found"})),
+        "pimlico_getUserOperationStatus" => (
+            200,
+            Some(json!({ "result": {"status": "not_found"} })),
+            state.status_delay,
+        ),
         method => (
             200,
             Some(
@@ -260,7 +282,7 @@ async fn mode_a_receipt_poll_503_is_retried_and_returns_the_receipt() {
     let bundler = Bundler::spawn().await;
     bundler.set(|s| s.receipt_503s = 1);
     let account = bundler.account(Duration::from_secs(2));
-    let hash = send(&account, Duration::from_secs(3))
+    let hash = send(&account, Duration::from_secs(10))
         .await
         .expect("send_calls");
     assert_eq!(bundler.held(), vec![hash]);
@@ -319,7 +341,7 @@ async fn without_wait_returns_the_hash_the_bundler_holds() {
 
 #[tokio::test]
 async fn definite_refusal_of_the_send_is_not_outcome_unknown() {
-    for code in [-32602i64, -32500] {
+    for code in [-32602i64, -32500, -32507, -32601] {
         let bundler = Bundler::spawn().await;
         bundler.set(|s| {
             s.send_error = Some(json!({"code": code, "message": "invalid UserOperation"}))
@@ -356,4 +378,151 @@ async fn internal_error_answer_to_the_send_keeps_the_hash() {
         matches!(**source, Error::JsonRpc { code: -32603, .. }),
         "{source:?}"
     );
+}
+
+#[tokio::test]
+async fn unrecognized_error_code_after_storing_keeps_the_hash() {
+    // An HTTP 200 JSON-RPC error whose code is not a defined refusal proves
+    // nothing: here the bundler stored the operation before answering it.
+    for code in [504i64, 1, -32000, -32099, -32506, -32603] {
+        let bundler = Bundler::spawn().await;
+        bundler.set(|s| {
+            s.stored_send_error = Some(json!({"code": code, "message": "gateway timeout"}))
+        });
+        let account = bundler.account(Duration::from_secs(2));
+        let error = send(&account, Duration::from_secs(3)).await.unwrap_err();
+        let hash = assert_unknown_with_hash(&error, &bundler);
+        let Error::UserOperationOutcomeUnknown { source, .. } = &error else {
+            panic!("{error:?}");
+        };
+        assert!(
+            matches!(**source, Error::JsonRpc { code: c, .. } if c == code),
+            "{source:?}"
+        );
+        assert!(source.mutation_outcome_unknown(), "{source:?}");
+        recover_by_waiting(&account, &bundler, &hash).await;
+    }
+}
+
+#[tokio::test]
+async fn malformed_error_object_with_a_refusal_code_keeps_the_hash() {
+    // A refusal code proves a refusal only in a well-formed error object: an
+    // integer code and a string message. Here the bundler stored the operation.
+    let errors = [
+        json!({"code": -32602}),
+        json!({"code": -32602, "message": null}),
+        json!({"code": -32500, "message": 7}),
+        json!({"code": "-32602", "message": "invalid UserOperation"}),
+        json!({"code": -32602.0, "message": "invalid UserOperation"}),
+        json!({"code": true, "message": "invalid UserOperation"}),
+    ];
+    for error in errors {
+        let bundler = Bundler::spawn().await;
+        bundler.set(|s| s.stored_send_error = Some(error.clone()));
+        let account = bundler.account(Duration::from_secs(2));
+        let outcome = send(&account, Duration::from_secs(3)).await.unwrap_err();
+        let hash = assert_unknown_with_hash(&outcome, &bundler);
+        let Error::UserOperationOutcomeUnknown { source, .. } = &outcome else {
+            panic!("{outcome:?}");
+        };
+        assert!(
+            matches!(**source, Error::Transport { .. }),
+            "{error}: {source:?}"
+        );
+        recover_by_waiting(&account, &bundler, &hash).await;
+    }
+}
+
+#[tokio::test]
+async fn answer_naming_another_hash_keeps_the_computed_hash() {
+    let replies = [
+        json!(format!("0x{}", "cd".repeat(32))),
+        json!(""),
+        json!(7),
+        Value::Null,
+    ];
+    for reply in replies {
+        for wait in [true, false] {
+            let bundler = Bundler::spawn().await;
+            bundler.set(|s| s.send_reply = Some(reply.clone()));
+            let account = bundler.account(Duration::from_secs(2));
+            let error = account
+                .send_calls(&[withdraw()], wait, Duration::from_secs(3))
+                .await
+                .unwrap_err();
+            let hash = assert_unknown_with_hash(&error, &bundler);
+            assert_ne!(reply.as_str(), Some(hash.as_str()));
+            recover_by_waiting(&account, &bundler, &hash).await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn receipt_answered_after_the_deadline_is_not_returned() {
+    let bundler = Bundler::spawn().await;
+    bundler.set(|s| s.receipt_delay = Duration::from_millis(1500));
+    let account = bundler.account(Duration::from_secs(5));
+    let started = Instant::now();
+    let error = send(&account, Duration::from_millis(400))
+        .await
+        .unwrap_err();
+    assert!(
+        started.elapsed() < Duration::from_millis(1200),
+        "send_calls took {:?} on a 400ms receipt budget",
+        started.elapsed()
+    );
+    let hash = assert_unknown_with_hash(&error, &bundler);
+    bundler.set(|s| s.receipt_delay = Duration::ZERO);
+    recover_by_waiting(&account, &bundler, &hash).await;
+}
+
+#[tokio::test]
+async fn stalled_status_read_ends_with_the_wait() {
+    let bundler = Bundler::spawn().await;
+    let account = bundler.account(Duration::from_secs(2));
+    let SendCallsResult::Hash(hash) = account
+        .send_calls(&[withdraw()], false, Duration::ZERO)
+        .await
+        .expect("send_calls")
+    else {
+        panic!("no wait returned a receipt");
+    };
+    bundler.set(|s| {
+        s.receipt_missing = true;
+        s.status_delay = Duration::from_secs(3);
+    });
+    let account = bundler.account(Duration::from_secs(5));
+    let started = Instant::now();
+    account
+        .wait_for_receipt(&hash, Duration::from_millis(400), Duration::from_millis(50))
+        .await
+        .unwrap_err();
+    assert!(
+        started.elapsed() < Duration::from_millis(1200),
+        "wait_for_receipt took {:?} on a 400ms budget",
+        started.elapsed()
+    );
+    bundler.set(|s| {
+        s.receipt_missing = false;
+        s.status_delay = Duration::ZERO;
+    });
+    recover_by_waiting(&account, &bundler, &hash).await;
+}
+
+#[test]
+fn json_rpc_error_answers_are_unknown_unless_their_code_proves_a_refusal() {
+    let answer = |code: i64| Error::JsonRpc {
+        method: "eth_sendUserOperation".into(),
+        code,
+        message: "refused".into(),
+    };
+    for code in [
+        -32700, -32600, -32601, -32602, -32500, -32505, -32507, -32508,
+    ] {
+        assert!(!answer(code).mutation_outcome_unknown(), "{code}");
+    }
+    for code in [504, 0, -32506, -32509, -32603, -32000, -32099] {
+        assert!(answer(code).mutation_outcome_unknown(), "{code}");
+        assert!(!answer(code).is_retryable(), "{code}");
+    }
 }

@@ -4,7 +4,7 @@ use alloy_primitives::{Address, B256, Bytes, U256, keccak256};
 use alloy_sol_types::{SolCall, SolStruct, SolValue, eip712_domain, sol};
 use k256::ecdsa::SigningKey;
 use serde_json::{Value, json};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::chain::calldata::ChainCall;
 use crate::chain::environment::{POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment};
@@ -192,17 +192,12 @@ fn decode_hex_bytes(value: &str) -> Result<Vec<u8>> {
     hex::decode(hex).map_err(|e| Error::transport(format!("invalid hex bytes: {e}")))
 }
 
-/// JSON-RPC error codes that do not prove the bundler refused an operation:
-/// an internal error and the implementation-defined server error range.
-const JSONRPC_INTERNAL_ERROR: i64 = -32603;
-const JSONRPC_SERVER_ERRORS: std::ops::RangeInclusive<i64> = -32099..=-32000;
-
-/// Whether `error` is an answered JSON-RPC error object that refuses the call.
-/// An HTTP error, a timeout, a malformed answer, an internal error or a server
-/// error proves nothing about the call's outcome.
+/// Whether `error` is a JSON-RPC error answer whose code proves a refusal
+/// (see [`Error::JsonRpc`]). An HTTP error, a timeout, a malformed answer, or
+/// an error object whose code is not a refusal code proves nothing about the
+/// call's outcome.
 fn is_jsonrpc_refusal(error: &Error) -> bool {
-    matches!(error, Error::JsonRpc { code, .. }
-        if *code != JSONRPC_INTERNAL_ERROR && !JSONRPC_SERVER_ERRORS.contains(code))
+    matches!(error, Error::JsonRpc { code, .. } if crate::errors::is_jsonrpc_refusal_code(*code))
 }
 
 fn outcome_unknown(user_operation_hash: &str, source: Error) -> Error {
@@ -613,53 +608,68 @@ impl PolyesterSmartAccount {
             Err(error) if is_jsonrpc_refusal(&error) => return Err(error),
             Err(error) => return Err(outcome_unknown(&computed_hash, error)),
         };
-        let hash = match accepted.as_str() {
-            Some(hash) if !hash.is_empty() => hash.to_string(),
-            _ => {
-                return Err(outcome_unknown(
-                    &computed_hash,
-                    Error::transport("eth_sendUserOperation returned no hash"),
-                ));
-            }
-        };
+        // The computed hash is the operation's identity: an answer that names
+        // another one (or none) does not say what the bundler holds.
+        if !accepted
+            .as_str()
+            .is_some_and(|hash| hash.eq_ignore_ascii_case(&computed_hash))
+        {
+            let answered: String = accepted.to_string().chars().take(80).collect();
+            return Err(outcome_unknown(
+                &computed_hash,
+                Error::transport(format!(
+                    "eth_sendUserOperation answered {answered}, not the operation's hash {computed_hash}"
+                )),
+            ));
+        }
         if !wait {
-            return Ok(SendCallsResult::Hash(hash));
+            return Ok(SendCallsResult::Hash(computed_hash));
         }
         match self
-            .wait_for_receipt(&hash, receipt_timeout, Duration::from_secs(1))
+            .wait_for_receipt(&computed_hash, receipt_timeout, Duration::from_secs(1))
             .await
         {
             Ok(receipt) => Ok(SendCallsResult::Receipt(receipt)),
-            Err(error) => Err(outcome_unknown(&hash, error)),
+            Err(error) => Err(outcome_unknown(&computed_hash, error)),
         }
     }
 
     /// Poll the bundler for a UserOperation's receipt until `timeout` passes.
     ///
-    /// A poll that fails without a JSON-RPC refusal (an HTTP error such as
-    /// 503, a timeout or a transport error) is retried until the deadline, and
-    /// the deadline's error names the last such failure. Fails at once when
-    /// the bundler reports the operation rejected.
+    /// `timeout` bounds the whole wait: every request and every pause ends by
+    /// then. A poll that fails without a JSON-RPC refusal (an HTTP error such
+    /// as 503, a timeout or a transport error) is retried until the deadline,
+    /// and the deadline's error names the last such failure. Fails at once
+    /// when the bundler reports the operation rejected. An error means no
+    /// receipt was read in time, not that the operation will not execute.
     pub async fn wait_for_receipt(
         &self,
         user_operation_hash: &str,
         timeout: Duration,
         poll_interval: Duration,
     ) -> Result<UserOperationReceipt> {
-        let deadline = Instant::now() + timeout;
+        let deadline = tokio::time::Instant::now() + timeout;
+        let pause =
+            || tokio::time::sleep_until(deadline.min(tokio::time::Instant::now() + poll_interval));
         let mut last_error: Option<Error> = None;
-        while Instant::now() < deadline {
-            let raw = match self
-                .bundler
-                .request("eth_getUserOperationReceipt", json!([user_operation_hash]))
-                .await
-            {
+        while tokio::time::Instant::now() < deadline {
+            let receipt = tokio::time::timeout_at(
+                deadline,
+                self.bundler
+                    .request("eth_getUserOperationReceipt", json!([user_operation_hash])),
+            )
+            .await
+            .unwrap_or_else(|_| {
+                Err(Error::transport(
+                    "jsonrpc timeout calling eth_getUserOperationReceipt",
+                ))
+            });
+            let raw = match receipt {
                 Ok(raw) => raw,
                 Err(error) if is_jsonrpc_refusal(&error) => return Err(error),
                 Err(error) => {
                     last_error = Some(error);
-                    let left = deadline.saturating_duration_since(Instant::now());
-                    tokio::time::sleep(poll_interval.min(left)).await;
+                    pause().await;
                     continue;
                 }
             };
@@ -691,20 +701,21 @@ impl PolyesterSmartAccount {
                     raw,
                 });
             }
-            if let Ok(status) = self
-                .bundler
-                .request(
+            if let Ok(Ok(status)) = tokio::time::timeout_at(
+                deadline,
+                self.bundler.request(
                     "pimlico_getUserOperationStatus",
                     json!([user_operation_hash]),
-                )
-                .await
+                ),
+            )
+            .await
                 && status.get("status").and_then(|v| v.as_str()) == Some("rejected")
             {
                 return Err(Error::transport(format!(
                     "bundler rejected UserOperation {user_operation_hash}: {status}"
                 )));
             }
-            tokio::time::sleep(poll_interval).await;
+            pause().await;
         }
         let error = Error::transport(format!(
             "timed out waiting for UserOperation receipt {user_operation_hash}{}",
