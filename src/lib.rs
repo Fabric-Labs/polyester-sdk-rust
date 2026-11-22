@@ -49,6 +49,8 @@ pub mod client;
 #[cfg(test)]
 mod client_secret_release_tests;
 pub mod codecs;
+#[cfg(test)]
+mod crypto_golden_tests;
 pub mod environment;
 pub mod errors;
 pub mod marketoverview;

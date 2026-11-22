@@ -1,0 +1,285 @@
+{
+  "ed25519": [
+    {
+      "payloads": [
+        {
+          "payload": "",
+          "signature": "9ca53579530654d5c3df77089ef45eda613e2fedf670e96bedac4639504e5845ef4b95d5793077233dd16817b2532e9c5525872a73a4ad74b759369a9e05c102"
+        },
+        {
+          "payload": "00",
+          "signature": "d45bd436eca8cf5deec21c0da72226f03aa29cabccce352c6740fba7c61267c8057328c52ef100e5bc02356fe2d4c53a1424116ce6a1cf77b4480fe3a905f90e"
+        },
+        {
+          "payload": "706f6c7965737465722d676f6c64656e",
+          "signature": "e05c5bc04dc9aef3e5824798e6f4e3624ae945ee8dc827ec7bfcfec5b9cfc61dd396335548db18f607da2a2554eb662ad364f0d9bc6b9c673a09d7a9d9f2dc0f"
+        }
+      ],
+      "requests": [
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-SIGNATURE": "d594c4da038ba0a6fdce75246d85b34f80735f7051ed0102073fbd04bd4057889249ddbab7c177887d7eed1fa3aaa8e8c8e68104cf784289306412a560fdeb04",
+            "X-API-TIMESTAMP": "123"
+          },
+          "method": "GET",
+          "recv_window_ms": null,
+          "timestamp_ms": "123",
+          "url": "https://api.example.com/v1/orders?symbol=BTC-USDC&limit=10"
+        },
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-RECV-WINDOW": "5000",
+            "X-API-SIGNATURE": "092fd250e15d860e878e93e7d89abed024626a3292584a7c9e384587e502fa51d7baf7d03e5be84e2b6b4772ea158ea1755e34a3e0d245c7c6793a30b0007202",
+            "X-API-TIMESTAMP": "1700000000000"
+          },
+          "method": "POST",
+          "recv_window_ms": 5000,
+          "timestamp_ms": "1700000000000",
+          "url": "https://api.example.com/orders.v1.OrderService/PlaceOrder"
+        },
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-SIGNATURE": "62f9d67f400d277b81aa56a242adf4dda4a195c99c868d2ac1c21ba28e17f26f0ff5fa99f746fdd729eb33c484288c6380306615c3b31f9b095cfa26df68110a",
+            "X-API-TIMESTAMP": "1"
+          },
+          "method": "POST",
+          "recv_window_ms": null,
+          "timestamp_ms": "1",
+          "url": "https://api.example.com/auth.v1.AuthService/Me"
+        }
+      ],
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    },
+    {
+      "payloads": [
+        {
+          "payload": "",
+          "signature": "8f895b3cafe2c9506039d0e2a66382568004674fe8d237785092e40d6aaf483e4fc60168705f31f101596138ce21aa357c0d32a064f423dc3ee4aa3abf53f803"
+        },
+        {
+          "payload": "00",
+          "signature": "1b9da904f12708363c88d4b96b33b474b2a5a863e290be2be5d4cacef8a5cbac1c0132c3e20e477d7affd1491be6577e8b83af012773beaf51c6df3f4af95b0e"
+        },
+        {
+          "payload": "706f6c7965737465722d676f6c64656e",
+          "signature": "7ab04b7d83cbdde46968b1560af1b72f760846d2d0e24ab95be59931bcb20abea2f9ded7621d48e73e628b65f7f8efbefe0c081f51100523740cfb6bf1d1a40f"
+        }
+      ],
+      "requests": [
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-SIGNATURE": "50a67e19093cf6bb0e9a49c97f6c2e931128eb595058a583580079e7ca05736f3280ad04ad39835164b4d299d6241aad0b24f2fc979880244e8d8783978f980f",
+            "X-API-TIMESTAMP": "123"
+          },
+          "method": "GET",
+          "recv_window_ms": null,
+          "timestamp_ms": "123",
+          "url": "https://api.example.com/v1/orders?symbol=BTC-USDC&limit=10"
+        },
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-RECV-WINDOW": "5000",
+            "X-API-SIGNATURE": "419cdc2769d878867b83c4918e92fc1a4f93489558159445a5586a238e393c83ce11626f284e9f1d23e5bf304591a1fc7fc034c1b45a41bbc3f7cf9b0017de01",
+            "X-API-TIMESTAMP": "1700000000000"
+          },
+          "method": "POST",
+          "recv_window_ms": 5000,
+          "timestamp_ms": "1700000000000",
+          "url": "https://api.example.com/orders.v1.OrderService/PlaceOrder"
+        },
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-SIGNATURE": "b6c3e47efeae7c5035ad7aeafe27337bd7e667a5143f165fc5d86483657c0588a9886184f3727cc03a9b04068d9af2583c49542761bdd2425386dca80af2600a",
+            "X-API-TIMESTAMP": "1"
+          },
+          "method": "POST",
+          "recv_window_ms": null,
+          "timestamp_ms": "1",
+          "url": "https://api.example.com/auth.v1.AuthService/Me"
+        }
+      ],
+      "seed": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "payloads": [
+        {
+          "payload": "",
+          "signature": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+        },
+        {
+          "payload": "00",
+          "signature": "fb6665a8e278a0d6a80450b95d4c4ef7e4bc78694db766e16c8b754f8589e1f3b39709e7d714f8173023cf7d4f46330b216cbf4e95274b22bbd6125aa14c8f0a"
+        },
+        {
+          "payload": "706f6c7965737465722d676f6c64656e",
+          "signature": "2d81fe639b0eabd2baaea41cc58bd5e7041c23e93738800dd5b27bf88341d2e2672aa0409921dd1e5f06101c076b9c4e7fb46f1dfacf2f20ba787c90c6c52503"
+        }
+      ],
+      "requests": [
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-SIGNATURE": "973c667f12ff5b2ba4d549c82e9cb4ce16cfcda36998832ef59c82050b1abcf7a914da392a44306449ca5413b67121068eec02b16ee9b6981c1831fd9b4a720a",
+            "X-API-TIMESTAMP": "123"
+          },
+          "method": "GET",
+          "recv_window_ms": null,
+          "timestamp_ms": "123",
+          "url": "https://api.example.com/v1/orders?symbol=BTC-USDC&limit=10"
+        },
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-RECV-WINDOW": "5000",
+            "X-API-SIGNATURE": "84699a61b534caad175d57849cf47eb4aa745bc72b89da325124ac45be3d1ff1853b2f9eb29d3c3ba11febdd25fb974af5cbcfe357519d02e2d150c02132920b",
+            "X-API-TIMESTAMP": "1700000000000"
+          },
+          "method": "POST",
+          "recv_window_ms": 5000,
+          "timestamp_ms": "1700000000000",
+          "url": "https://api.example.com/orders.v1.OrderService/PlaceOrder"
+        },
+        {
+          "headers": {
+            "X-API-KEY-ID": "ak_golden",
+            "X-API-SIGNATURE": "9ea2be9d099aa3d3a840087549c2d3f4c8f182b3baac9c45b49cf555fad18a0e63f324c2b08511d9e53cb1b548f1e5188105df78744e829bed23aa0550b07d07",
+            "X-API-TIMESTAMP": "1"
+          },
+          "method": "POST",
+          "recv_window_ms": null,
+          "timestamp_ms": "1",
+          "url": "https://api.example.com/auth.v1.AuthService/Me"
+        }
+      ],
+      "seed": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+    }
+  ],
+  "secp256k1": [
+    {
+      "key": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "owner": "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+      "safe_ops": [
+        {
+          "case": "devnet-empty",
+          "packed": "000000000000000000000000e6df949cfa2870e913847b52e13f3699faadb2156dc3984eb9cbfd2da18a37581b0f8179bfefa5763b6684b83d384a7bb078830d9c703835cb3781dd89c96cf21b",
+          "r": "e6df949cfa2870e913847b52e13f3699faadb2156dc3984eb9cbfd2da18a3758",
+          "s": "1b0f8179bfefa5763b6684b83d384a7bb078830d9c703835cb3781dd89c96cf2",
+          "safe": "0xA244Ed1dc6B46C75F37E0119054fFa45E76c9B6f",
+          "v": 27
+        },
+        {
+          "case": "devnet-call",
+          "packed": "00006553f10000006553ff10a1fd31ac9b8d62d7f97c09f6da181b1fcb561ced2c506254594538e3b6bf06b66744638075931803d24f865d6dcce47e122ffa47b5e4a2e4b3f49b888e8103581c",
+          "r": "a1fd31ac9b8d62d7f97c09f6da181b1fcb561ced2c506254594538e3b6bf06b6",
+          "s": "6744638075931803d24f865d6dcce47e122ffa47b5e4a2e4b3f49b888e810358",
+          "safe": "0x4AEdcc90537f9fb3828E6b431E5A16Cdc473D6f0",
+          "v": 28
+        },
+        {
+          "case": "testnet-deploy-paymaster",
+          "packed": "000000000001ffffffffffffc573839fe9fbd460cd5e9d51366f7ca9c3aede1b331fb8cff4b6f9e0fe2b907927bc7aab8dd07750cfaa5e57c8d236bc47d81d44dd37661855fe404dca1244cb1b",
+          "r": "c573839fe9fbd460cd5e9d51366f7ca9c3aede1b331fb8cff4b6f9e0fe2b9079",
+          "s": "27bc7aab8dd07750cfaa5e57c8d236bc47d81d44dd37661855fe404dca1244cb",
+          "safe": "0x6271416227962a579dC845786f8516e4C8F67D06",
+          "v": 27
+        }
+      ]
+    },
+    {
+      "key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+      "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "safe_ops": [
+        {
+          "case": "devnet-empty",
+          "packed": "00000000000000000000000080ff56f1881bab7e4423498bcf9594135eaa7811febc443a97618a16b6768e7f43b0365153d58e342246860a0c34653da31a17e509b12f1e6ab610e1b2be6c6a1b",
+          "r": "80ff56f1881bab7e4423498bcf9594135eaa7811febc443a97618a16b6768e7f",
+          "s": "43b0365153d58e342246860a0c34653da31a17e509b12f1e6ab610e1b2be6c6a",
+          "safe": "0x37CFE2fB03F121e18733C3323859E496fF9eA7a1",
+          "v": 27
+        },
+        {
+          "case": "devnet-call",
+          "packed": "00006553f10000006553ff1041b4b30811dcea011617b8afadddae8f66b01a27a7672bfe3e5fd6240ff2b9eb5ba1d8c15fac6b19dab928c51565636930e2327f4c95754a4642f6c5d1e6b2121b",
+          "r": "41b4b30811dcea011617b8afadddae8f66b01a27a7672bfe3e5fd6240ff2b9eb",
+          "s": "5ba1d8c15fac6b19dab928c51565636930e2327f4c95754a4642f6c5d1e6b212",
+          "safe": "0xd045C3DA5796EC44D1B5C5677c68Fc7D96F51Af0",
+          "v": 27
+        },
+        {
+          "case": "testnet-deploy-paymaster",
+          "packed": "000000000001fffffffffffffecdf1cc0ebee76660531ea26f5919ddd2db3365964d46666184d331cdc5a8012f2a5a9db6fa654bbd14a4e63b5b7c1278fedd16e2c71bbaa08730b3564f02f61b",
+          "r": "fecdf1cc0ebee76660531ea26f5919ddd2db3365964d46666184d331cdc5a801",
+          "s": "2f2a5a9db6fa654bbd14a4e63b5b7c1278fedd16e2c71bbaa08730b3564f02f6",
+          "safe": "0x36278DE529205bC2803de657429878AF39CCF92D",
+          "v": 27
+        }
+      ]
+    },
+    {
+      "key": "0x4646464646464646464646464646464646464646464646464646464646464646",
+      "owner": "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+      "safe_ops": [
+        {
+          "case": "devnet-empty",
+          "packed": "000000000000000000000000463a22bf7dc8bc30845982669a899c8eb78477f9dded70b2cac30f6552bd09384730e7c922b616757cd7e5f54c2d0c5340103ca3ae6372a31466d7c217a47a011c",
+          "r": "463a22bf7dc8bc30845982669a899c8eb78477f9dded70b2cac30f6552bd0938",
+          "s": "4730e7c922b616757cd7e5f54c2d0c5340103ca3ae6372a31466d7c217a47a01",
+          "safe": "0xcbb10859e2d502f8f21571eDbEa412CB1A9C87df",
+          "v": 28
+        },
+        {
+          "case": "devnet-call",
+          "packed": "00006553f10000006553ff103c63a610aa7fa1e74c0dab1a8e5d8d0625bd1247e75c0cbba1ac1a5154d0aa751ff2d5e226405602f417d47ad6c562c124050739916a368dfccb7173dea46f3c1c",
+          "r": "3c63a610aa7fa1e74c0dab1a8e5d8d0625bd1247e75c0cbba1ac1a5154d0aa75",
+          "s": "1ff2d5e226405602f417d47ad6c562c124050739916a368dfccb7173dea46f3c",
+          "safe": "0x78a9B2deBa644438F9Cc5A8e6f2308d00Ec4AC3c",
+          "v": 28
+        },
+        {
+          "case": "testnet-deploy-paymaster",
+          "packed": "000000000001ffffffffffff747773acca2f58cdfb992f85cbdae5c5adbc422cd8677f37119ac61919006d8769f5beaf3cc3e40168b4c01fcecccaf5360d122240ef00c3914850709c6753291b",
+          "r": "747773acca2f58cdfb992f85cbdae5c5adbc422cd8677f37119ac61919006d87",
+          "s": "69f5beaf3cc3e40168b4c01fcecccaf5360d122240ef00c3914850709c675329",
+          "safe": "0x86c85A9026b02DA32Aa524664ECDee4A019b730B",
+          "v": 27
+        }
+      ]
+    },
+    {
+      "key": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
+      "owner": "0x80C0dbf239224071c59dD8970ab9d542E3414aB2",
+      "safe_ops": [
+        {
+          "case": "devnet-empty",
+          "packed": "000000000000000000000000adc6da0c7e2cb3f2e56b307cd29a89c96ebbcea0872a0e8226f9dbc48976c3ad1df827ec10e9cfa21512b038428e597502f2fb48a9aec0cc3a5a082f3bb6a05f1c",
+          "r": "adc6da0c7e2cb3f2e56b307cd29a89c96ebbcea0872a0e8226f9dbc48976c3ad",
+          "s": "1df827ec10e9cfa21512b038428e597502f2fb48a9aec0cc3a5a082f3bb6a05f",
+          "safe": "0x96aaf9489a9D304c2BcC07c281DAfFB958c9cD41",
+          "v": 28
+        },
+        {
+          "case": "devnet-call",
+          "packed": "00006553f10000006553ff101ffe94acfdf3a9ed154d51e314bcb2c3af90094b9fdaca9450dfc540801a5b74776b44cbe30e78f5815cbab53800cfe7ff0936008eb0eb7f16452406b698ebe71b",
+          "r": "1ffe94acfdf3a9ed154d51e314bcb2c3af90094b9fdaca9450dfc540801a5b74",
+          "s": "776b44cbe30e78f5815cbab53800cfe7ff0936008eb0eb7f16452406b698ebe7",
+          "safe": "0xcc3DCF77bd5dAaa5BCE32239abfC47e9B6210F9a",
+          "v": 27
+        },
+        {
+          "case": "testnet-deploy-paymaster",
+          "packed": "000000000001ffffffffffff9256e1d4373896e9b531e9b2b9eccefaeb0548b59adaa9da121423770dfddcdb503edf5ef73f9ba9d188c5fcf21fa81d3263af4a3686ebe923a8bf9ea2090d6b1c",
+          "r": "9256e1d4373896e9b531e9b2b9eccefaeb0548b59adaa9da121423770dfddcdb",
+          "s": "503edf5ef73f9ba9d188c5fcf21fa81d3263af4a3686ebe923a8bf9ea2090d6b",
+          "safe": "0xF50b7EB250ED9DabA2932913d4AbAe32e2018817",
+          "v": 28
+        }
+      ]
+    }
+  ]
+}
