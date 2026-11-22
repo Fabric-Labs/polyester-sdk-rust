@@ -408,6 +408,8 @@ impl TriggersService {
             limit: opts.limit.unwrap_or(0),
             ..Default::default()
         };
+        // A blank symbol would list every market: refused before any wait.
+        crate::catalogs::Manager::check_optional_symbol(opts.symbol.as_deref())?;
         if opts.symbol.is_some() || opts.symbol_id.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
@@ -1657,6 +1659,8 @@ impl TriggersService {
     /// A trigger that has already ended is refused as for
     /// [`Self::resume_by_id`].
     pub async fn resume_with(&self, params: ResumeTriggerParams) -> Result<TriggerMutationResult> {
+        // A blank symbol is refused before any wait, as for every market filter.
+        crate::catalogs::Manager::check_optional_symbol(params.symbol.as_deref())?;
         if params.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
@@ -1692,6 +1696,8 @@ impl TriggersService {
             .into_iter()
             .flatten()
             .any(|price| price.symbol().is_some());
+        // A blank symbol is refused before any wait, as for every market filter.
+        crate::catalogs::Manager::check_optional_symbol(params.symbol.as_deref())?;
         if params.symbol.is_some() || (params.symbol_id.is_some() && bound_price) {
             self.ctx.wait_for_catalogs().await?;
         }

@@ -746,6 +746,7 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
         submitted_cancels: msg.submitted_cancels,
         failed_cancels: msg.failed_cancels,
         matched_triggers: msg.matched_triggers,
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
         cancelled_orders: msg
             .cancelled_orders
             .iter()
@@ -938,6 +939,7 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
         results,
         accepted_count: msg.accepted_count,
         rejected_count: msg.rejected_count,
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
     })
 }
 
@@ -1183,6 +1185,7 @@ pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<Cance
                 symbol_id: scope.symbol_id,
                 side: enum_value_side(scope.side),
             }),
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
     })
 }
 
@@ -4236,5 +4239,84 @@ mod tests {
             Some(format_uint64_id(77).as_str())
         );
         assert_eq!(result.results[1].existing_order_id, None);
+    }
+    /// The cancel-all, cancel-all-after and batch-cancel results carry the
+    /// server's response time as `ModifyOrderResult` does: `ts_ns`, or `ts`
+    /// when only that is sent, and 0 when the server sent neither. A cancel-all
+    /// retry's original time is passed through as the server sent it.
+    #[test]
+    fn cancel_results_read_the_server_timestamp() {
+        use buffa_types::google::protobuf::Timestamp;
+        const TS_NS: u64 = 1_700_000_000_123_456_789;
+        let ts = || {
+            buffa::MessageField::some(Timestamp {
+                seconds: 1_700_000_000,
+                nanos: 5,
+                ..Default::default()
+            })
+        };
+        use cancel_all_orders_response::ListingStatus;
+        let cases = [
+            (
+                "ts_ns",
+                TS_NS,
+                buffa::MessageField::none(),
+                ListingStatus::Included,
+                TS_NS,
+            ),
+            ("ts_ns and ts", TS_NS, ts(), ListingStatus::Included, TS_NS),
+            (
+                "ts only",
+                0,
+                ts(),
+                ListingStatus::Included,
+                1_700_000_000_000_000_005,
+            ),
+            (
+                "retry",
+                TS_NS,
+                ts(),
+                ListingStatus::NotRetainedReadOpenOrders,
+                TS_NS,
+            ),
+            (
+                "absent",
+                0,
+                buffa::MessageField::none(),
+                ListingStatus::Included,
+                0,
+            ),
+        ];
+        for (name, ts_ns, ts, listing, want) in cases {
+            let cancel_all = cancel_all_from_proto(&CancelAllOrdersResponse {
+                status: cancel_all_orders_response::Status::Submitted.into(),
+                matched_orders: 1,
+                submitted_cancels: 1,
+                listing_status: listing.into(),
+                ts_ns,
+                ts: ts.clone(),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(cancel_all.ts_ns, want, "{name}");
+            let after = cancel_all_after_from_proto(&CancelAllAfterResponse {
+                status: cancel_all_after_response::Status::Armed.into(),
+                effective_timeout_sec: 30,
+                expires_at_ts_ns: 42,
+                ts_ns,
+                ts: ts.clone(),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(after.ts_ns, want, "{name}");
+            assert_eq!(after.expires_at_ts_ns, "42", "{name}");
+            let batch = batch_cancel_from_proto(&BatchCancelOrdersResponse {
+                ts_ns,
+                ts,
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(batch.ts_ns, want, "{name}");
+        }
     }
 }

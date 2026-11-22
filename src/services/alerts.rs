@@ -231,6 +231,8 @@ impl AlertsService {
             }
             statuses.push(value.into());
         }
+        // A blank symbol would match every market: refused before any wait.
+        crate::catalogs::Manager::check_optional_symbol(opts.symbol.as_deref())?;
         if opts.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         } else {

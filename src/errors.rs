@@ -1971,12 +1971,22 @@ fn decode_ledger_error_detail(detail: &ErrorDetail) -> Option<LedgerErrorDetail>
     LedgerErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
-fn is_auth_like_error_code(code: &str) -> bool {
+/// Whether a service error code refuses the caller's credentials or their
+/// scope. A sub-account policy code is one only when the status says so
+/// (`permission_denied` or `unauthenticated`, such as POLICY_SPOT_TRADE_DENY):
+/// a policy cap such as POLICY_MAX_NOTIONAL or POLICY_MAX_OPEN_ORDERS is
+/// `invalid_argument`, an order refusal like any other, and stays an
+/// [`Error::Api`] that keeps its code.
+fn is_auth_like_error_code(code: &str, status: ErrorCode) -> bool {
     code.contains("UNAUTHENTICATED")
         || code.contains("PERMISSION")
         || code.contains("API_KEY")
         || code.contains("WALLET_BINDING")
-        || code.contains("POLICY")
+        || (code.contains("POLICY")
+            && matches!(
+                status,
+                ErrorCode::PermissionDenied | ErrorCode::Unauthenticated
+            ))
 }
 
 /// The request-size detail, read only under its exact type name: bare, as
@@ -2584,7 +2594,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     answer: None,
                 };
             }
-            if is_auth_like_error_code(&code) {
+            if is_auth_like_error_code(&code, err.code) {
                 return Error::auth(fallback_message.clone());
             }
             let mut metadata = order_detail
@@ -2638,7 +2648,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     answer: None,
                 };
             }
-            if is_auth_like_error_code(&code) {
+            if is_auth_like_error_code(&code, err.code) {
                 return Error::auth(fallback_message.clone());
             }
             return Error::Api {
@@ -2685,7 +2695,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     answer: None,
                 };
             }
-            if is_auth_like_error_code(&code) {
+            if is_auth_like_error_code(&code, err.code) {
                 return Error::auth(fallback_message.clone());
             }
             return Error::Api {
@@ -2739,7 +2749,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     answer: None,
                 };
             }
-            if is_auth_like_error_code(&code) {
+            if is_auth_like_error_code(&code, err.code) {
                 return Error::auth(fallback_message.clone());
             }
             return Error::Api {
@@ -3372,6 +3382,47 @@ mod tests {
             ConnectError::new(connect_code, "order error")
                 .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &detail)),
         )
+    }
+
+    /// A sub-account policy cap refusal (`POLICY_MAX_NOTIONAL`,
+    /// `POLICY_MAX_OPEN_ORDERS`) is `invalid_argument` (HTTP 400): an order
+    /// refusal that maps by its status to an `Error::Api` keeping its code,
+    /// never to `Error::Auth`, whatever "POLICY" its name contains.
+    #[test]
+    fn policy_cap_refusal_is_an_api_error_that_keeps_its_code() {
+        for name in [
+            "ERROR_CODE_POLICY_MAX_NOTIONAL",
+            "ERROR_CODE_POLICY_MAX_OPEN_ORDERS",
+        ] {
+            let mapped = map_order(
+                OrderErrorCode::from_proto_name(name).unwrap(),
+                ErrorCode::InvalidArgument,
+            );
+            assert!(
+                matches!(&mapped, Error::Api { code, .. } if code == name),
+                "{name}: {mapped:?}"
+            );
+            assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
+            assert!(!mapped.mutation_outcome_unknown(), "{name}: {mapped:?}");
+        }
+        // With permission_denied a policy code stays a permission refusal,
+        // and with unauthenticated an authentication error.
+        for name in [
+            "ERROR_CODE_POLICY_SPOT_TRADE_DENY",
+            "ERROR_CODE_POLICY_MARKET_DENY",
+        ] {
+            let code = OrderErrorCode::from_proto_name(name).unwrap();
+            let denied = map_order(code, ErrorCode::PermissionDenied);
+            assert!(
+                matches!(&denied, Error::PermissionDenied { .. }),
+                "{name}: {denied:?}"
+            );
+            let unauthenticated = map_order(code, ErrorCode::Unauthenticated);
+            assert!(
+                matches!(&unauthenticated, Error::Auth { .. }),
+                "{name}: {unauthenticated:?}"
+            );
+        }
     }
 
     /// Orders and triggers answer insufficient funds with `failed_precondition`
