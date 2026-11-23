@@ -1,5 +1,7 @@
 //! Sub-account models (Go `models/sub_accounts.go` thin parity).
 
+use crate::proto::auth::v1 as pb;
+use buffa::EnumValue;
 use buffa_types::google::protobuf::Timestamp;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -135,7 +137,7 @@ pub struct SubAccountInvitesList {
     pub invites: Vec<SubAccountInvite>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SubAccountActivityEvent {
     pub event_type: String,
     pub ts_ms: i64,
@@ -352,11 +354,12 @@ pub enum ActivityAllowlistAction {
 /// What an activity event changed, by the kind of item it affected.
 ///
 /// Each `Option` field is `None` when the event did not set it. A text
-/// change reads an unset side as `""`, an ID change as `None`, a time change
-/// as `None`. Enums shared with other APIs read as those APIs read them:
-/// proto names such as `"ACTIVE"` or `"TRADE_SPOT"`, `""` when unset and
-/// `"UNKNOWN(n)"` for a value this SDK does not know.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// change reads an unset side as `""`, an ID change and a time change as
+/// `None`. Times keep the contract's full precision. Enums shared with
+/// other APIs keep the contract's own types as sent: an unset value reads as
+/// its `..._UNSPECIFIED` variant, and a value newer than this SDK as
+/// [`EnumValue::Unknown`] with its number.
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum ActivityDetails {
     /// An account change.
@@ -408,20 +411,18 @@ pub struct ActivitySessionDetails {
 }
 
 /// What an API key event changed.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ActivityApiKeyDetails {
     pub label: Option<ActivityChange<String>>,
-    /// `auth.v1.ApiKeyStatus` names, such as `"ACTIVE"`.
-    pub status: Option<ActivityChange<String>>,
-    /// `auth.v1.ApiKeyPurpose` names, such as `"STANDARD"`.
-    pub purpose: Option<ActivityChange<String>>,
+    pub status: Option<ActivityChange<EnumValue<pb::ApiKeyStatus>>>,
+    pub purpose: Option<ActivityChange<EnumValue<pb::ApiKeyPurpose>>>,
     pub icon: Option<ActivityChange<String>>,
     pub color: Option<ActivityChange<String>>,
     /// IP addresses or ranges added to and removed from the key's allowlist,
     /// masked like the event's IP for callers who may not see IP addresses.
     pub ip_allowlist: Option<ActivityListChange<String>>,
-    /// The key's expiry, in Unix milliseconds.
-    pub expires_at_ms: Option<ActivityChange<Option<i64>>>,
+    /// The key's expiry.
+    pub expires_at: Option<ActivityChange<Option<Timestamp>>>,
     /// The API key policy bound to the key, as base58 IDs.
     pub api_policy_id: Option<ActivityChange<Option<String>>>,
     /// The strategy bot the key belongs to, as a base58 ID, for a strategy
@@ -430,13 +431,12 @@ pub struct ActivityApiKeyDetails {
 }
 
 /// What a policy event changed.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ActivityPolicyDetails {
     pub name: Option<ActivityChange<String>>,
     pub description: Option<ActivityChange<String>>,
-    /// Actions the policy allowed and stopped allowing, as
-    /// `auth.v1.PolicyAction` names such as `"TRADE_SPOT"`.
-    pub actions: Option<ActivityListChange<String>>,
+    /// Actions the policy allowed and stopped allowing.
+    pub actions: Option<ActivityListChange<EnumValue<pb::PolicyAction>>>,
     /// Whether the policy allows every spot market.
     pub all_spot_markets: Option<ActivityChange<bool>>,
     /// Maximum notional of one order, in canonical quote microunits (one unit
@@ -446,13 +446,12 @@ pub struct ActivityPolicyDetails {
     pub max_open_orders: Option<ActivityChange<u64>>,
     pub trading_halted: Option<ActivityChange<bool>>,
     pub locked: Option<ActivityChange<bool>>,
-    /// The policy's review time, in Unix milliseconds.
-    pub review_at_ms: Option<ActivityChange<Option<i64>>>,
-    /// The policy's expiry, in Unix milliseconds.
-    pub expires_at_ms: Option<ActivityChange<Option<i64>>>,
-    /// The AI assistant key preset the policy follows, as its
-    /// `auth.v1.AssistantKeyPreset` name.
-    pub assistant_preset: String,
+    /// The policy's review time.
+    pub review_at: Option<ActivityChange<Option<Timestamp>>>,
+    /// The policy's expiry.
+    pub expires_at: Option<ActivityChange<Option<Timestamp>>>,
+    /// The AI assistant key preset the policy follows.
+    pub assistant_preset: EnumValue<pb::AssistantKeyPreset>,
     /// The template the policy was copied from, as a base58 ID.
     pub source_template_id: Option<String>,
     /// That template's revision when it was copied; 0 when none.
@@ -468,8 +467,7 @@ pub struct ActivityPolicyDetails {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ActivitySubaccountDetails {
     pub label: Option<ActivityChange<String>>,
-    /// Status as [`SubAccount::status`] reads it: `"active"`, `"disabled"`.
-    pub status: Option<ActivityChange<String>>,
+    pub status: Option<ActivityChange<EnumValue<pb::SubaccountStatus>>>,
     pub icon: Option<ActivityChange<String>>,
     pub color: Option<ActivityChange<String>>,
     /// Whether the sub-account's members must use MFA.
@@ -479,9 +477,9 @@ pub struct ActivitySubaccountDetails {
 /// What a membership event changed.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ActivityMemberDetails {
-    /// The member's sub-account role as [`SubAccountMember::role`] reads
-    /// it; `""` on the side where the member had none.
-    pub role: Option<ActivityChange<String>>,
+    /// The member's sub-account role; `SUBACCOUNT_ROLE_UNSPECIFIED` on the
+    /// side where the member had none.
+    pub role: Option<ActivityChange<EnumValue<pb::SubaccountRole>>>,
     /// The member's QuickSwap broker role; `None` on the side where the
     /// member had none.
     pub broker_role: Option<ActivityChange<Option<ActivityBrokerRole>>>,
@@ -494,14 +492,11 @@ pub struct ActivityMemberDetails {
 pub struct ActivityInviteDetails {
     /// The account invited, as a base58 ID.
     pub grantee_account_id: Option<String>,
-    /// The sub-account role offered, as [`SubAccountInvite::role`] reads it;
-    /// `""` when none.
-    pub role: String,
+    /// The sub-account role offered.
+    pub role: EnumValue<pb::SubaccountRole>,
     /// The QuickSwap broker role offered.
     pub broker_role: Option<ActivityBrokerRole>,
-    /// The invitation's status, as [`SubAccountInvite::status`] names it;
-    /// `""` on an unset side.
-    pub status: Option<ActivityChange<String>>,
+    pub status: Option<ActivityChange<EnumValue<pb::SubaccountInviteStatus>>>,
 }
 
 /// What an address-book event changed.
@@ -527,18 +522,16 @@ pub struct ActivityBrokerAllowlistDetails {
 /// What an account security event changed.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ActivitySecurityDetails {
-    /// Type of the MFA factor added, changed, removed or used, as its
-    /// `auth.v1.MFAFactorType` name.
-    pub factor_type: String,
+    /// Type of the MFA factor added, changed, removed or used.
+    pub factor_type: EnumValue<pb::MFAFactorType>,
     pub label: Option<ActivityChange<String>>,
-    /// What a passed MFA check was for, as its `auth.v1.MFAChallengePurpose`
-    /// name.
-    pub challenge_purpose: String,
+    /// What a passed MFA check was for.
+    pub challenge_purpose: EnumValue<pb::MFAChallengePurpose>,
     /// The recovery codes were replaced by new ones.
     pub recovery_codes_rotated: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SubAccountActivityList {
     pub events: Vec<SubAccountActivityEvent>,
     pub next_page_token: String,
@@ -546,7 +539,7 @@ pub struct SubAccountActivityList {
 
 /// One event of the whole account's activity feed, from
 /// [`crate::services::SubAccountsService::list_account_activity`].
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct AccountActivityEvent {
     /// `<entity>:<action>` in lowercase, as [`SubAccountActivityEvent`]
     /// names it, such as `"api_key:created"`.
@@ -575,7 +568,7 @@ pub struct AccountActivityEvent {
 }
 
 /// One page of the whole account's activity feed, newest first.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct AccountActivityList {
     pub events: Vec<AccountActivityEvent>,
     /// Cursor for the next page; empty when there is none.

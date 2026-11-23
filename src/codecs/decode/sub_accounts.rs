@@ -283,19 +283,11 @@ fn optional_id(id: u64) -> Option<String> {
     (id != 0).then(|| format_uint64_id(id))
 }
 
-/// A proto enum other APIs read as its proto name: `""` when unset,
-/// `"UNKNOWN(n)"` for a value this SDK does not know.
-fn named<T: buffa::Enumeration>(value: &buffa::EnumValue<T>) -> String {
-    if value.to_i32() == 0 {
-        String::new()
-    } else {
-        enum_proto_name(value)
-    }
-}
-
-/// A Timestamp as Unix milliseconds; `None` when unset.
-fn optional_ms(ts: &buffa::MessageField<buffa_types::google::protobuf::Timestamp>) -> Option<i64> {
-    ts.as_option().map(|t| timestamp_ms(Some(t)))
+/// A Timestamp as sent, at full precision; `None` when unset.
+fn optional_timestamp(
+    ts: &buffa::MessageField<buffa_types::google::protobuf::Timestamp>,
+) -> Option<buffa_types::google::protobuf::Timestamp> {
+    ts.as_option().cloned()
 }
 
 fn change<T, U>(from: T, to: T, read: impl Fn(T) -> U) -> ActivityChange<U> {
@@ -322,8 +314,9 @@ fn uint_change(msg: &buffa::MessageField<pb::ActivityUintChange>) -> Option<Acti
 
 fn time_change(
     msg: &buffa::MessageField<pb::ActivityTimeChange>,
-) -> Option<ActivityChange<Option<i64>>> {
-    msg.as_option().map(|c| change(&c.from, &c.to, optional_ms))
+) -> Option<ActivityChange<Option<buffa_types::google::protobuf::Timestamp>>> {
+    msg.as_option()
+        .map(|c| change(&c.from, &c.to, optional_timestamp))
 }
 
 fn id_change(
@@ -333,11 +326,13 @@ fn id_change(
         .map(|c| change(c.from_id, c.to_id, optional_id))
 }
 
-fn enum_change<T: buffa::Enumeration>(
-    from: &buffa::EnumValue<T>,
-    to: &buffa::EnumValue<T>,
-) -> ActivityChange<String> {
-    change(from, to, named)
+/// A change of an enum shared with other APIs, kept as the contract's own
+/// type: unset and unknown values read as sent.
+fn enum_change<T: buffa::Enumeration + Copy>(
+    from: buffa::EnumValue<T>,
+    to: buffa::EnumValue<T>,
+) -> ActivityChange<buffa::EnumValue<T>> {
+    ActivityChange { from, to }
 }
 
 fn activity_actor_kind(
@@ -518,15 +513,15 @@ fn activity_details(msg: &pb::ActivityDetails) -> Option<ActivityDetails> {
         }),
         Kind::ApiKey(d) => ActivityDetails::ApiKey(ActivityApiKeyDetails {
             label: text_change(&d.label),
-            status: d.status.as_option().map(|c| enum_change(&c.from, &c.to)),
-            purpose: d.purpose.as_option().map(|c| enum_change(&c.from, &c.to)),
+            status: d.status.as_option().map(|c| enum_change(c.from, c.to)),
+            purpose: d.purpose.as_option().map(|c| enum_change(c.from, c.to)),
             icon: text_change(&d.icon),
             color: text_change(&d.color),
             ip_allowlist: d.ip_allowlist.as_option().map(|c| ActivityListChange {
                 added: c.added.clone(),
                 removed: c.removed.clone(),
             }),
-            expires_at_ms: time_change(&d.expires_at),
+            expires_at: time_change(&d.expires_at),
             api_policy_id: id_change(&d.api_policy_id),
             strategy_bot_id: optional_id(d.strategy_bot_id),
         }),
@@ -534,17 +529,17 @@ fn activity_details(msg: &pb::ActivityDetails) -> Option<ActivityDetails> {
             name: text_change(&d.name),
             description: text_change(&d.description),
             actions: d.actions.as_option().map(|c| ActivityListChange {
-                added: c.added.iter().map(named).collect(),
-                removed: c.removed.iter().map(named).collect(),
+                added: c.added.clone(),
+                removed: c.removed.clone(),
             }),
             all_spot_markets: bool_change(&d.all_spot_markets),
             max_order_notional: uint_change(&d.max_order_notional),
             max_open_orders: uint_change(&d.max_open_orders),
             trading_halted: bool_change(&d.trading_halted),
             locked: bool_change(&d.locked),
-            review_at_ms: time_change(&d.review_at),
-            expires_at_ms: time_change(&d.expires_at),
-            assistant_preset: named(&d.assistant_preset),
+            review_at: time_change(&d.review_at),
+            expires_at: time_change(&d.expires_at),
+            assistant_preset: d.assistant_preset,
             source_template_id: optional_id(d.source_template_id),
             source_template_revision: d.source_template_revision,
             subaccount_policy_id: id_change(&d.subaccount_policy_id),
@@ -552,16 +547,13 @@ fn activity_details(msg: &pb::ActivityDetails) -> Option<ActivityDetails> {
         }),
         Kind::Subaccount(d) => ActivityDetails::Subaccount(ActivitySubaccountDetails {
             label: text_change(&d.label),
-            status: d
-                .status
-                .as_option()
-                .map(|c| change(&c.from, &c.to, subaccount_status_name)),
+            status: d.status.as_option().map(|c| enum_change(c.from, c.to)),
             icon: text_change(&d.icon),
             color: text_change(&d.color),
             require_member_mfa: bool_change(&d.require_member_mfa),
         }),
         Kind::Member(d) => ActivityDetails::Member(ActivityMemberDetails {
-            role: d.role.as_option().map(|c| enum_change(&c.from, &c.to)),
+            role: d.role.as_option().map(|c| enum_change(c.from, c.to)),
             broker_role: d
                 .broker_role
                 .as_option()
@@ -570,9 +562,9 @@ fn activity_details(msg: &pb::ActivityDetails) -> Option<ActivityDetails> {
         }),
         Kind::Invite(d) => ActivityDetails::Invite(ActivityInviteDetails {
             grantee_account_id: optional_id(d.grantee_account_id),
-            role: named(&d.role),
+            role: d.role,
             broker_role: activity_broker_role(&d.broker_role),
-            status: d.status.as_option().map(|c| enum_change(&c.from, &c.to)),
+            status: d.status.as_option().map(|c| enum_change(c.from, c.to)),
         }),
         Kind::Destination(d) => ActivityDetails::Destination(ActivityDestinationDetails {
             label: text_change(&d.label),
@@ -596,9 +588,9 @@ fn activity_details(msg: &pb::ActivityDetails) -> Option<ActivityDetails> {
             })
         }
         Kind::Security(d) => ActivityDetails::Security(ActivitySecurityDetails {
-            factor_type: named(&d.factor_type),
+            factor_type: d.factor_type,
             label: text_change(&d.label),
-            challenge_purpose: named(&d.challenge_purpose),
+            challenge_purpose: d.challenge_purpose,
             recovery_codes_rotated: d.recovery_codes_rotated,
         }),
     })
@@ -1146,13 +1138,16 @@ mod activity_tests {
         .into()
     }
 
-    fn ts(seconds: i64, nanos: i32) -> buffa::MessageField<Timestamp> {
+    fn stamp(seconds: i64, nanos: i32) -> Timestamp {
         Timestamp {
             seconds,
             nanos,
             ..Default::default()
         }
-        .into()
+    }
+
+    fn ts(seconds: i64, nanos: i32) -> buffa::MessageField<Timestamp> {
+        stamp(seconds, nanos).into()
     }
 
     fn id_change(from_id: u64, to_id: u64) -> buffa::MessageField<pb::ActivityIdChange> {
@@ -1506,7 +1501,7 @@ mod activity_tests {
                     .into(),
                     expires_at: pb::ActivityTimeChange {
                         from: buffa::MessageField::none(),
-                        to: ts(1_794_700_000, 250_000_000),
+                        to: ts(1_794_700_000, 250_000_001),
                         ..Default::default()
                     }
                     .into(),
@@ -1517,17 +1512,23 @@ mod activity_tests {
             ))),
             ActivityDetails::ApiKey(ActivityApiKeyDetails {
                 label: text_change("old", "new"),
-                status: text_change("ACTIVE", "REVOKED"),
-                purpose: text_change("", "STRATEGY_BOT"),
+                status: Some(ActivityChange {
+                    from: pb::ApiKeyStatus::ACTIVE.into(),
+                    to: pb::ApiKeyStatus::REVOKED.into(),
+                }),
+                purpose: Some(ActivityChange {
+                    from: pb::ApiKeyPurpose::PURPOSE_UNSPECIFIED.into(),
+                    to: pb::ApiKeyPurpose::STRATEGY_BOT.into(),
+                }),
                 icon: text_change("", "🤖"),
                 color: text_change("red", ""),
                 ip_allowlist: Some(ActivityListChange {
                     added: vec!["10.0.0.0/8".into()],
                     removed: vec!["192.168.*.*".into(), "1.2.3.4".into()],
                 }),
-                expires_at_ms: Some(ActivityChange {
+                expires_at: Some(ActivityChange {
                     from: None,
-                    to: Some(1_794_700_000_250),
+                    to: Some(stamp(1_794_700_000, 250_000_001)),
                 }),
                 api_policy_id: Some(ActivityChange {
                     from: None,
@@ -1552,7 +1553,11 @@ mod activity_tests {
                     name: text("a", "b"),
                     description: text("c", "d"),
                     actions: pb::ActivityActionsChange {
-                        added: vec![pb::PolicyAction::TRADE_SPOT.into(), EnumValue::from(999)],
+                        added: vec![
+                            pb::PolicyAction::TRADE_SPOT.into(),
+                            pb::PolicyAction::UNSPECIFIED.into(),
+                            EnumValue::from(999),
+                        ],
                         removed: vec![pb::PolicyAction::EXTERNAL_WITHDRAW.into()],
                         ..Default::default()
                     }
@@ -1563,13 +1568,13 @@ mod activity_tests {
                     trading_halted: bool_change(true, false),
                     locked: bool_change(false, true),
                     review_at: pb::ActivityTimeChange {
-                        from: ts(1_794_700_000, 0),
-                        to: ts(1_794_800_000, 0),
+                        from: ts(1_794_700_000, 1),
+                        to: ts(1_794_800_000, 999_999_999),
                         ..Default::default()
                     }
                     .into(),
                     expires_at: pb::ActivityTimeChange {
-                        from: ts(1_794_900_000, 0),
+                        from: ts(1_794_900_000, 123_456_789),
                         to: buffa::MessageField::none(),
                         ..Default::default()
                     }
@@ -1586,8 +1591,12 @@ mod activity_tests {
                 name: text_change("a", "b"),
                 description: text_change("c", "d"),
                 actions: Some(ActivityListChange {
-                    added: vec!["TRADE_SPOT".into(), "UNKNOWN(999)".into()],
-                    removed: vec!["EXTERNAL_WITHDRAW".into()],
+                    added: vec![
+                        pb::PolicyAction::TRADE_SPOT.into(),
+                        pb::PolicyAction::UNSPECIFIED.into(),
+                        EnumValue::Unknown(999),
+                    ],
+                    removed: vec![pb::PolicyAction::EXTERNAL_WITHDRAW.into()],
                 }),
                 all_spot_markets: Some(ActivityChange {
                     from: false,
@@ -1606,15 +1615,15 @@ mod activity_tests {
                     from: false,
                     to: true,
                 }),
-                review_at_ms: Some(ActivityChange {
-                    from: Some(1_794_700_000_000),
-                    to: Some(1_794_800_000_000),
+                review_at: Some(ActivityChange {
+                    from: Some(stamp(1_794_700_000, 1)),
+                    to: Some(stamp(1_794_800_000, 999_999_999)),
                 }),
-                expires_at_ms: Some(ActivityChange {
-                    from: Some(1_794_900_000_000),
+                expires_at: Some(ActivityChange {
+                    from: Some(stamp(1_794_900_000, 123_456_789)),
                     to: None,
                 }),
-                assistant_preset: "TRADE_WITH_APPROVAL".into(),
+                assistant_preset: pb::AssistantKeyPreset::TRADE_WITH_APPROVAL.into(),
                 source_template_id: Some(id(41)),
                 source_template_revision: 3,
                 subaccount_policy_id: Some(ActivityChange {
@@ -1634,7 +1643,7 @@ mod activity_tests {
                     label: text("desk", "desk 2"),
                     status: pb::ActivitySubaccountStatusChange {
                         from: pb::SubaccountStatus::SUBACCOUNT_STATUS_ACTIVE.into(),
-                        to: pb::SubaccountStatus::SUBACCOUNT_STATUS_DISABLED.into(),
+                        to: EnumValue::from(9),
                         ..Default::default()
                     }
                     .into(),
@@ -1646,7 +1655,10 @@ mod activity_tests {
             ))),
             ActivityDetails::Subaccount(ActivitySubaccountDetails {
                 label: text_change("desk", "desk 2"),
-                status: text_change("active", "disabled"),
+                status: Some(ActivityChange {
+                    from: pb::SubaccountStatus::SUBACCOUNT_STATUS_ACTIVE.into(),
+                    to: EnumValue::Unknown(9),
+                }),
                 icon: text_change("a", "b"),
                 color: text_change("c", "d"),
                 require_member_mfa: Some(ActivityChange {
@@ -1679,7 +1691,10 @@ mod activity_tests {
                 }
             ))),
             ActivityDetails::Member(ActivityMemberDetails {
-                role: text_change("", "TRADER"),
+                role: Some(ActivityChange {
+                    from: pb::SubaccountRole::SUBACCOUNT_ROLE_UNSPECIFIED.into(),
+                    to: pb::SubaccountRole::TRADER.into(),
+                }),
                 broker_role: Some(ActivityChange {
                     from: Some(ActivityBrokerRole::Admin),
                     to: Some(ActivityBrokerRole::Owner),
@@ -1747,12 +1762,12 @@ mod activity_tests {
             ))),
             ActivityDetails::Invite(ActivityInviteDetails {
                 grantee_account_id: Some(id(51)),
-                role: "VIEWER".into(),
+                role: pb::SubaccountRole::VIEWER.into(),
                 broker_role: Some(ActivityBrokerRole::Finance),
-                status: text_change(
-                    "SUBACCOUNT_INVITE_STATUS_PENDING",
-                    "SUBACCOUNT_INVITE_STATUS_ACCEPTED"
-                ),
+                status: Some(ActivityChange {
+                    from: pb::SubaccountInviteStatus::SUBACCOUNT_INVITE_STATUS_PENDING.into(),
+                    to: pb::SubaccountInviteStatus::SUBACCOUNT_INVITE_STATUS_ACCEPTED.into(),
+                }),
             })
         );
     }
@@ -1817,6 +1832,82 @@ mod activity_tests {
         }
     }
 
+    /// Times keep the contract's full precision: two expiries within the
+    /// same millisecond stay apart, through both reads.
+    #[test]
+    fn detail_times_keep_full_precision() {
+        let expiry = |nanos| {
+            let ActivityDetails::ApiKey(key) = details(pb::activity_details::Kind::ApiKey(
+                Box::new(pb::ActivityApiKeyDetails {
+                    expires_at: pb::ActivityTimeChange {
+                        from: ts(1_794_700_000, 250_000_000),
+                        to: ts(1_794_700_000, nanos),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }),
+            )) else {
+                panic!("not an API key change");
+            };
+            key.expires_at.unwrap()
+        };
+        let change = expiry(250_000_001);
+        assert_eq!(change.from, Some(stamp(1_794_700_000, 250_000_000)));
+        assert_eq!(change.to, Some(stamp(1_794_700_000, 250_000_001)));
+        assert_ne!(change.from, change.to);
+        assert_eq!(
+            expiry(999_999_999).to,
+            Some(stamp(1_794_700_000, 999_999_999))
+        );
+    }
+
+    /// Unset and unknown values of the shared enums read as sent.
+    #[test]
+    fn shared_enums_keep_unset_and_unknown_values() {
+        assert_eq!(
+            details(pb::activity_details::Kind::Security(Box::default())),
+            ActivityDetails::Security(ActivitySecurityDetails {
+                factor_type: pb::MFAFactorType::MFA_FACTOR_TYPE_UNSPECIFIED.into(),
+                challenge_purpose: pb::MFAChallengePurpose::MFA_CHALLENGE_PURPOSE_UNSPECIFIED
+                    .into(),
+                ..Default::default()
+            })
+        );
+        let ActivityDetails::Security(security) = details(pb::activity_details::Kind::Security(
+            Box::new(pb::ActivitySecurityDetails {
+                factor_type: EnumValue::from(41),
+                challenge_purpose: EnumValue::from(42),
+                ..Default::default()
+            }),
+        )) else {
+            panic!("not a security change");
+        };
+        assert_eq!(
+            (security.factor_type, security.challenge_purpose),
+            (EnumValue::Unknown(41), EnumValue::Unknown(42))
+        );
+        let ActivityDetails::Invite(invite) = details(pb::activity_details::Kind::Invite(
+            Box::new(pb::ActivityInviteDetails {
+                role: EnumValue::from(43),
+                ..Default::default()
+            }),
+        )) else {
+            panic!("not an invite");
+        };
+        assert_eq!(invite.role, EnumValue::Unknown(43));
+        assert_eq!(invite.status, None);
+        let ActivityDetails::Policy(policy) = details(pb::activity_details::Kind::Policy(
+            Box::new(pb::ActivityPolicyDetails {
+                assistant_preset: EnumValue::from(44),
+                ..Default::default()
+            }),
+        )) else {
+            panic!("not a policy change");
+        };
+        assert_eq!(policy.assistant_preset, EnumValue::Unknown(44));
+    }
+
     #[test]
     fn security_details_read_every_field() {
         assert_eq!(
@@ -1831,9 +1922,10 @@ mod activity_tests {
                 }
             ))),
             ActivityDetails::Security(ActivitySecurityDetails {
-                factor_type: "MFA_FACTOR_TYPE_PASSKEY".into(),
+                factor_type: pb::MFAFactorType::MFA_FACTOR_TYPE_PASSKEY.into(),
                 label: text_change("laptop", "yubikey"),
-                challenge_purpose: "MFA_CHALLENGE_PURPOSE_FRESH_STEP_UP".into(),
+                challenge_purpose: pb::MFAChallengePurpose::MFA_CHALLENGE_PURPOSE_FRESH_STEP_UP
+                    .into(),
                 recovery_codes_rotated: true,
             })
         );
