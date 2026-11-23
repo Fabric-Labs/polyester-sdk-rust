@@ -82,6 +82,42 @@ pub type OwnedDeleteStrategyRequestView = ::buffa::view::OwnedView<
 pub type OwnedDeleteStrategyResponseView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::DeleteStrategyResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetStrategyNotesRequestView<'static>>`.
+pub type OwnedGetStrategyNotesRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetStrategyNotesRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetStrategyNotesResponseView<'static>>`.
+pub type OwnedGetStrategyNotesResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetStrategyNotesResponseView<'static>,
+>;
+///Shorthand for `OwnedView<SaveStrategyNotesRequestView<'static>>`.
+pub type OwnedSaveStrategyNotesRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SaveStrategyNotesResponseView<'static>>`.
+pub type OwnedSaveStrategyNotesResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListStrategyNotesRevisionsRequestView<'static>>`.
+pub type OwnedListStrategyNotesRevisionsRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListStrategyNotesRevisionsResponseView<'static>>`.
+pub type OwnedListStrategyNotesRevisionsResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListBacktestsRequestView<'static>>`.
+pub type OwnedListBacktestsRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListBacktestsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListBacktestsResponseView<'static>>`.
+pub type OwnedListBacktestsResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListBacktestsResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<RunScenariosRequestView<'static>>`.
 pub type OwnedRunScenariosRequestView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::RunScenariosRequestView<'static>,
@@ -106,6 +142,14 @@ pub type OwnedGetBacktestRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetBacktestResponseView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::GetBacktestResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ListBacktestTradesRequestView<'static>>`.
+pub type OwnedListBacktestTradesRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListBacktestTradesRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListBacktestTradesResponseView<'static>>`.
+pub type OwnedListBacktestTradesResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListBacktestTradesResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<ExplainStrategyRequestView<'static>>`.
 pub type OwnedExplainStrategyRequestView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::ExplainStrategyRequestView<'static>,
@@ -121,6 +165,14 @@ pub type OwnedProposeDeployRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<ProposeDeployResponseView<'static>>`.
 pub type OwnedProposeDeployResponseView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::ProposeDeployResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DeployBotRequestView<'static>>`.
+pub type OwnedDeployBotRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::DeployBotRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeployBotResponseView<'static>>`.
+pub type OwnedDeployBotResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::DeployBotResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<GetDeployStatusRequestView<'static>>`.
 pub type OwnedGetDeployStatusRequestView = ::buffa::view::OwnedView<
@@ -372,6 +424,94 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::GetStrategyNotesResponse>
+for crate::proto::strategies::v1::__buffa::view::GetStrategyNotesResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::GetStrategyNotesResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetStrategyNotesResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::SaveStrategyNotesResponse>
+for crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::SaveStrategyNotesResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::ListStrategyNotesRevisionsResponse,
+>
+for crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::ListStrategyNotesRevisionsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ListBacktestsResponse>
+for crate::proto::strategies::v1::__buffa::view::ListBacktestsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ListBacktestsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListBacktestsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::strategies::v1::RunScenariosResponse>
 for crate::proto::strategies::v1::__buffa::view::RunScenariosResponseView<'_> {
     fn encode(
@@ -432,6 +572,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ListBacktestTradesResponse>
+for crate::proto::strategies::v1::__buffa::view::ListBacktestTradesResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ListBacktestTradesResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListBacktestTradesResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::strategies::v1::ExplainStrategyResponse>
 for crate::proto::strategies::v1::__buffa::view::ExplainStrategyResponseView<'_> {
     fn encode(
@@ -464,6 +624,26 @@ for crate::proto::strategies::v1::__buffa::view::ProposeDeployResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::strategies::v1::ProposeDeployResponse>
 for ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::ProposeDeployResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::DeployBotResponse>
+for crate::proto::strategies::v1::__buffa::view::DeployBotResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::DeployBotResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::DeployBotResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -715,6 +895,42 @@ pub const STRATEGIES_SERVICE_DELETE_STRATEGY_SPEC: ::connectrpc::Spec = ::connec
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetStrategyNotes` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_GET_STRATEGY_NOTES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/GetStrategyNotes",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SaveStrategyNotes` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_SAVE_STRATEGY_NOTES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/SaveStrategyNotes",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListStrategyNotesRevisions` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_LIST_STRATEGY_NOTES_REVISIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/ListStrategyNotesRevisions",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListBacktests` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_LIST_BACKTESTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/ListBacktests",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `RunScenarios` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -742,6 +958,15 @@ pub const STRATEGIES_SERVICE_GET_BACKTEST_SPEC: ::connectrpc::Spec = ::connectrp
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListBacktestTrades` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_LIST_BACKTEST_TRADES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/ListBacktestTrades",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ExplainStrategy` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -757,6 +982,15 @@ pub const STRATEGIES_SERVICE_EXPLAIN_STRATEGY_SPEC: ::connectrpc::Spec = ::conne
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const STRATEGIES_SERVICE_PROPOSE_DEPLOY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/strategies.v1.StrategiesService/ProposeDeploy",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `DeployBot` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_DEPLOY_BOT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/DeployBot",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
@@ -1012,7 +1246,9 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
     /// an unknown one.
     /// - FAILED_PRECONDITION: DRAFT_REVISION_CONFLICT; revision_conflict gives
-    /// the current revision and its version.
+    /// the current revision and its version. NOTES_REVISION_CONFLICT when
+    /// expected_notes_revision is set and the notes moved past it;
+    /// notes_conflict gives their current revision.
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original save stands.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
     /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
@@ -1205,13 +1441,154 @@ pub trait StrategiesService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// GetStrategyNotes reads the notes of one strategy of the caller: its
+    /// summary and body as last saved.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
+    /// an unknown one.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant READ_STRATEGIES or the key is scoped to a subaccount.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_strategy_notes<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::GetStrategyNotesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::GetStrategyNotesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// SaveStrategyNotes saves the notes of one strategy of the caller as their
+    /// next revision. expected_notes_revision must be the notes' current
+    /// revision; every revision is kept. Notes equal to the current ones add no
+    /// revision.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request, including a summary with a line
+    /// break or over 120 characters, or a body over 8192 bytes; its
+    /// buf.validate.Violations detail names the field and the rule.
+    /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
+    /// an unknown one.
+    /// - FAILED_PRECONDITION: NOTES_REVISION_CONFLICT; notes_conflict gives the
+    /// notes' current revision. DRAFT_REVISION_CONFLICT when
+    /// expected_revision is set and the strategy moved past it.
+    /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original save stands.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant DRAFT_STRATEGIES or the key is scoped to a subaccount.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn save_strategy_notes<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::SaveStrategyNotesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::SaveStrategyNotesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListStrategyNotesRevisions lists the saved notes of one strategy of the
+    /// caller, newest first, with who saved each.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request or page token.
+    /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
+    /// an unknown one.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant READ_STRATEGIES or the key is scoped to a subaccount.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_strategy_notes_revisions<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::ListStrategyNotesRevisionsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::ListStrategyNotesRevisionsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListBacktests lists the backtests of one strategy of the caller, newest
+    /// first: those of the versions its revisions saved, each as a headline. A
+    /// backtest is kept 30 days after it finished; GetBacktest reads one whole.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request or page token.
+    /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
+    /// an unknown one.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant READ_STRATEGIES or the key is scoped to a subaccount.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_backtests<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::ListBacktestsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::ListBacktestsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// RunScenarios runs a version's behaviour examples against its code and
-    /// records the results. The result is deterministic: a version always gets
-    /// the same one.
+    /// records the results. Each market's trading rules (tick, step, minimum
+    /// quantity and minimum notional) are the exchange's when the version first
+    /// runs, unless an example's `observe.markets` says otherwise, and the
+    /// record keeps them: a version always gets the same result, and a new
+    /// version runs on the rules current then.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request.
     /// - NOT_FOUND: VERSION_NOT_FOUND.
-    /// - FAILED_PRECONDITION: VERSION_INVALID.
+    /// - FAILED_PRECONDITION: VERSION_INVALID, also when a market of the
+    /// version isn't listed on the exchange.
     /// - RESOURCE_EXHAUSTED: SCENARIO_RUN_LIMIT_REACHED; retry after
     /// retry_after.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
@@ -1242,9 +1619,10 @@ pub trait StrategiesService: Send + Sync + 'static {
     > + Send;
     /// StartBacktest starts a backtest of a version. A retry with the same
     /// idempotency_key and request returns the backtest the first call started.
-    /// Across keys, a request with the same version, effective window, effective
-    /// settings and effective initial balances returns the same backtest rather
-    /// than running again; defaults count as their resolved values (see
+    /// Across keys, a request with the same identity (version, effective window,
+    /// settings and initial balances, and the fee rates, platform assumptions and
+    /// simulation versions in force) returns the same backtest rather than
+    /// running again; defaults count as their resolved values (see
     /// StartBacktestRequest). Every new backtest counts in the attempts of the
     /// bot's family of versions.
     /// Errors:
@@ -1253,8 +1631,9 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// - NOT_FOUND: VERSION_NOT_FOUND.
     /// - FAILED_PRECONDITION: VERSION_INVALID, WINDOW_HAS_NO_DATA or
     /// NOT_BACKTESTABLE.
-    /// - RESOURCE_EXHAUSTED: BACKTEST_LIMIT_REACHED, retry after retry_after; or
-    /// INDICATOR_SETTINGS_LIMIT_REACHED.
+    /// - RESOURCE_EXHAUSTED: BACKTEST_LIMIT_REACHED, for the daily limit retry
+    /// after retry_after, for the limit on backtests at once retry when one
+    /// finishes; or INDICATOR_SETTINGS_LIMIT_REACHED.
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original backtest stands.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
     /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
@@ -1310,6 +1689,40 @@ pub trait StrategiesService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::strategies::v1::GetBacktestResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListBacktestTrades lists every trade of one finished backtest of the
+    /// caller, in trade_index order, a page at a time.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request, or a page token from another
+    /// caller or backtest.
+    /// - NOT_FOUND: BACKTEST_NOT_FOUND, also once a backtest is past its
+    /// retention.
+    /// - FAILED_PRECONDITION: BACKTEST_NOT_DONE.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant READ_STRATEGIES or the key is scoped to a subaccount.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_backtest_trades<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::ListBacktestTradesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::ListBacktestTradesResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1389,6 +1802,55 @@ pub trait StrategiesService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::strategies::v1::ProposeDeployResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// DeployBot deploys one deploy proposal of the caller: it checks the
+    /// version again, prepares the bot's subaccount, sets the bot's limits and
+    /// its trading key, and starts the bot. The steps run in the call; once the
+    /// bot's start is recorded, the bot starts without the user.
+    /// Only the user's own session may deploy, and it must be a recently
+    /// MFA-elevated session (MFA_RECENT). API keys and sessions a connected app
+    /// holds on the user's behalf are refused.
+    /// A proposal is deployed at most once. Calling again, after an error, a
+    /// timeout or from another tab, continues the same deploy from where it
+    /// is, and answers its status; it never starts a second bot. A step that
+    /// fails ends the deploy as FAILED, answered as a status, not an error:
+    /// failure says why and what to do.
+    /// A deploy that creates a subaccount needs the user's signed
+    /// authorization: request a challenge with CreateSubaccountChallenge, have
+    /// the user sign it, and pass it as subaccount_authorization.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: PROPOSAL_NOT_FOUND, for another account's proposal as for
+    /// an unknown one.
+    /// - FAILED_PRECONDITION: PROPOSAL_EXPIRED, BOT_CAP_REACHED (nothing was
+    /// started), or SUBACCOUNT_AUTHORIZATION_REQUIRED (the deploy keeps its
+    /// progress).
+    /// - PERMISSION_DENIED: MFA_ELEVATION_REQUIRED; or
+    /// AUTH_SESSION_KIND_NOT_ALLOWED for an API key or a session a connected
+    /// app holds on the user's behalf.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn deploy_bot<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::DeployBotRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::DeployBotResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1485,9 +1947,11 @@ pub trait StrategiesService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// GetBot reads one bot of the caller: its money rules and settings, its
-    /// subaccount's balances and open orders, and its recent decisions and
-    /// errors. Only the caller's main account reads its bots.
+    /// GetBot reads one bot of the caller: its money rules and settings, and
+    /// its recent decisions and errors. Its subaccount's balances, open orders
+    /// and profit and loss are read by the bot's subaccount_id, with
+    /// LedgerReadService.GetBalances, OrdersReadService.GetOpenOrders and
+    /// ProfitAndLossService. Only the caller's main account reads its bots.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request.
     /// - NOT_FOUND: BOT_NOT_FOUND, for another account's bot as for an unknown
@@ -1585,7 +2049,10 @@ pub trait StrategiesService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListBotLogs reads a bot's log lines, decisions and errors, oldest first.
+    /// ListBotLogs reads a bot's recent activity, oldest first: the last 20
+    /// decisions of its current deployment, each with the lines its call wrote,
+    /// and its last 20 errors. Older entries are not kept. Each entry lags the
+    /// bot by up to about a minute.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request or page token.
     /// - NOT_FOUND: BOT_NOT_FOUND.
@@ -1620,7 +2087,8 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// stay in the book as the subaccount's own orders, which the bot no longer
     /// manages. CANCEL_ORDERS cancels them all. Its holdings stay in its
     /// subaccount. It works in every state but STOPPED: a running or paused bot
-    /// is stopped. The stop is recorded before the call answers; the bot then
+    /// is stopped, and a bot still being deployed is stopped by ending its
+    /// deploy before the bot starts. The stop is recorded before the call answers; the bot then
     /// reads STOPPING, with no deadline, until its stop is reported complete to
     /// the service, and STOPPED after. A KEEP_ORDERS stop is complete once the
     /// bot's in-flight orders are settled: the orders it hands over never hold
@@ -1961,6 +2429,122 @@ impl<S: StrategiesService> StrategiesServiceExt for S {
                 },
             )
             .with_spec(STRATEGIES_SERVICE_DELETE_STRATEGY_SPEC)
+            .route_view_idempotent(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "GetStrategyNotes",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::GetStrategyNotesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::GetStrategyNotesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_strategy_notes(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::GetStrategyNotesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_GET_STRATEGY_NOTES_SPEC)
+            .route_view(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "SaveStrategyNotes",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::SaveStrategyNotesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.save_strategy_notes(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::SaveStrategyNotesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_SAVE_STRATEGY_NOTES_SPEC)
+            .route_view_idempotent(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListStrategyNotesRevisions",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::ListStrategyNotesRevisionsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_strategy_notes_revisions(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::ListStrategyNotesRevisionsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_LIST_STRATEGY_NOTES_REVISIONS_SPEC)
+            .route_view_idempotent(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListBacktests",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::ListBacktestsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::ListBacktestsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_backtests(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::ListBacktestsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_LIST_BACKTESTS_SPEC)
             .route_view(
                 STRATEGIES_SERVICE_SERVICE_NAME,
                 "RunScenarios",
@@ -2050,6 +2634,35 @@ impl<S: StrategiesService> StrategiesServiceExt for S {
             .with_spec(STRATEGIES_SERVICE_GET_BACKTEST_SPEC)
             .route_view_idempotent(
                 STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListBacktestTrades",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::ListBacktestTradesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::ListBacktestTradesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_backtest_trades(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::ListBacktestTradesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_LIST_BACKTEST_TRADES_SPEC)
+            .route_view_idempotent(
+                STRATEGIES_SERVICE_SERVICE_NAME,
                 "ExplainStrategy",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -2106,6 +2719,35 @@ impl<S: StrategiesService> StrategiesServiceExt for S {
                 },
             )
             .with_spec(STRATEGIES_SERVICE_PROPOSE_DEPLOY_SPEC)
+            .route_view(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "DeployBot",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::DeployBotRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::DeployBotRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.deploy_bot(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::DeployBotResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_DEPLOY_BOT_SPEC)
             .route_view_idempotent(
                 STRATEGIES_SERVICE_SERVICE_NAME,
                 "GetDeployStatus",
@@ -2446,6 +3088,30 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         .with_spec(STRATEGIES_SERVICE_DELETE_STRATEGY_SPEC),
                 )
             }
+            "GetStrategyNotes" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(STRATEGIES_SERVICE_GET_STRATEGY_NOTES_SPEC),
+                )
+            }
+            "SaveStrategyNotes" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STRATEGIES_SERVICE_SAVE_STRATEGY_NOTES_SPEC),
+                )
+            }
+            "ListStrategyNotesRevisions" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(STRATEGIES_SERVICE_LIST_STRATEGY_NOTES_REVISIONS_SPEC),
+                )
+            }
+            "ListBacktests" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(STRATEGIES_SERVICE_LIST_BACKTESTS_SPEC),
+                )
+            }
             "RunScenarios" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -2464,6 +3130,12 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         .with_spec(STRATEGIES_SERVICE_GET_BACKTEST_SPEC),
                 )
             }
+            "ListBacktestTrades" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(STRATEGIES_SERVICE_LIST_BACKTEST_TRADES_SPEC),
+                )
+            }
             "ExplainStrategy" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -2474,6 +3146,12 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(STRATEGIES_SERVICE_PROPOSE_DEPLOY_SPEC),
+                )
+            }
+            "DeployBot" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STRATEGIES_SERVICE_DEPLOY_BOT_SPEC),
                 )
             }
             "GetDeployStatus" => {
@@ -2728,6 +3406,90 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         >(format)
                 })
             }
+            "GetStrategyNotes" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::GetStrategyNotesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::GetStrategyNotesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::GetStrategyNotesRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_strategy_notes(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::GetStrategyNotesResponse,
+                        >(format)
+                })
+            }
+            "SaveStrategyNotes" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::SaveStrategyNotesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::SaveStrategyNotesRequest,
+                    >::from_parts(&req, &body);
+                    svc.save_strategy_notes(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::SaveStrategyNotesResponse,
+                        >(format)
+                })
+            }
+            "ListStrategyNotesRevisions" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::ListStrategyNotesRevisionsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::ListStrategyNotesRevisionsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_strategy_notes_revisions(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::ListStrategyNotesRevisionsResponse,
+                        >(format)
+                })
+            }
+            "ListBacktests" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::ListBacktestsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::ListBacktestsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::ListBacktestsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_backtests(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::ListBacktestsResponse,
+                        >(format)
+                })
+            }
             "RunScenarios" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -2791,6 +3553,27 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         >(format)
                 })
             }
+            "ListBacktestTrades" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::ListBacktestTradesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::ListBacktestTradesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::ListBacktestTradesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_backtest_trades(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::ListBacktestTradesResponse,
+                        >(format)
+                })
+            }
             "ExplainStrategy" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -2830,6 +3613,27 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         .await?
                         .encode::<
                             crate::proto::strategies::v1::ProposeDeployResponse,
+                        >(format)
+                })
+            }
+            "DeployBot" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::DeployBotRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::DeployBotRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::DeployBotRequest,
+                    >::from_parts(&req, &body);
+                    svc.deploy_bot(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::DeployBotResponse,
                         >(format)
                 })
             }
@@ -3502,6 +4306,186 @@ where
             )
             .await
     }
+    /// Call the GetStrategyNotes RPC. Sends a request to /strategies.v1.StrategiesService/GetStrategyNotes.
+    pub async fn get_strategy_notes(
+        &self,
+        request: crate::proto::strategies::v1::GetStrategyNotesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::GetStrategyNotesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_strategy_notes_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetStrategyNotes RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_strategy_notes_with_options(
+        &self,
+        request: crate::proto::strategies::v1::GetStrategyNotesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::GetStrategyNotesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "GetStrategyNotes",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SaveStrategyNotes RPC. Sends a request to /strategies.v1.StrategiesService/SaveStrategyNotes.
+    pub async fn save_strategy_notes(
+        &self,
+        request: crate::proto::strategies::v1::SaveStrategyNotesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.save_strategy_notes_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SaveStrategyNotes RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn save_strategy_notes_with_options(
+        &self,
+        request: crate::proto::strategies::v1::SaveStrategyNotesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::SaveStrategyNotesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "SaveStrategyNotes",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListStrategyNotesRevisions RPC. Sends a request to /strategies.v1.StrategiesService/ListStrategyNotesRevisions.
+    pub async fn list_strategy_notes_revisions(
+        &self,
+        request: crate::proto::strategies::v1::ListStrategyNotesRevisionsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_strategy_notes_revisions_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListStrategyNotesRevisions RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_strategy_notes_revisions_with_options(
+        &self,
+        request: crate::proto::strategies::v1::ListStrategyNotesRevisionsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListStrategyNotesRevisionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListStrategyNotesRevisions",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListBacktests RPC. Sends a request to /strategies.v1.StrategiesService/ListBacktests.
+    pub async fn list_backtests(
+        &self,
+        request: crate::proto::strategies::v1::ListBacktestsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListBacktestsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_backtests_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListBacktests RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_backtests_with_options(
+        &self,
+        request: crate::proto::strategies::v1::ListBacktestsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListBacktestsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListBacktests",
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the RunScenarios RPC. Sends a request to /strategies.v1.StrategiesService/RunScenarios.
     pub async fn run_scenarios(
         &self,
@@ -3637,6 +4621,51 @@ where
             )
             .await
     }
+    /// Call the ListBacktestTrades RPC. Sends a request to /strategies.v1.StrategiesService/ListBacktestTrades.
+    pub async fn list_backtest_trades(
+        &self,
+        request: crate::proto::strategies::v1::ListBacktestTradesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListBacktestTradesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_backtest_trades_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListBacktestTrades RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_backtest_trades_with_options(
+        &self,
+        request: crate::proto::strategies::v1::ListBacktestTradesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListBacktestTradesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListBacktestTrades",
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the ExplainStrategy RPC. Sends a request to /strategies.v1.StrategiesService/ExplainStrategy.
     pub async fn explain_strategy(
         &self,
@@ -3722,6 +4751,51 @@ where
                 &self.config,
                 STRATEGIES_SERVICE_SERVICE_NAME,
                 "ProposeDeploy",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeployBot RPC. Sends a request to /strategies.v1.StrategiesService/DeployBot.
+    pub async fn deploy_bot(
+        &self,
+        request: crate::proto::strategies::v1::DeployBotRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::DeployBotResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.deploy_bot_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeployBot RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn deploy_bot_with_options(
+        &self,
+        request: crate::proto::strategies::v1::DeployBotRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::DeployBotResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "DeployBot",
                 request,
                 options,
             )

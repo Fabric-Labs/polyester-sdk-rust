@@ -208,6 +208,11 @@ pub enum TransferCode {
     /// refunded, and Zipper settles it with the user outside Polyester Chain. A withdrawal from the
     /// Trading account uses TRADING_WITHDRAW_REQUEST_FEE instead.
     WITHDRAW_FAILED = 1075i32,
+    /// Dust conversion leg: a source asset's whole dust amount debited from the
+    /// Trading account, or the target asset's payout credited after the fee. The
+    /// fee is taken from the payout, not booked as a separate transfer; see
+    /// transfer.v1.DustConversionService for the gross amount and fee.
+    DUST_CONVERT = 1077i32,
     /// One leg of an all-or-nothing batch of internal transfers between Trading
     /// accounts: credited together with the batch's other legs. Legs of one batch
     /// share its batch reference.
@@ -283,6 +288,9 @@ impl TransferCode {
     ///Idiomatic alias for [`Self::WITHDRAW_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const WithdrawFailed: Self = Self::WITHDRAW_FAILED;
+    ///Idiomatic alias for [`Self::DUST_CONVERT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustConvert: Self = Self::DUST_CONVERT;
     ///Idiomatic alias for [`Self::INTERNAL_BATCH`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const InternalBatch: Self = Self::INTERNAL_BATCH;
@@ -404,6 +412,7 @@ impl ::buffa::Enumeration for TransferCode {
             1073i32 => ::core::option::Option::Some(Self::FEE_REFILL),
             1074i32 => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
             1075i32 => ::core::option::Option::Some(Self::WITHDRAW_FAILED),
+            1077i32 => ::core::option::Option::Some(Self::DUST_CONVERT),
             1078i32 => ::core::option::Option::Some(Self::INTERNAL_BATCH),
             _ => ::core::option::Option::None,
         }
@@ -436,6 +445,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::FEE_REFILL => "FEE_REFILL",
             Self::SYSTEM_ADJUSTMENT => "SYSTEM_ADJUSTMENT",
             Self::WITHDRAW_FAILED => "WITHDRAW_FAILED",
+            Self::DUST_CONVERT => "DUST_CONVERT",
             Self::INTERNAL_BATCH => "INTERNAL_BATCH",
         }
     }
@@ -486,6 +496,7 @@ impl ::buffa::Enumeration for TransferCode {
             "FEE_REFILL" => ::core::option::Option::Some(Self::FEE_REFILL),
             "SYSTEM_ADJUSTMENT" => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
             "WITHDRAW_FAILED" => ::core::option::Option::Some(Self::WITHDRAW_FAILED),
+            "DUST_CONVERT" => ::core::option::Option::Some(Self::DUST_CONVERT),
             "INTERNAL_BATCH" => ::core::option::Option::Some(Self::INTERNAL_BATCH),
             _ => ::core::option::Option::None,
         }
@@ -515,6 +526,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::FEE_REFILL,
             Self::SYSTEM_ADJUSTMENT,
             Self::WITHDRAW_FAILED,
+            Self::DUST_CONVERT,
             Self::INTERNAL_BATCH,
         ]
     }

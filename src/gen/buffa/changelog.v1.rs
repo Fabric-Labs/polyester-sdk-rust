@@ -367,6 +367,9 @@ pub enum Surface {
     REWARDS = 10i32,
     /// The AI assistant: chats, approvals, memories and preferences.
     ASSISTANT = 11i32,
+    /// Trading bots: strategies you build, backtest and share, and bots running
+    /// them live.
+    TRADING_BOTS = 12i32,
 }
 impl Surface {
     ///Idiomatic alias for [`Self::SURFACE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -405,6 +408,9 @@ impl Surface {
     ///Idiomatic alias for [`Self::ASSISTANT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Assistant: Self = Self::ASSISTANT;
+    ///Idiomatic alias for [`Self::TRADING_BOTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradingBots: Self = Self::TRADING_BOTS;
 }
 impl ::core::default::Default for Surface {
     fn default() -> Self {
@@ -512,6 +518,7 @@ impl ::buffa::Enumeration for Surface {
             9i32 => ::core::option::Option::Some(Self::QUICKSWAP),
             10i32 => ::core::option::Option::Some(Self::REWARDS),
             11i32 => ::core::option::Option::Some(Self::ASSISTANT),
+            12i32 => ::core::option::Option::Some(Self::TRADING_BOTS),
             _ => ::core::option::Option::None,
         }
     }
@@ -532,6 +539,7 @@ impl ::buffa::Enumeration for Surface {
             Self::QUICKSWAP => "QUICKSWAP",
             Self::REWARDS => "REWARDS",
             Self::ASSISTANT => "ASSISTANT",
+            Self::TRADING_BOTS => "TRADING_BOTS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -550,6 +558,7 @@ impl ::buffa::Enumeration for Surface {
             "QUICKSWAP" => ::core::option::Option::Some(Self::QUICKSWAP),
             "REWARDS" => ::core::option::Option::Some(Self::REWARDS),
             "ASSISTANT" => ::core::option::Option::Some(Self::ASSISTANT),
+            "TRADING_BOTS" => ::core::option::Option::Some(Self::TRADING_BOTS),
             _ => ::core::option::Option::None,
         }
     }
@@ -567,6 +576,7 @@ impl ::buffa::Enumeration for Surface {
             Self::QUICKSWAP,
             Self::REWARDS,
             Self::ASSISTANT,
+            Self::TRADING_BOTS,
         ]
     }
 }

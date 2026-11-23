@@ -2334,6 +2334,179 @@ impl ::buffa::Enumeration for Timeframe {
         ]
     }
 }
+/// ---------------------------------------------------------------------------
+/// GetIndexPriceCandles: one continuous price series per spot market, its
+/// composite reference candles before listing and its index price after.
+/// ---------------------------------------------------------------------------
+///
+/// IndexPriceCandleSource names the series a GetIndexPriceCandles candle comes
+/// from.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum IndexPriceCandleSource {
+    INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED = 0i32,
+    /// A composite reference candle: the median of external venues' candles,
+    /// from a bucket that starts before the bucket containing the pair's
+    /// listing_at.
+    INDEX_PRICE_CANDLE_SOURCE_REFERENCE = 1i32,
+    /// An index price candle: the open, high, low and close of the pair's index
+    /// price within the bucket, from the bucket containing listing_at on.
+    INDEX_PRICE_CANDLE_SOURCE_INDEX = 2i32,
+}
+impl IndexPriceCandleSource {
+    ///Idiomatic alias for [`Self::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::INDEX_PRICE_CANDLE_SOURCE_REFERENCE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Reference: Self = Self::INDEX_PRICE_CANDLE_SOURCE_REFERENCE;
+    ///Idiomatic alias for [`Self::INDEX_PRICE_CANDLE_SOURCE_INDEX`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Index: Self = Self::INDEX_PRICE_CANDLE_SOURCE_INDEX;
+}
+impl ::core::default::Default for IndexPriceCandleSource {
+    fn default() -> Self {
+        Self::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for IndexPriceCandleSource {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for IndexPriceCandleSource {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = IndexPriceCandleSource;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(IndexPriceCandleSource)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<IndexPriceCandleSource, E> {
+                <IndexPriceCandleSource as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<IndexPriceCandleSource, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <IndexPriceCandleSource as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<IndexPriceCandleSource, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <IndexPriceCandleSource as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<IndexPriceCandleSource, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for IndexPriceCandleSource {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for IndexPriceCandleSource {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(Self::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED)
+            }
+            1i32 => {
+                ::core::option::Option::Some(Self::INDEX_PRICE_CANDLE_SOURCE_REFERENCE)
+            }
+            2i32 => ::core::option::Option::Some(Self::INDEX_PRICE_CANDLE_SOURCE_INDEX),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED => {
+                "INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED"
+            }
+            Self::INDEX_PRICE_CANDLE_SOURCE_REFERENCE => {
+                "INDEX_PRICE_CANDLE_SOURCE_REFERENCE"
+            }
+            Self::INDEX_PRICE_CANDLE_SOURCE_INDEX => "INDEX_PRICE_CANDLE_SOURCE_INDEX",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED)
+            }
+            "INDEX_PRICE_CANDLE_SOURCE_REFERENCE" => {
+                ::core::option::Option::Some(Self::INDEX_PRICE_CANDLE_SOURCE_REFERENCE)
+            }
+            "INDEX_PRICE_CANDLE_SOURCE_INDEX" => {
+                ::core::option::Option::Some(Self::INDEX_PRICE_CANDLE_SOURCE_INDEX)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED,
+            Self::INDEX_PRICE_CANDLE_SOURCE_REFERENCE,
+            Self::INDEX_PRICE_CANDLE_SOURCE_INDEX,
+        ]
+    }
+}
 /// PairStatus describes which order mutations a spot pair currently accepts.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -4112,8 +4285,13 @@ pub struct GetCandlesRequest {
     pub include_incomplete: bool,
     /// Include the composite reference market candle series for the same market,
     /// timeframe, and time range.
+    /// Reference candles cover only the time before the pair's listing: each one's
+    /// bucket starts before the bucket that contains listing_at, as GetSpotConfig
+    /// reports it. From that bucket on, the pair's own candles cover the market.
+    /// Without listing_at no listing cutoff applies; availability, the requested
+    /// range and pagination still do.
     /// The reference series can be empty when no reference series is available for
-    /// the requested timeframe.
+    /// the requested timeframe, or when the requested range starts after listing.
     ///
     /// Field 7: `include_reference`
     #[serde(
@@ -4123,9 +4301,16 @@ pub struct GetCandlesRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_reference: bool,
-    /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-    /// bound to symbol, timeframe, time bounds, and newest-first candle ordering.
-    /// Inclusion flags affect response enrichment and may change between pages.
+    /// Opaque exclusive keyset cursor from a previous GetCandles or
+    /// GetCandlesColumns response; a cursor from either pages the other. It is
+    /// bound to symbol_id, timeframe, and start_time and end_time exactly as
+    /// sent: an absent bound and an explicit one, the Unix epoch included, are
+    /// different requests. Inclusion flags affect response enrichment and may
+    /// change between pages. At most 512 characters. For a known symbol_id, a
+    /// cursor that is longer, malformed, from GetIndexPriceCandles, or sent with a
+    /// different symbol_id, timeframe, start_time or end_time fails with
+    /// invalid_argument (PAGE_TOKEN_INVALID); an unknown symbol_id fails with
+    /// not_found (UNKNOWN_SYMBOL) first.
     ///
     /// Field 8: `page_token`
     #[serde(
@@ -4454,8 +4639,13 @@ pub struct GetCandlesColumnsRequest {
     pub include_incomplete: bool,
     /// Include the composite reference market candle series for the same market,
     /// timeframe, and time range.
+    /// Reference candles cover only the time before the pair's listing: each one's
+    /// bucket starts before the bucket that contains listing_at, as GetSpotConfig
+    /// reports it. From that bucket on, the pair's own candles cover the market.
+    /// Without listing_at no listing cutoff applies; availability, the requested
+    /// range and pagination still do.
     /// The reference series can be empty when no reference series is available for
-    /// the requested timeframe.
+    /// the requested timeframe, or when the requested range starts after listing.
     ///
     /// Field 7: `include_reference`
     #[serde(
@@ -4465,9 +4655,17 @@ pub struct GetCandlesColumnsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_reference: bool,
-    /// Opaque exclusive keyset cursor for older closed candles, bound to symbol,
-    /// timeframe, and time bounds. Columns within each page are ordered oldest-first.
-    /// Inclusion flags and response shape may change between pages.
+    /// Opaque exclusive keyset cursor for older closed candles, from a previous
+    /// GetCandlesColumns or GetCandles response; a cursor from either pages the
+    /// other. It is bound to symbol_id, timeframe, and start_time and end_time
+    /// exactly as sent: an absent bound and an explicit one, the Unix epoch
+    /// included, are different requests. Columns within each page are ordered
+    /// oldest-first. Inclusion flags and response shape may change between
+    /// pages. At most 512 characters. For a known symbol_id, a cursor that is
+    /// longer, malformed, from GetIndexPriceCandles, or sent with a different
+    /// symbol_id, timeframe, start_time or end_time fails with invalid_argument
+    /// (PAGE_TOKEN_INVALID); an unknown symbol_id fails with not_found
+    /// (UNKNOWN_SYMBOL) first.
     ///
     /// Field 8: `page_token`
     #[serde(
@@ -6321,6 +6519,886 @@ pub const __GET_CANDLES_COLUMNS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
     type_url: "type.googleapis.com/marketdata.v1.GetCandlesColumnsResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetCandlesColumnsResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetCandlesColumnsResponse>,
+    is_wkt: false,
+};
+/// GetIndexPriceCandlesRequest selects one page of a spot market's index price
+/// candles.
+///
+/// The series is continuous across the listing: buckets that start before the
+/// bucket containing the pair's listing_at (as GetSpotConfig reports it) are
+/// reference candles, and from that bucket on they are index price candles. A
+/// bucket is never both. Without listing_at, or with a listing_at in the future,
+/// the series is reference candles only. Only closed candles are returned,
+/// newest-first by bucket start time, with the same bucket alignment as
+/// GetCandles. When both start_time and end_time are set, both bounds are
+/// inclusive.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetIndexPriceCandlesRequest {
+    /// Numeric spot market identifier.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    /// Candle bucket size. Required. Every candle timeframe except SEC_1, which
+    /// has no index price candles and fails with invalid_argument (BAD_REQUEST).
+    ///
+    /// Field 2: `timeframe`
+    #[serde(
+        rename = "timeframe",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub timeframe: ::buffa::EnumValue<Timeframe>,
+    /// Maximum number of candles to return. Defaults to 500 when unset; max
+    /// 10000.
+    ///
+    /// Field 3: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub limit: u32,
+    /// Inclusive lower bound for candle bucket start time, as a UTC timestamp.
+    /// Must not be more than 5 minutes in the future.
+    ///
+    /// Field 4: `start_time`
+    #[serde(
+        rename = "startTime",
+        alias = "start_time",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub start_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Inclusive upper bound for candle bucket start time, as a UTC timestamp.
+    /// Must be greater than or equal to start_time when both are set, and must not
+    /// be more than 5 minutes in the future.
+    ///
+    /// Field 5: `end_time`
+    #[serde(
+        rename = "endTime",
+        alias = "end_time",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub end_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Opaque exclusive keyset cursor from a previous GetIndexPriceCandles
+    /// response, bound to symbol_id, timeframe, and start_time and end_time as
+    /// sent, an absent bound included. It continues toward older candles. At
+    /// most 512 characters. For a known symbol_id, a cursor that is longer,
+    /// malformed, from GetCandles or GetCandlesColumns, or bound to another
+    /// request fails with invalid_argument (PAGE_TOKEN_INVALID); an unknown
+    /// symbol_id fails with not_found (UNKNOWN_SYMBOL) first.
+    ///
+    /// Field 6: `page_token`
+    #[serde(
+        rename = "pageToken",
+        alias = "page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetIndexPriceCandlesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetIndexPriceCandlesRequest")
+            .field("symbol_id", &self.symbol_id)
+            .field("timeframe", &self.timeframe)
+            .field("limit", &self.limit)
+            .field("start_time", &self.start_time)
+            .field("end_time", &self.end_time)
+            .field("page_token", &self.page_token)
+            .finish()
+    }
+}
+impl GetIndexPriceCandlesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesRequest";
+}
+::buffa::impl_default_instance!(GetIndexPriceCandlesRequest);
+impl ::buffa::MessageName for GetIndexPriceCandlesRequest {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "GetIndexPriceCandlesRequest";
+    const FULL_NAME: &'static str = "marketdata.v1.GetIndexPriceCandlesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesRequest";
+}
+impl ::buffa::Message for GetIndexPriceCandlesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        {
+            let val = self.timeframe.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.limit != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+        }
+        if self.start_time.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.start_time.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.end_time.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.end_time.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.page_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+        }
+        {
+            let val = self.timeframe.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if self.limit != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.limit, buf);
+        }
+        if self.start_time.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.start_time.write_to(__cache, buf);
+        }
+        if self.end_time.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.end_time.write_to(__cache, buf);
+        }
+        if !self.page_token.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.timeframe = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.start_time.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.end_time.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id = 0u32;
+        self.timeframe = ::buffa::EnumValue::from(0);
+        self.limit = 0u32;
+        self.start_time = ::buffa::MessageField::none();
+        self.end_time = ::buffa::MessageField::none();
+        self.page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetIndexPriceCandlesRequest {
+    const PROTO_FQN: &'static str = "marketdata.v1.GetIndexPriceCandlesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetIndexPriceCandlesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_INDEX_PRICE_CANDLES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetIndexPriceCandlesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetIndexPriceCandlesRequest>,
+    is_wkt: false,
+};
+/// GetIndexPriceCandlesResponse contains one page of a spot market's index price
+/// candles in columns: element i of every repeated field describes the same
+/// candle.
+///
+/// Candles are ordered newest-first by ts_sec, strictly descending, with no
+/// two at the same ts_sec. There is no volume field: neither a reference candle
+/// nor an index price candle carries trading volume. Gaps exist: a bucket from
+/// the listing on in which the index price had no valid value is omitted, never
+/// filled from the reference series, so treat a missing ts_sec as a gap. Index
+/// price candles begin with the release that introduced them; buckets after a
+/// listing but before that release are omitted the same way. A closed candle
+/// appears once its series has processed the bucket, and candles of longer
+/// timeframes are refreshed periodically, so the newest closed candles can
+/// appear some time after their bucket closes. Reference candles of the most
+/// recent 48 hours can still be revised. Reference candles reach back 180 days
+/// at timeframes shorter than one hour, five years from one hour to twelve
+/// hours, and up to 20 years, as far as the market's history goes, at one day
+/// and longer. Index price candles are kept without a time limit.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetIndexPriceCandlesResponse {
+    /// Numeric spot market identifier echoed from the request.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    /// Candle bucket size of the returned series.
+    ///
+    /// Field 2: `timeframe`
+    #[serde(
+        rename = "timeframe",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub timeframe: ::buffa::EnumValue<Timeframe>,
+    /// Candle bucket start timestamps, in seconds since epoch (UTC), newest
+    /// first. Empty when no candle exists in the requested range.
+    ///
+    /// Field 3: `ts_sec`
+    #[serde(
+        rename = "tsSec",
+        alias = "ts_sec",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub ts_sec: ::buffa::alloc::vec::Vec<u64>,
+    /// Opening prices, scaled by the pair's reference_price_scale from
+    /// GetSpotConfig, the scale of both series.
+    ///
+    /// Field 4: `open`
+    #[serde(
+        rename = "open",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub open: ::buffa::alloc::vec::Vec<i64>,
+    /// Highest prices in each bucket, using the same scale as open.
+    ///
+    /// Field 5: `high`
+    #[serde(
+        rename = "high",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub high: ::buffa::alloc::vec::Vec<i64>,
+    /// Lowest prices in each bucket, using the same scale as open.
+    ///
+    /// Field 6: `low`
+    #[serde(
+        rename = "low",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub low: ::buffa::alloc::vec::Vec<i64>,
+    /// Closing prices, using the same scale as open.
+    ///
+    /// Field 7: `close`
+    #[serde(
+        rename = "close",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub close: ::buffa::alloc::vec::Vec<i64>,
+    /// The series each candle comes from.
+    ///
+    /// Field 8: `source`
+    #[serde(
+        rename = "source",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub source: ::buffa::alloc::vec::Vec<::buffa::EnumValue<IndexPriceCandleSource>>,
+    /// Opaque cursor for the next, older page. Empty when no older candle exists
+    /// in the requested range.
+    ///
+    /// Field 9: `next_page_token`
+    #[serde(
+        rename = "nextPageToken",
+        alias = "next_page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub next_page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetIndexPriceCandlesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetIndexPriceCandlesResponse")
+            .field("symbol_id", &self.symbol_id)
+            .field("timeframe", &self.timeframe)
+            .field("ts_sec", &self.ts_sec)
+            .field("open", &self.open)
+            .field("high", &self.high)
+            .field("low", &self.low)
+            .field("close", &self.close)
+            .field("source", &self.source)
+            .field("next_page_token", &self.next_page_token)
+            .finish()
+    }
+}
+impl GetIndexPriceCandlesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesResponse";
+}
+::buffa::impl_default_instance!(GetIndexPriceCandlesResponse);
+impl ::buffa::MessageName for GetIndexPriceCandlesResponse {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "GetIndexPriceCandlesResponse";
+    const FULL_NAME: &'static str = "marketdata.v1.GetIndexPriceCandlesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesResponse";
+}
+impl ::buffa::Message for GetIndexPriceCandlesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        {
+            let val = self.timeframe.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.ts_sec.is_empty() {
+            let payload: u32 = self
+                .ts_sec
+                .iter()
+                .map(|&v| ::buffa::types::uint64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.open.is_empty() {
+            let payload: u32 = self
+                .open
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.high.is_empty() {
+            let payload: u32 = self
+                .high
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.low.is_empty() {
+            let payload: u32 = self
+                .low
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.close.is_empty() {
+            let payload: u32 = self
+                .close
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.source.is_empty() {
+            let payload: u32 = self
+                .source
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.next_page_token.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+        }
+        {
+            let val = self.timeframe.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if !self.ts_sec.is_empty() {
+            let payload: u32 = self
+                .ts_sec
+                .iter()
+                .map(|&v| ::buffa::types::uint64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+            for &v in &self.ts_sec {
+                ::buffa::types::encode_uint64(v, buf);
+            }
+        }
+        if !self.open.is_empty() {
+            let payload: u32 = self
+                .open
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(4u32, payload, buf);
+            for &v in &self.open {
+                ::buffa::types::encode_int64(v, buf);
+            }
+        }
+        if !self.high.is_empty() {
+            let payload: u32 = self
+                .high
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(5u32, payload, buf);
+            for &v in &self.high {
+                ::buffa::types::encode_int64(v, buf);
+            }
+        }
+        if !self.low.is_empty() {
+            let payload: u32 = self
+                .low
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(6u32, payload, buf);
+            for &v in &self.low {
+                ::buffa::types::encode_int64(v, buf);
+            }
+        }
+        if !self.close.is_empty() {
+            let payload: u32 = self
+                .close
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(7u32, payload, buf);
+            for &v in &self.close {
+                ::buffa::types::encode_int64(v, buf);
+            }
+        }
+        if !self.source.is_empty() {
+            let payload: u32 = self
+                .source
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(8u32, payload, buf);
+            for v in &self.source {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
+        }
+        if !self.next_page_token.is_empty() {
+            ::buffa::types::put_string_field(9u32, &self.next_page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.timeframe = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.ts_sec.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.ts_sec.push(::buffa::types::decode_uint64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.ts_sec.push(::buffa::types::decode_uint64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            4u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.open.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.open.push(::buffa::types::decode_int64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.open.push(::buffa::types::decode_int64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            5u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.high.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.high.push(::buffa::types::decode_int64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.high.push(::buffa::types::decode_int64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            6u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.low.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.low.push(::buffa::types::decode_int64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.low.push(::buffa::types::decode_int64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            7u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.close.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.close.push(::buffa::types::decode_int64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.close.push(::buffa::types::decode_int64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            8u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.source.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.source
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.source
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id = 0u32;
+        self.timeframe = ::buffa::EnumValue::from(0);
+        self.ts_sec.clear();
+        self.open.clear();
+        self.high.clear();
+        self.low.clear();
+        self.close.clear();
+        self.source.clear();
+        self.next_page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetIndexPriceCandlesResponse {
+    const PROTO_FQN: &'static str = "marketdata.v1.GetIndexPriceCandlesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetIndexPriceCandlesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_INDEX_PRICE_CANDLES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetIndexPriceCandlesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetIndexPriceCandlesResponse>,
     is_wkt: false,
 };
 /// ---------------------------------------------------------------------------
@@ -17996,14 +19074,26 @@ pub mod __buffa {
             pub include_incomplete: bool,
             /// Include the composite reference market candle series for the same market,
             /// timeframe, and time range.
+            /// Reference candles cover only the time before the pair's listing: each one's
+            /// bucket starts before the bucket that contains listing_at, as GetSpotConfig
+            /// reports it. From that bucket on, the pair's own candles cover the market.
+            /// Without listing_at no listing cutoff applies; availability, the requested
+            /// range and pagination still do.
             /// The reference series can be empty when no reference series is available for
-            /// the requested timeframe.
+            /// the requested timeframe, or when the requested range starts after listing.
             ///
             /// Field 7: `include_reference`
             pub include_reference: bool,
-            /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to symbol, timeframe, time bounds, and newest-first candle ordering.
-            /// Inclusion flags affect response enrichment and may change between pages.
+            /// Opaque exclusive keyset cursor from a previous GetCandles or
+            /// GetCandlesColumns response; a cursor from either pages the other. It is
+            /// bound to symbol_id, timeframe, and start_time and end_time exactly as
+            /// sent: an absent bound and an explicit one, the Unix epoch included, are
+            /// different requests. Inclusion flags affect response enrichment and may
+            /// change between pages. At most 512 characters. For a known symbol_id, a
+            /// cursor that is longer, malformed, from GetIndexPriceCandles, or sent with a
+            /// different symbol_id, timeframe, start_time or end_time fails with
+            /// invalid_argument (PAGE_TOKEN_INVALID); an unknown symbol_id fails with
+            /// not_found (UNKNOWN_SYMBOL) first.
             ///
             /// Field 8: `page_token`
             pub page_token: &'a str,
@@ -18508,17 +19598,29 @@ pub mod __buffa {
             }
             /// Include the composite reference market candle series for the same market,
             /// timeframe, and time range.
+            /// Reference candles cover only the time before the pair's listing: each one's
+            /// bucket starts before the bucket that contains listing_at, as GetSpotConfig
+            /// reports it. From that bucket on, the pair's own candles cover the market.
+            /// Without listing_at no listing cutoff applies; availability, the requested
+            /// range and pagination still do.
             /// The reference series can be empty when no reference series is available for
-            /// the requested timeframe.
+            /// the requested timeframe, or when the requested range starts after listing.
             ///
             /// Field 7: `include_reference`
             #[must_use]
             pub fn include_reference(&self) -> bool {
                 self.0.reborrow().include_reference
             }
-            /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to symbol, timeframe, time bounds, and newest-first candle ordering.
-            /// Inclusion flags affect response enrichment and may change between pages.
+            /// Opaque exclusive keyset cursor from a previous GetCandles or
+            /// GetCandlesColumns response; a cursor from either pages the other. It is
+            /// bound to symbol_id, timeframe, and start_time and end_time exactly as
+            /// sent: an absent bound and an explicit one, the Unix epoch included, are
+            /// different requests. Inclusion flags affect response enrichment and may
+            /// change between pages. At most 512 characters. For a known symbol_id, a
+            /// cursor that is longer, malformed, from GetIndexPriceCandles, or sent with a
+            /// different symbol_id, timeframe, start_time or end_time fails with
+            /// invalid_argument (PAGE_TOKEN_INVALID); an unknown symbol_id fails with
+            /// not_found (UNKNOWN_SYMBOL) first.
             ///
             /// Field 8: `page_token`
             #[must_use]
@@ -18599,14 +19701,27 @@ pub mod __buffa {
             pub include_incomplete: bool,
             /// Include the composite reference market candle series for the same market,
             /// timeframe, and time range.
+            /// Reference candles cover only the time before the pair's listing: each one's
+            /// bucket starts before the bucket that contains listing_at, as GetSpotConfig
+            /// reports it. From that bucket on, the pair's own candles cover the market.
+            /// Without listing_at no listing cutoff applies; availability, the requested
+            /// range and pagination still do.
             /// The reference series can be empty when no reference series is available for
-            /// the requested timeframe.
+            /// the requested timeframe, or when the requested range starts after listing.
             ///
             /// Field 7: `include_reference`
             pub include_reference: bool,
-            /// Opaque exclusive keyset cursor for older closed candles, bound to symbol,
-            /// timeframe, and time bounds. Columns within each page are ordered oldest-first.
-            /// Inclusion flags and response shape may change between pages.
+            /// Opaque exclusive keyset cursor for older closed candles, from a previous
+            /// GetCandlesColumns or GetCandles response; a cursor from either pages the
+            /// other. It is bound to symbol_id, timeframe, and start_time and end_time
+            /// exactly as sent: an absent bound and an explicit one, the Unix epoch
+            /// included, are different requests. Columns within each page are ordered
+            /// oldest-first. Inclusion flags and response shape may change between
+            /// pages. At most 512 characters. For a known symbol_id, a cursor that is
+            /// longer, malformed, from GetIndexPriceCandles, or sent with a different
+            /// symbol_id, timeframe, start_time or end_time fails with invalid_argument
+            /// (PAGE_TOKEN_INVALID); an unknown symbol_id fails with not_found
+            /// (UNKNOWN_SYMBOL) first.
             ///
             /// Field 8: `page_token`
             pub page_token: &'a str,
@@ -19112,17 +20227,30 @@ pub mod __buffa {
             }
             /// Include the composite reference market candle series for the same market,
             /// timeframe, and time range.
+            /// Reference candles cover only the time before the pair's listing: each one's
+            /// bucket starts before the bucket that contains listing_at, as GetSpotConfig
+            /// reports it. From that bucket on, the pair's own candles cover the market.
+            /// Without listing_at no listing cutoff applies; availability, the requested
+            /// range and pagination still do.
             /// The reference series can be empty when no reference series is available for
-            /// the requested timeframe.
+            /// the requested timeframe, or when the requested range starts after listing.
             ///
             /// Field 7: `include_reference`
             #[must_use]
             pub fn include_reference(&self) -> bool {
                 self.0.reborrow().include_reference
             }
-            /// Opaque exclusive keyset cursor for older closed candles, bound to symbol,
-            /// timeframe, and time bounds. Columns within each page are ordered oldest-first.
-            /// Inclusion flags and response shape may change between pages.
+            /// Opaque exclusive keyset cursor for older closed candles, from a previous
+            /// GetCandlesColumns or GetCandles response; a cursor from either pages the
+            /// other. It is bound to symbol_id, timeframe, and start_time and end_time
+            /// exactly as sent: an absent bound and an explicit one, the Unix epoch
+            /// included, are different requests. Columns within each page are ordered
+            /// oldest-first. Inclusion flags and response shape may change between
+            /// pages. At most 512 characters. For a known symbol_id, a cursor that is
+            /// longer, malformed, from GetIndexPriceCandles, or sent with a different
+            /// symbol_id, timeframe, start_time or end_time fails with invalid_argument
+            /// (PAGE_TOKEN_INVALID); an unknown symbol_id fails with not_found
+            /// (UNKNOWN_SYMBOL) first.
             ///
             /// Field 8: `page_token`
             #[must_use]
@@ -21365,6 +22493,1334 @@ pub mod __buffa {
             type ViewHandle = GetCandlesColumnsResponseOwnedView;
         }
         impl ::serde::Serialize for GetCandlesColumnsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetIndexPriceCandlesRequest selects one page of a spot market's index price
+        /// candles.
+        ///
+        /// The series is continuous across the listing: buckets that start before the
+        /// bucket containing the pair's listing_at (as GetSpotConfig reports it) are
+        /// reference candles, and from that bucket on they are index price candles. A
+        /// bucket is never both. Without listing_at, or with a listing_at in the future,
+        /// the series is reference candles only. Only closed candles are returned,
+        /// newest-first by bucket start time, with the same bucket alignment as
+        /// GetCandles. When both start_time and end_time are set, both bounds are
+        /// inclusive.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetIndexPriceCandlesRequestView<'a> {
+            /// Numeric spot market identifier.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
+            /// Candle bucket size. Required. Every candle timeframe except SEC_1, which
+            /// has no index price candles and fails with invalid_argument (BAD_REQUEST).
+            ///
+            /// Field 2: `timeframe`
+            pub timeframe: ::buffa::EnumValue<super::super::Timeframe>,
+            /// Maximum number of candles to return. Defaults to 500 when unset; max
+            /// 10000.
+            ///
+            /// Field 3: `limit`
+            pub limit: u32,
+            /// Inclusive lower bound for candle bucket start time, as a UTC timestamp.
+            /// Must not be more than 5 minutes in the future.
+            ///
+            /// Field 4: `start_time`
+            pub start_time: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Inclusive upper bound for candle bucket start time, as a UTC timestamp.
+            /// Must be greater than or equal to start_time when both are set, and must not
+            /// be more than 5 minutes in the future.
+            ///
+            /// Field 5: `end_time`
+            pub end_time: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Opaque exclusive keyset cursor from a previous GetIndexPriceCandles
+            /// response, bound to symbol_id, timeframe, and start_time and end_time as
+            /// sent, an absent bound included. It continues toward older candles. At
+            /// most 512 characters. For a known symbol_id, a cursor that is longer,
+            /// malformed, from GetCandles or GetCandlesColumns, or bound to another
+            /// request fails with invalid_argument (PAGE_TOKEN_INVALID); an unknown
+            /// symbol_id fails with not_found (UNKNOWN_SYMBOL) first.
+            ///
+            /// Field 6: `page_token`
+            pub page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetIndexPriceCandlesRequestView<'a> {
+            type Owned = super::super::GetIndexPriceCandlesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.timeframe = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.start_time.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.start_time = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.end_time.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.end_time = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetIndexPriceCandlesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetIndexPriceCandlesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetIndexPriceCandlesRequest {
+                    symbol_id: self.symbol_id,
+                    timeframe: self.timeframe,
+                    limit: self.limit,
+                    start_time: match self.start_time.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    end_time: match self.end_time.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    page_token: self.page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetIndexPriceCandlesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                {
+                    let val = self.timeframe.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.limit != 0u32 {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+                }
+                if self.start_time.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.start_time.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.end_time.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.end_time.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+                }
+                {
+                    let val = self.timeframe.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.limit != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.limit, buf);
+                }
+                if self.start_time.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.start_time.write_to(__cache, buf);
+                }
+                if self.end_time.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.end_time.write_to(__cache, buf);
+                }
+                if !self.page_token.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetIndexPriceCandlesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.timeframe,
+                ) {
+                    __map.serialize_entry("timeframe", &self.timeframe)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&self.limit),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .start_time
+                        .as_option()
+                    {
+                        __map.serialize_entry("startTime", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.end_time.as_option()
+                    {
+                        __map.serialize_entry("endTime", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
+                    __map.serialize_entry("pageToken", self.page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetIndexPriceCandlesRequestView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "GetIndexPriceCandlesRequest";
+            const FULL_NAME: &'static str = "marketdata.v1.GetIndexPriceCandlesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetIndexPriceCandlesRequestView);
+        ::buffa::impl_view_reborrow!(GetIndexPriceCandlesRequestView);
+        /** Self-contained, `'static` owned view of a `GetIndexPriceCandlesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetIndexPriceCandlesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetIndexPriceCandlesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetIndexPriceCandlesRequestOwnedView(
+            ::buffa::OwnedView<GetIndexPriceCandlesRequestView<'static>>,
+        );
+        impl GetIndexPriceCandlesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetIndexPriceCandlesRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetIndexPriceCandlesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetIndexPriceCandlesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetIndexPriceCandlesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetIndexPriceCandlesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetIndexPriceCandlesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetIndexPriceCandlesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Numeric spot market identifier.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+            /// Candle bucket size. Required. Every candle timeframe except SEC_1, which
+            /// has no index price candles and fails with invalid_argument (BAD_REQUEST).
+            ///
+            /// Field 2: `timeframe`
+            #[must_use]
+            pub fn timeframe(&self) -> ::buffa::EnumValue<super::super::Timeframe> {
+                self.0.reborrow().timeframe
+            }
+            /// Maximum number of candles to return. Defaults to 500 when unset; max
+            /// 10000.
+            ///
+            /// Field 3: `limit`
+            #[must_use]
+            pub fn limit(&self) -> u32 {
+                self.0.reborrow().limit
+            }
+            /// Inclusive lower bound for candle bucket start time, as a UTC timestamp.
+            /// Must not be more than 5 minutes in the future.
+            ///
+            /// Field 4: `start_time`
+            #[must_use]
+            pub fn start_time(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().start_time
+            }
+            /// Inclusive upper bound for candle bucket start time, as a UTC timestamp.
+            /// Must be greater than or equal to start_time when both are set, and must not
+            /// be more than 5 minutes in the future.
+            ///
+            /// Field 5: `end_time`
+            #[must_use]
+            pub fn end_time(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().end_time
+            }
+            /// Opaque exclusive keyset cursor from a previous GetIndexPriceCandles
+            /// response, bound to symbol_id, timeframe, and start_time and end_time as
+            /// sent, an absent bound included. It continues toward older candles. At
+            /// most 512 characters. For a known symbol_id, a cursor that is longer,
+            /// malformed, from GetCandles or GetCandlesColumns, or bound to another
+            /// request fails with invalid_argument (PAGE_TOKEN_INVALID); an unknown
+            /// symbol_id fails with not_found (UNKNOWN_SYMBOL) first.
+            ///
+            /// Field 6: `page_token`
+            #[must_use]
+            pub fn page_token(&self) -> &'_ str {
+                self.0.reborrow().page_token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetIndexPriceCandlesRequestView<'static>>,
+        > for GetIndexPriceCandlesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetIndexPriceCandlesRequestView<'static>>,
+            ) -> Self {
+                GetIndexPriceCandlesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetIndexPriceCandlesRequestOwnedView>
+        for ::buffa::OwnedView<GetIndexPriceCandlesRequestView<'static>> {
+            fn from(wrapper: GetIndexPriceCandlesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetIndexPriceCandlesRequestView<'static>>,
+        > for GetIndexPriceCandlesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetIndexPriceCandlesRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetIndexPriceCandlesRequest {
+            type View<'a> = GetIndexPriceCandlesRequestView<'a>;
+            type ViewHandle = GetIndexPriceCandlesRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetIndexPriceCandlesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetIndexPriceCandlesResponse contains one page of a spot market's index price
+        /// candles in columns: element i of every repeated field describes the same
+        /// candle.
+        ///
+        /// Candles are ordered newest-first by ts_sec, strictly descending, with no
+        /// two at the same ts_sec. There is no volume field: neither a reference candle
+        /// nor an index price candle carries trading volume. Gaps exist: a bucket from
+        /// the listing on in which the index price had no valid value is omitted, never
+        /// filled from the reference series, so treat a missing ts_sec as a gap. Index
+        /// price candles begin with the release that introduced them; buckets after a
+        /// listing but before that release are omitted the same way. A closed candle
+        /// appears once its series has processed the bucket, and candles of longer
+        /// timeframes are refreshed periodically, so the newest closed candles can
+        /// appear some time after their bucket closes. Reference candles of the most
+        /// recent 48 hours can still be revised. Reference candles reach back 180 days
+        /// at timeframes shorter than one hour, five years from one hour to twelve
+        /// hours, and up to 20 years, as far as the market's history goes, at one day
+        /// and longer. Index price candles are kept without a time limit.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetIndexPriceCandlesResponseView<'a> {
+            /// Numeric spot market identifier echoed from the request.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
+            /// Candle bucket size of the returned series.
+            ///
+            /// Field 2: `timeframe`
+            pub timeframe: ::buffa::EnumValue<super::super::Timeframe>,
+            /// Candle bucket start timestamps, in seconds since epoch (UTC), newest
+            /// first. Empty when no candle exists in the requested range.
+            ///
+            /// Field 3: `ts_sec`
+            pub ts_sec: ::buffa::RepeatedView<'a, u64>,
+            /// Opening prices, scaled by the pair's reference_price_scale from
+            /// GetSpotConfig, the scale of both series.
+            ///
+            /// Field 4: `open`
+            pub open: ::buffa::RepeatedView<'a, i64>,
+            /// Highest prices in each bucket, using the same scale as open.
+            ///
+            /// Field 5: `high`
+            pub high: ::buffa::RepeatedView<'a, i64>,
+            /// Lowest prices in each bucket, using the same scale as open.
+            ///
+            /// Field 6: `low`
+            pub low: ::buffa::RepeatedView<'a, i64>,
+            /// Closing prices, using the same scale as open.
+            ///
+            /// Field 7: `close`
+            pub close: ::buffa::RepeatedView<'a, i64>,
+            /// The series each candle comes from.
+            ///
+            /// Field 8: `source`
+            pub source: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::IndexPriceCandleSource>,
+            >,
+            /// Opaque cursor for the next, older page. Empty when no older candle exists
+            /// in the requested range.
+            ///
+            /// Field 9: `next_page_token`
+            pub next_page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetIndexPriceCandlesResponseView<'a> {
+            type Owned = super::super::GetIndexPriceCandlesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.timeframe = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.ts_sec
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.ts_sec.push(::buffa::types::decode_uint64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.ts_sec.push(::buffa::types::decode_uint64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    4u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.open.reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.open.push(::buffa::types::decode_int64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.open.push(::buffa::types::decode_int64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    5u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.high.reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.high.push(::buffa::types::decode_int64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.high.push(::buffa::types::decode_int64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    6u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.low.reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.low.push(::buffa::types::decode_int64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.low.push(::buffa::types::decode_int64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    7u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.close
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.close.push(::buffa::types::decode_int64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.close.push(::buffa::types::decode_int64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    8u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.source
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.source
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.source
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetIndexPriceCandlesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetIndexPriceCandlesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetIndexPriceCandlesResponse {
+                    symbol_id: self.symbol_id,
+                    timeframe: self.timeframe,
+                    ts_sec: self.ts_sec.to_vec(),
+                    open: self.open.to_vec(),
+                    high: self.high.to_vec(),
+                    low: self.low.to_vec(),
+                    close: self.close.to_vec(),
+                    source: self.source.to_vec(),
+                    next_page_token: self.next_page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetIndexPriceCandlesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                {
+                    let val = self.timeframe.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.ts_sec.is_empty() {
+                    let payload: u32 = self
+                        .ts_sec
+                        .iter()
+                        .map(|&v| ::buffa::types::uint64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.open.is_empty() {
+                    let payload: u32 = self
+                        .open
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.high.is_empty() {
+                    let payload: u32 = self
+                        .high
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.low.is_empty() {
+                    let payload: u32 = self
+                        .low
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.close.is_empty() {
+                    let payload: u32 = self
+                        .close
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.source.is_empty() {
+                    let payload: u32 = self
+                        .source
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.next_page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.next_page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+                }
+                {
+                    let val = self.timeframe.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if !self.ts_sec.is_empty() {
+                    let payload: u32 = self
+                        .ts_sec
+                        .iter()
+                        .map(|&v| ::buffa::types::uint64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+                    for &v in &self.ts_sec {
+                        ::buffa::types::encode_uint64(v, buf);
+                    }
+                }
+                if !self.open.is_empty() {
+                    let payload: u32 = self
+                        .open
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(4u32, payload, buf);
+                    for &v in &self.open {
+                        ::buffa::types::encode_int64(v, buf);
+                    }
+                }
+                if !self.high.is_empty() {
+                    let payload: u32 = self
+                        .high
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(5u32, payload, buf);
+                    for &v in &self.high {
+                        ::buffa::types::encode_int64(v, buf);
+                    }
+                }
+                if !self.low.is_empty() {
+                    let payload: u32 = self
+                        .low
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(6u32, payload, buf);
+                    for &v in &self.low {
+                        ::buffa::types::encode_int64(v, buf);
+                    }
+                }
+                if !self.close.is_empty() {
+                    let payload: u32 = self
+                        .close
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(7u32, payload, buf);
+                    for &v in &self.close {
+                        ::buffa::types::encode_int64(v, buf);
+                    }
+                }
+                if !self.source.is_empty() {
+                    let payload: u32 = self
+                        .source
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(8u32, payload, buf);
+                    for v in &self.source {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
+                }
+                if !self.next_page_token.is_empty() {
+                    ::buffa::types::put_string_field(9u32, &self.next_page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetIndexPriceCandlesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.timeframe,
+                ) {
+                    __map.serialize_entry("timeframe", &self.timeframe)?;
+                }
+                if !self.ts_sec.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "tsSec",
+                            &::buffa::json_helpers::RepeatedJson(&self.ts_sec),
+                        )?;
+                }
+                if !self.open.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "open",
+                            &::buffa::json_helpers::RepeatedJson(&self.open),
+                        )?;
+                }
+                if !self.high.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "high",
+                            &::buffa::json_helpers::RepeatedJson(&self.high),
+                        )?;
+                }
+                if !self.low.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "low",
+                            &::buffa::json_helpers::RepeatedJson(&self.low),
+                        )?;
+                }
+                if !self.close.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "close",
+                            &::buffa::json_helpers::RepeatedJson(&self.close),
+                        )?;
+                }
+                if !self.source.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "source",
+                            &::buffa::json_helpers::EnumSeqJson(&self.source),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
+                    __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetIndexPriceCandlesResponseView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "GetIndexPriceCandlesResponse";
+            const FULL_NAME: &'static str = "marketdata.v1.GetIndexPriceCandlesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetIndexPriceCandlesResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetIndexPriceCandlesResponseView);
+        ::buffa::impl_view_reborrow!(GetIndexPriceCandlesResponseView);
+        /** Self-contained, `'static` owned view of a `GetIndexPriceCandlesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetIndexPriceCandlesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetIndexPriceCandlesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetIndexPriceCandlesResponseOwnedView(
+            ::buffa::OwnedView<GetIndexPriceCandlesResponseView<'static>>,
+        );
+        impl GetIndexPriceCandlesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetIndexPriceCandlesResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetIndexPriceCandlesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetIndexPriceCandlesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetIndexPriceCandlesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetIndexPriceCandlesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetIndexPriceCandlesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetIndexPriceCandlesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Numeric spot market identifier echoed from the request.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+            /// Candle bucket size of the returned series.
+            ///
+            /// Field 2: `timeframe`
+            #[must_use]
+            pub fn timeframe(&self) -> ::buffa::EnumValue<super::super::Timeframe> {
+                self.0.reborrow().timeframe
+            }
+            /// Candle bucket start timestamps, in seconds since epoch (UTC), newest
+            /// first. Empty when no candle exists in the requested range.
+            ///
+            /// Field 3: `ts_sec`
+            #[must_use]
+            pub fn ts_sec(&self) -> &::buffa::RepeatedView<'_, u64> {
+                &self.0.reborrow().ts_sec
+            }
+            /// Opening prices, scaled by the pair's reference_price_scale from
+            /// GetSpotConfig, the scale of both series.
+            ///
+            /// Field 4: `open`
+            #[must_use]
+            pub fn open(&self) -> &::buffa::RepeatedView<'_, i64> {
+                &self.0.reborrow().open
+            }
+            /// Highest prices in each bucket, using the same scale as open.
+            ///
+            /// Field 5: `high`
+            #[must_use]
+            pub fn high(&self) -> &::buffa::RepeatedView<'_, i64> {
+                &self.0.reborrow().high
+            }
+            /// Lowest prices in each bucket, using the same scale as open.
+            ///
+            /// Field 6: `low`
+            #[must_use]
+            pub fn low(&self) -> &::buffa::RepeatedView<'_, i64> {
+                &self.0.reborrow().low
+            }
+            /// Closing prices, using the same scale as open.
+            ///
+            /// Field 7: `close`
+            #[must_use]
+            pub fn close(&self) -> &::buffa::RepeatedView<'_, i64> {
+                &self.0.reborrow().close
+            }
+            /// The series each candle comes from.
+            ///
+            /// Field 8: `source`
+            #[must_use]
+            pub fn source(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::IndexPriceCandleSource>,
+            > {
+                &self.0.reborrow().source
+            }
+            /// Opaque cursor for the next, older page. Empty when no older candle exists
+            /// in the requested range.
+            ///
+            /// Field 9: `next_page_token`
+            #[must_use]
+            pub fn next_page_token(&self) -> &'_ str {
+                self.0.reborrow().next_page_token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetIndexPriceCandlesResponseView<'static>>,
+        > for GetIndexPriceCandlesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetIndexPriceCandlesResponseView<'static>>,
+            ) -> Self {
+                GetIndexPriceCandlesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetIndexPriceCandlesResponseOwnedView>
+        for ::buffa::OwnedView<GetIndexPriceCandlesResponseView<'static>> {
+            fn from(wrapper: GetIndexPriceCandlesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetIndexPriceCandlesResponseView<'static>>,
+        > for GetIndexPriceCandlesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetIndexPriceCandlesResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetIndexPriceCandlesResponse {
+            type View<'a> = GetIndexPriceCandlesResponseView<'a>;
+            type ViewHandle = GetIndexPriceCandlesResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetIndexPriceCandlesResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -31238,6 +33694,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CANDLE_POINT_JSON_ANY);
         reg.register_json_any(super::__GET_CANDLES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_CANDLES_COLUMNS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_INDEX_PRICE_CANDLES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_INDEX_PRICE_CANDLES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANDLE_JSON_ANY);
         reg.register_json_any(super::__ASSET_CONFIG_JSON_ANY);
         reg.register_json_any(super::__PAIR_MARKETDATA_CONFIG_JSON_ANY);
@@ -31331,6 +33789,14 @@ pub use self::__buffa::view::GetCandlesResponseOwnedView;
 pub use self::__buffa::view::GetCandlesColumnsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetCandlesColumnsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetIndexPriceCandlesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetIndexPriceCandlesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetIndexPriceCandlesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetIndexPriceCandlesResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CandleView;
 #[doc(inline)]
