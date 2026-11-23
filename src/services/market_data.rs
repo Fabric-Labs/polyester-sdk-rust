@@ -6,9 +6,10 @@ use super::unary;
 use crate::codecs::decode::{
     DEPTH_TIERS, asset_info_list_from_proto, candles_columns_from_proto, candles_from_proto,
     currency_conversion_config_from_proto, currency_conversion_rates_from_proto,
-    depth_tier_for_levels, market_overview_list_from_proto, market_trades_from_proto,
-    orderbook_from_proto, orderbook_snapshot_depth, orderbook_stream_tier,
-    require_published_stream_depth, spot_config_from_proto, spot_volume_history_from_proto,
+    depth_tier_for_levels, index_price_candles_from_proto, market_overview_list_from_proto,
+    market_trades_from_proto, orderbook_from_proto, orderbook_snapshot_depth,
+    orderbook_stream_tier, require_published_stream_depth, spot_config_from_proto,
+    spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
@@ -16,13 +17,13 @@ use crate::connect::orderbook::v1::OrderbookServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
     AssetInfo, Candle, CandlesResult, CurrencyConversionConfig, CurrencyConversionRates,
-    GetCandlesOpts, GetTradesOpts, MarketOverviewList, MarketTradesResult, OrderbookData,
-    SpotConfig, SpotVolumeHistory,
+    GetCandlesOpts, GetIndexPriceCandlesOpts, GetTradesOpts, IndexPriceCandlesResult,
+    MarketOverviewList, MarketTradesResult, OrderbookData, SpotConfig, SpotVolumeHistory,
 };
 use crate::models::{MarketOverviewEntry, MarketTrade, OrderBookDeltaUpdate};
 use crate::proto::marketdata::v1::{
-    GetCandlesColumnsRequest, GetCandlesRequest, GetSpotConfigRequest, GetTradesRequest,
-    ListAssetInfoRequest, Timeframe,
+    GetCandlesColumnsRequest, GetCandlesRequest, GetIndexPriceCandlesRequest, GetSpotConfigRequest,
+    GetTradesRequest, ListAssetInfoRequest, Timeframe,
 };
 use crate::proto::marketoverview::v1::{
     GetCurrencyConversionConfigRequest, GetCurrencyConversionRatesRequest,
@@ -335,6 +336,82 @@ impl MarketDataService {
         Ok(result)
     }
 
+    /// Index price candles for a symbol
+    /// (`marketdata.v1.MarketDataService/GetIndexPriceCandles`), newest first
+    /// by `ts_sec`: one continuous series of the market's composite reference
+    /// candles before the bucket containing its listing, and its index price
+    /// candles from that bucket on, each marked with its
+    /// [`IndexPriceCandle::source`](crate::models::IndexPriceCandle::source).
+    /// Public: no API key is needed and the request is never signed.
+    ///
+    /// `interval` is read as [`Self::get_candles`] reads it, except that one
+    /// second (`"1s"`, `"SEC_1"`) has no index price candles; that, an empty
+    /// string or any other unknown label is a validation error before any
+    /// catalog wait or request.
+    pub async fn get_index_price_candles(
+        &self,
+        symbol: &str,
+        interval: &str,
+        limit: Option<u32>,
+    ) -> Result<IndexPriceCandlesResult> {
+        self.get_index_price_candles_with(GetIndexPriceCandlesOpts {
+            symbol: Some(symbol.to_owned()),
+            timeframe: interval.to_owned(),
+            limit,
+            ..Default::default()
+        })
+        .await
+    }
+
+    /// [`Self::get_index_price_candles`] with a time range and paging.
+    ///
+    /// Only closed candles are returned; a bucket without a valid index price
+    /// is omitted, so a missing `ts_sec` is a gap. Prices use the pair's
+    /// `reference_price_scale`, and a pair whose catalog has none is refused
+    /// with [`Error::Validation`] before sending. A `limit` above 10000 is
+    /// refused before sending; `None` takes the server's default of 500.
+    /// Follow `next_page_token` with the same symbol, timeframe, `start` and
+    /// `end`; a page token of another candle method is refused by the API.
+    pub async fn get_index_price_candles_with(
+        &self,
+        opts: GetIndexPriceCandlesOpts,
+    ) -> Result<IndexPriceCandlesResult> {
+        let limit = opts.limit.unwrap_or(0);
+        check_limit("get_index_price_candles", limit, CANDLES_LIMIT_MAX)?;
+        // An unknown timeframe is refused before the catalog wait or any request.
+        let timeframe = parse_index_price_timeframe(&opts.timeframe)?;
+        // Decoded with the pair's catalog scales.
+        self.ctx.wait_for_catalogs().await?;
+        let symbol_id = self.resolve_symbol_id(
+            opts.symbol.as_deref(),
+            opts.symbol_id,
+            "get_index_price_candles",
+        )?;
+        let price_scale = self
+            .ctx
+            .catalogs
+            .reference_price_scale_for_symbol_id(symbol_id)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "index price candles require reference_price_scale for symbol_id {symbol_id}"
+                ))
+            })?;
+        let req = GetIndexPriceCandlesRequest {
+            symbol_id,
+            timeframe: timeframe.into(),
+            limit,
+            start_time: Self::timestamp_field(opts.start),
+            end_time: Self::timestamp_field(opts.end),
+            page_token: opts.page_token.unwrap_or_default(),
+            ..Default::default()
+        };
+        // "/marketdata.v1.MarketDataService/GetIndexPriceCandles"
+        let resp = unary::await_public(self.client().get_index_price_candles(req))
+            .await?
+            .into_owned();
+        index_price_candles_from_proto(&resp, price_scale)
+    }
+
     fn build_candles_request(&self, opts: &GetCandlesOpts) -> Result<(GetCandlesRequest, u32)> {
         let symbol_id =
             self.resolve_symbol_id(opts.symbol.as_deref(), opts.symbol_id, "get_candles")?;
@@ -489,6 +566,18 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
 /// the field out through [`GetCandlesOpts::default`] asks for `"1m"`.
 fn candle_timeframe(opts: &GetCandlesOpts) -> Result<Timeframe> {
     parse_timeframe(&opts.timeframe)
+}
+
+/// The timeframe an index price candles call reads: any candle timeframe
+/// [`parse_timeframe`] reads except one second, which has no index price
+/// candles.
+fn parse_index_price_timeframe(interval: &str) -> Result<Timeframe> {
+    match parse_timeframe(interval)? {
+        Timeframe::Sec1 => Err(Error::validation(format!(
+            "unsupported index price candle interval {interval:?}; one second has no index price candles, use \"1m\" or longer"
+        ))),
+        timeframe => Ok(timeframe),
+    }
 }
 
 fn newest_candle(result: CandlesResult) -> Option<Candle> {
@@ -1577,6 +1666,63 @@ mod tests {
                 "{label:?} accepted"
             );
         }
+    }
+
+    /// Index price candles take every candle timeframe, in either spelling,
+    /// except one second, and refuse what `parse_timeframe` refuses, an
+    /// empty timeframe included.
+    #[test]
+    fn index_price_timeframes_are_the_candle_timeframes_but_one_second() {
+        for (label, name, timeframe) in CANDLE_TIMEFRAMES {
+            for spelling in [label, name] {
+                let parsed = parse_index_price_timeframe(spelling);
+                if timeframe == Timeframe::Sec1 {
+                    assert!(
+                        matches!(&parsed, Err(Error::Validation(msg)) if msg.contains("one second")),
+                        "{spelling:?}: {parsed:?}"
+                    );
+                } else {
+                    assert_eq!(parsed.unwrap(), timeframe, "{spelling:?}");
+                }
+            }
+        }
+        for spelling in ["", " 1h", "1H", "1M", "hour_1", "TIMEFRAME_UNSPECIFIED"] {
+            assert!(
+                matches!(
+                    parse_index_price_timeframe(spelling),
+                    Err(Error::Validation(_))
+                ),
+                "{spelling:?} accepted"
+            );
+        }
+    }
+
+    /// A pair whose catalog row has no reference price scale cannot have its
+    /// index price candles decoded, so the call is refused before sending
+    /// (the client's API URL refuses every connection).
+    #[tokio::test]
+    async fn index_price_candles_need_the_reference_price_scale() {
+        let client = crate::Client::new(crate::Config {
+            api_url: "http://127.0.0.1:1".into(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(serde_json::json!({
+                "pairs": [{"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+            }))
+            .unwrap();
+        let err = client
+            .market_data
+            .get_index_price_candles("BTC-USDT", "1h", None)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, Error::Validation(msg) if msg.contains("reference_price_scale")),
+            "{err:?}"
+        );
     }
 
     #[test]

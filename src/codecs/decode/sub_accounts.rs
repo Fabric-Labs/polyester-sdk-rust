@@ -287,11 +287,8 @@ fn account_activity_event_from_proto(e: &ProtoActivityEvent) -> SdkResult<Accoun
             activity_label(&e.source, "ACTIVITY_SOURCE_")
         },
         subaccount_id: optional_id(e.subaccount_id),
-        actor_account_id: optional_id(e.actor_account_id),
-        actor_api_key_id: optional_id(e.actor_api_key_id),
         ip: e.ip.clone(),
         user_agent: e.user_agent.clone(),
-        payload_json: e.payload_json.clone(),
     })
 }
 
@@ -361,11 +358,11 @@ mod tests {
         }
     }
 
-    /// The account feed names each event's sub-account, actor and API key as
-    /// base58 IDs, and reads 0 as absent: the main account's own event, or an
-    /// actor that used a session.
+    /// The account feed names each event's sub-account as a base58 ID, and
+    /// reads 0 as absent: the main account's own event. A system event reads
+    /// its `system` source.
     #[test]
-    fn account_activity_names_subaccount_and_api_key() {
+    fn account_activity_names_subaccount_and_source() {
         use crate::proto::auth::v1::ActivityEventSource;
 
         let list = account_activity_list_from_proto(&ListAccountActivityResponse {
@@ -381,9 +378,6 @@ mod tests {
                     event_action: ActivityEventAction::ACTIVITY_ACTION_CREATED.into(),
                     source: ActivityEventSource::ACTIVITY_SOURCE_API.into(),
                     subaccount_id: 42,
-                    actor_account_id: 7,
-                    actor_api_key_id: 9,
-                    payload_json: "{\"name\":\"bot\"}".into(),
                     ..Default::default()
                 },
                 ActivityEvent {
@@ -392,6 +386,15 @@ mod tests {
                         ..Default::default()
                     }
                     .into(),
+                    ..Default::default()
+                },
+                ActivityEvent {
+                    created_at: Timestamp {
+                        seconds: 1_794_700_002,
+                        ..Default::default()
+                    }
+                    .into(),
+                    source: ActivityEventSource::ACTIVITY_SOURCE_SYSTEM.into(),
                     ..Default::default()
                 },
             ],
@@ -404,18 +407,9 @@ mod tests {
         assert_eq!(first.ts_ms, 1_794_700_000_250);
         assert_eq!(first.source, "api");
         assert_eq!(first.subaccount_id, Some(format_uint64_id(42)));
-        assert_eq!(first.actor_account_id, Some(format_uint64_id(7)));
-        assert_eq!(first.actor_api_key_id, Some(format_uint64_id(9)));
-        assert_eq!(first.payload_json, "{\"name\":\"bot\"}");
         let main = &list.events[1];
-        assert_eq!(
-            (
-                &main.subaccount_id,
-                &main.actor_api_key_id,
-                main.source.as_str()
-            ),
-            (&None, &None, "")
-        );
+        assert_eq!((&main.subaccount_id, main.source.as_str()), (&None, ""));
+        assert_eq!(list.events[2].source, "system");
         assert_eq!(list.next_page_token, "next");
     }
 

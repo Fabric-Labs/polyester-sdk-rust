@@ -355,6 +355,15 @@ async fn call_public(client: &Client, procedure: &str) -> Vec<(&'static str, Res
                     .await,
             ),
         )],
+        "/marketdata.v1.MarketDataService/GetIndexPriceCandles" => vec![(
+            "market_data.get_index_price_candles",
+            done(
+                client
+                    .market_data
+                    .get_index_price_candles("BTC-USDT", "1h", Some(5))
+                    .await,
+            ),
+        )],
         "/marketoverview.v1.MarketOverviewService/ListMarketOverview" => vec![(
             "market_overview.list",
             done(client.market_overview.list(Some(5)).await),

@@ -192,6 +192,71 @@ pub struct CandlesResult {
     pub next_page_token: String,
 }
 
+/// Options for [`crate::services::MarketDataService::get_index_price_candles_with`].
+///
+/// [`Default::default`] asks for one-minute candles (`timeframe` `"1m"`).
+#[derive(Debug, Clone)]
+pub struct GetIndexPriceCandlesOpts {
+    pub symbol: Option<String>,
+    pub symbol_id: Option<u32>,
+    /// Candle interval, read exactly as [`GetCandlesOpts::timeframe`] is,
+    /// except that one second (`"1s"`, `"SEC_1"`) is refused: it has no
+    /// index price candles. An empty string is refused too.
+    /// [`Default::default`] sets it to `"1m"`.
+    pub timeframe: String,
+    /// Page size, at most 10000; `None` takes the server's default of 500.
+    pub limit: Option<u32>,
+    /// Inclusive lower bound on the bucket start (unix seconds UTC).
+    pub start: Option<i64>,
+    /// Inclusive upper bound on the bucket start (unix seconds UTC).
+    pub end: Option<i64>,
+    /// `next_page_token` of a previous page, sent with the same symbol,
+    /// timeframe, `start` and `end`.
+    pub page_token: Option<String>,
+}
+
+impl Default for GetIndexPriceCandlesOpts {
+    fn default() -> Self {
+        Self {
+            symbol: None,
+            symbol_id: None,
+            timeframe: "1m".to_owned(),
+            limit: None,
+            start: None,
+            end: None,
+            page_token: None,
+        }
+    }
+}
+
+/// One closed index price candle. Prices use the pair's
+/// `reference_price_scale`; there is no volume.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexPriceCandle {
+    /// Bucket start, in unix seconds (UTC).
+    pub ts_sec: i64,
+    pub open: String,
+    pub high: String,
+    pub low: String,
+    pub close: String,
+    /// The series the candle comes from: `"reference"` for a composite
+    /// reference candle (a bucket before the pair's listing), `"index"` for
+    /// an index price candle (from the bucket containing the listing on), or
+    /// `"unspecified"` for a value this SDK version does not know.
+    pub source: String,
+}
+
+/// One page of a market's index price candles, newest first.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexPriceCandlesResult {
+    pub symbol_id: u32,
+    pub timeframe: String,
+    /// Closed candles, newest first by `ts_sec`. A missing bucket is a gap.
+    pub candles: Vec<IndexPriceCandle>,
+    /// Cursor for the next, older page; empty when there is none.
+    pub next_page_token: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarketTrade {
     pub symbol_id: u32,

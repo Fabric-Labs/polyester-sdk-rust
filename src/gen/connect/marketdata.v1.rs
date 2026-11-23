@@ -32,6 +32,16 @@ pub type OwnedGetCandlesColumnsRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetCandlesColumnsResponseView = ::buffa::view::OwnedView<
     crate::proto::marketdata::v1::__buffa::view::GetCandlesColumnsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetIndexPriceCandlesRequestView<'static>>`.
+pub type OwnedGetIndexPriceCandlesRequestView = ::buffa::view::OwnedView<
+    crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetIndexPriceCandlesResponseView<'static>>`.
+pub type OwnedGetIndexPriceCandlesResponseView = ::buffa::view::OwnedView<
+    crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<GetSpotConfigRequestView<'static>>`.
 pub type OwnedGetSpotConfigRequestView = ::buffa::view::OwnedView<
     crate::proto::marketdata::v1::__buffa::view::GetSpotConfigRequestView<'static>,
@@ -128,6 +138,28 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::marketdata::v1::GetIndexPriceCandlesResponse>
+for crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::marketdata::v1::GetIndexPriceCandlesResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::marketdata::v1::GetSpotConfigResponse>
 for crate::proto::marketdata::v1::__buffa::view::GetSpotConfigResponseView<'_> {
     fn encode(
@@ -203,6 +235,15 @@ pub const MARKET_DATA_SERVICE_GET_CANDLES_SPEC: ::connectrpc::Spec = ::connectrp
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const MARKET_DATA_SERVICE_GET_CANDLES_COLUMNS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/marketdata.v1.MarketDataService/GetCandlesColumns",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetIndexPriceCandles` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MARKET_DATA_SERVICE_GET_INDEX_PRICE_CANDLES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/marketdata.v1.MarketDataService/GetIndexPriceCandles",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -375,6 +416,37 @@ pub trait MarketDataService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::marketdata::v1::GetCandlesColumnsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Retrieve one continuous price series of a spot market in a columnar
+    /// representation: its composite reference candles before the bucket
+    /// containing listing_at, and its index price candles from that bucket on,
+    /// each candle marked with its source. Results are closed candles ordered
+    /// newest-first, with inclusive time bounds and opaque keyset pagination.
+    /// Prices use the pair's reference_price_scale from GetSpotConfig. There is
+    /// no volume field, and buckets with no index price sample are omitted as
+    /// gaps. A bad page_token fails with invalid_argument (PAGE_TOKEN_INVALID).
+    /// This method is for ConnectRPC clients and has no REST route.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_index_price_candles<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::marketdata::v1::GetIndexPriceCandlesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::marketdata::v1::GetIndexPriceCandlesResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -580,6 +652,35 @@ impl<S: MarketDataService> MarketDataServiceExt for S {
             .with_spec(MARKET_DATA_SERVICE_GET_CANDLES_COLUMNS_SPEC)
             .route_view(
                 MARKET_DATA_SERVICE_SERVICE_NAME,
+                "GetIndexPriceCandles",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::marketdata::v1::GetIndexPriceCandlesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_index_price_candles(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::marketdata::v1::GetIndexPriceCandlesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MARKET_DATA_SERVICE_GET_INDEX_PRICE_CANDLES_SPEC)
+            .route_view(
+                MARKET_DATA_SERVICE_SERVICE_NAME,
                 "GetSpotConfig",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -714,6 +815,12 @@ impl<T: MarketDataService> ::connectrpc::Dispatcher for MarketDataServiceServer<
                         .with_spec(MARKET_DATA_SERVICE_GET_CANDLES_COLUMNS_SPEC),
                 )
             }
+            "GetIndexPriceCandles" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MARKET_DATA_SERVICE_GET_INDEX_PRICE_CANDLES_SPEC),
+                )
+            }
             "GetSpotConfig" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -822,6 +929,27 @@ impl<T: MarketDataService> ::connectrpc::Dispatcher for MarketDataServiceServer<
                         .await?
                         .encode::<
                             crate::proto::marketdata::v1::GetCandlesColumnsResponse,
+                        >(format)
+                })
+            }
+            "GetIndexPriceCandles" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::marketdata::v1::GetIndexPriceCandlesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::marketdata::v1::GetIndexPriceCandlesRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_index_price_candles(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::marketdata::v1::GetIndexPriceCandlesResponse,
                         >(format)
                 })
             }
@@ -1144,6 +1272,51 @@ where
                 &self.config,
                 MARKET_DATA_SERVICE_SERVICE_NAME,
                 "GetCandlesColumns",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetIndexPriceCandles RPC. Sends a request to /marketdata.v1.MarketDataService/GetIndexPriceCandles.
+    pub async fn get_index_price_candles(
+        &self,
+        request: crate::proto::marketdata::v1::GetIndexPriceCandlesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_index_price_candles_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetIndexPriceCandles RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_index_price_candles_with_options(
+        &self,
+        request: crate::proto::marketdata::v1::GetIndexPriceCandlesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::marketdata::v1::__buffa::view::GetIndexPriceCandlesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MARKET_DATA_SERVICE_SERVICE_NAME,
+                "GetIndexPriceCandles",
                 request,
                 options,
             )

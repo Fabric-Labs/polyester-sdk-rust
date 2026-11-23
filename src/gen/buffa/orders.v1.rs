@@ -1010,11 +1010,10 @@ pub enum ErrorCode {
     /// policy is read-only. When the API key's policy lacks it instead, the
     /// refusal is ERROR_CODE_API_KEY_SPOT_TRADE_DENY.
     ERROR_CODE_POLICY_SPOT_TRADE_DENY = 23i32,
-    /// API key is scoped to the master/root account and cannot trade on
-    /// sub-accounts.
+    /// API key is scoped to the root account and cannot trade on sub-accounts.
     ERROR_CODE_API_KEY_ROOT_SCOPE_ONLY = 24i32,
-    /// API key is scoped to a specific sub-account and cannot trade on the
-    /// master/root account.
+    /// API key is scoped to a specific sub-account and cannot trade on the root
+    /// account.
     ERROR_CODE_API_KEY_SUB_SCOPE_ONLY = 25i32,
     /// API key is scoped to a different sub-account than the one requested.
     ERROR_CODE_API_KEY_SUBACCOUNT_MISMATCH = 26i32,
@@ -1135,7 +1134,7 @@ pub enum ErrorCode {
     ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN = 70i32,
     /// Sub-account policy does not allow reading spot data.
     ERROR_CODE_POLICY_SPOT_READ_DENY = 71i32,
-    /// API key policy does not allow reading spot data.
+    /// API key policy does not grant READ_SPOT.
     ERROR_CODE_API_KEY_SPOT_READ_DENY = 72i32,
     /// The cancel-all request arrived after its acceptance window of about two
     /// minutes had passed, so nothing was canceled. Send a new request with a
@@ -1222,8 +1221,8 @@ pub enum ErrorCode {
     /// An order flag is unknown, or not accepted with this order type or time in
     /// force, or on a trigger's child order.
     ERROR_CODE_INVALID_ORDER_FLAGS = 214i32,
-    /// Another item of the same batch was invalid, so this item was not applied
-    /// either. Nothing in the batch changed.
+    /// Another item of the same BatchReplaceOrders batch was invalid, so this item
+    /// was not applied either. Nothing in the batch changed.
     ERROR_CODE_BATCH_OTHER_ITEM_INVALID = 215i32,
     /// The replacement order identifier equals the identifier of the order it
     /// replaces.
@@ -7639,8 +7638,15 @@ pub struct CreateOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub accepted_at_ts_ns: u64,
-    /// Gross base quantity resolved for execution, scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig.
+    /// Gross base quantity admission resolved, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig. For base_qty_scaled sizing, the
+    /// order's quantity. For quote sizing (max_quote_debit_scaled BUY or
+    /// quote_proceeds_scaled SELL), the quantity the quote amount buys or sells at
+    /// the order's limit price, or a market order's protection price: a BUY can
+    /// fill more at better prices, or less when the book runs out, and a SELL sells
+    /// at most this. The executed quantity is the order's cumulative filled
+    /// quantity (cum_qty_scaled in GetOrder) or the sum of its fills
+    /// (GetUserTrades, or the fills of its private order events).
     ///
     /// Field 5: `resolved_base_qty_scaled`
     #[serde(
@@ -8225,9 +8231,18 @@ pub struct PreviewOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub rejection: ::buffa::MessageField<ErrorDetail>,
-    /// Gross base quantity resolved for execution. REST returns resolvedBaseQty as
-    /// a decimal string in base asset units, for example "0.005". Protobuf uses the
-    /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+    /// Gross base quantity admission resolved. REST returns resolvedBaseQty as a
+    /// decimal string in base asset units, for example "0.005". Protobuf uses the
+    /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was
+    /// resolved. For base_qty_scaled sizing, the order's quantity. For quote sizing
+    /// (max_quote_debit_scaled BUY or quote_proceeds_scaled SELL), the quantity the
+    /// quote amount buys or sells at the order's limit price, or at the market
+    /// protection price at preview time (protected_price_bound_ticks). CreateOrder
+    /// resolves the protection price and the order's quantity again at submission,
+    /// so the submitted order can buy or sell more or less than this. The executed
+    /// quantity is the order's cumulative filled quantity (cum_qty_scaled in
+    /// GetOrder) or the sum of its fills (GetUserTrades, or the fills of its
+    /// private order events).
     ///
     /// Field 3: `resolved_base_qty_scaled`
     #[serde(
@@ -13806,8 +13821,15 @@ pub struct BatchCreateAccepted {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub trailing_stop_trigger_id: ::core::option::Option<u64>,
-    /// Gross base quantity resolved for execution, scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig.
+    /// Gross base quantity admission resolved, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig. For base_qty_scaled sizing, the
+    /// order's quantity. For quote sizing (max_quote_debit_scaled BUY or
+    /// quote_proceeds_scaled SELL), the quantity the quote amount buys or sells at
+    /// the order's limit price, or a market order's protection price: a BUY can
+    /// fill more at better prices, or less when the book runs out, and a SELL sells
+    /// at most this. The executed quantity is the order's cumulative filled
+    /// quantity (cum_qty_scaled in GetOrder) or the sum of its fills
+    /// (GetUserTrades, or the fills of its private order events).
     ///
     /// Field 5: `resolved_base_qty_scaled`
     #[serde(
@@ -14565,7 +14587,14 @@ pub mod batch_create_result_item {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::batch_create_result_item::Outcome as OutcomeView;
 }
-/// BatchCreateOrdersRequest places multiple orders in one request.
+/// BatchCreateOrdersRequest places multiple orders in one request. A request can
+/// be refused as a whole before admission, admitting nothing: for example an
+/// invalid request_id or number of items, an item whose fields cannot be decoded
+/// over REST (a malformed decimal, or more than one execution or sizing field),
+/// or a failed authentication, permission or receive-window check. Once a
+/// request reaches admission, each item is admitted or rejected on its own,
+/// never all-or-nothing: a rejected item does not stop the other items from
+/// being admitted.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -16886,6 +16915,11 @@ pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonA
 };
 /// BatchReplaceOrdersRequest modifies same-symbol orders as one quote refresh:
 /// each item is amended in place or replaced as ModifyOrder decides by default.
+/// A request can be refused as a whole before admission, changing nothing: for
+/// example an invalid request_id or number of items, an item that names no
+/// order, supplies no patch field or breaks a field rule, or a failed
+/// authentication, permission or receive-window check. Once a request reaches
+/// admission, each item is admitted or rejected on its own.
 /// Identical retries replay the admission result for 60 seconds from acceptance;
 /// a different payload under the same key conflicts. Use a fresh key for a new batch.
 /// Read the batch's status with GetBatchReplaceStatus within the same window;
@@ -18022,7 +18056,12 @@ pub mod batch_cancel_result_item {
         }
     }
 }
-/// BatchCancelOrdersRequest cancels multiple orders by explicit ID.
+/// BatchCancelOrdersRequest cancels multiple orders by explicit ID. A request
+/// can be refused as a whole before admission, canceling nothing: for example an
+/// invalid request_id or number of items, an item that sets both order_id and
+/// client_order_id or neither, or a failed authentication, permission or
+/// receive-window check. Once a request reaches admission, each item's
+/// cancellation is accepted or rejected on its own.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -31052,8 +31091,15 @@ pub mod __buffa {
             ///
             /// Field 4: `accepted_at_ts_ns`
             pub accepted_at_ts_ns: u64,
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Gross base quantity admission resolved, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. For base_qty_scaled sizing, the
+            /// order's quantity. For quote sizing (max_quote_debit_scaled BUY or
+            /// quote_proceeds_scaled SELL), the quantity the quote amount buys or sells at
+            /// the order's limit price, or a market order's protection price: a BUY can
+            /// fill more at better prices, or less when the book runs out, and a SELL sells
+            /// at most this. The executed quantity is the order's cumulative filled
+            /// quantity (cum_qty_scaled in GetOrder) or the sum of its fills
+            /// (GetUserTrades, or the fills of its private order events).
             ///
             /// Field 5: `resolved_base_qty_scaled`
             pub resolved_base_qty_scaled: i64,
@@ -31600,8 +31646,15 @@ pub mod __buffa {
             pub fn accepted_at_ts_ns(&self) -> u64 {
                 self.0.reborrow().accepted_at_ts_ns
             }
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Gross base quantity admission resolved, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. For base_qty_scaled sizing, the
+            /// order's quantity. For quote sizing (max_quote_debit_scaled BUY or
+            /// quote_proceeds_scaled SELL), the quantity the quote amount buys or sells at
+            /// the order's limit price, or a market order's protection price: a BUY can
+            /// fill more at better prices, or less when the book runs out, and a SELL sells
+            /// at most this. The executed quantity is the order's cumulative filled
+            /// quantity (cum_qty_scaled in GetOrder) or the sum of its fills
+            /// (GetUserTrades, or the fills of its private order events).
             ///
             /// Field 5: `resolved_base_qty_scaled`
             #[must_use]
@@ -32054,9 +32107,18 @@ pub mod __buffa {
             pub rejection: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ErrorDetailView<'a>,
             >,
-            /// Gross base quantity resolved for execution. REST returns resolvedBaseQty as
-            /// a decimal string in base asset units, for example "0.005". Protobuf uses the
-            /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+            /// Gross base quantity admission resolved. REST returns resolvedBaseQty as a
+            /// decimal string in base asset units, for example "0.005". Protobuf uses the
+            /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was
+            /// resolved. For base_qty_scaled sizing, the order's quantity. For quote sizing
+            /// (max_quote_debit_scaled BUY or quote_proceeds_scaled SELL), the quantity the
+            /// quote amount buys or sells at the order's limit price, or at the market
+            /// protection price at preview time (protected_price_bound_ticks). CreateOrder
+            /// resolves the protection price and the order's quantity again at submission,
+            /// so the submitted order can buy or sell more or less than this. The executed
+            /// quantity is the order's cumulative filled quantity (cum_qty_scaled in
+            /// GetOrder) or the sum of its fills (GetUserTrades, or the fills of its
+            /// private order events).
             ///
             /// Field 3: `resolved_base_qty_scaled`
             pub resolved_base_qty_scaled: ::core::option::Option<i64>,
@@ -32475,9 +32537,18 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().rejection
             }
-            /// Gross base quantity resolved for execution. REST returns resolvedBaseQty as
-            /// a decimal string in base asset units, for example "0.005". Protobuf uses the
-            /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+            /// Gross base quantity admission resolved. REST returns resolvedBaseQty as a
+            /// decimal string in base asset units, for example "0.005". Protobuf uses the
+            /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was
+            /// resolved. For base_qty_scaled sizing, the order's quantity. For quote sizing
+            /// (max_quote_debit_scaled BUY or quote_proceeds_scaled SELL), the quantity the
+            /// quote amount buys or sells at the order's limit price, or at the market
+            /// protection price at preview time (protected_price_bound_ticks). CreateOrder
+            /// resolves the protection price and the order's quantity again at submission,
+            /// so the submitted order can buy or sell more or less than this. The executed
+            /// quantity is the order's cumulative filled quantity (cum_qty_scaled in
+            /// GetOrder) or the sum of its fills (GetUserTrades, or the fills of its
+            /// private order events).
             ///
             /// Field 3: `resolved_base_qty_scaled`
             #[must_use]
@@ -40115,8 +40186,15 @@ pub mod __buffa {
             ///
             /// Field 4: `trailing_stop_trigger_id`
             pub trailing_stop_trigger_id: ::core::option::Option<u64>,
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Gross base quantity admission resolved, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. For base_qty_scaled sizing, the
+            /// order's quantity. For quote sizing (max_quote_debit_scaled BUY or
+            /// quote_proceeds_scaled SELL), the quantity the quote amount buys or sells at
+            /// the order's limit price, or a market order's protection price: a BUY can
+            /// fill more at better prices, or less when the book runs out, and a SELL sells
+            /// at most this. The executed quantity is the order's cumulative filled
+            /// quantity (cum_qty_scaled in GetOrder) or the sum of its fills
+            /// (GetUserTrades, or the fills of its private order events).
             ///
             /// Field 5: `resolved_base_qty_scaled`
             pub resolved_base_qty_scaled: i64,
@@ -40540,8 +40618,15 @@ pub mod __buffa {
             pub fn trailing_stop_trigger_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().trailing_stop_trigger_id
             }
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Gross base quantity admission resolved, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. For base_qty_scaled sizing, the
+            /// order's quantity. For quote sizing (max_quote_debit_scaled BUY or
+            /// quote_proceeds_scaled SELL), the quantity the quote amount buys or sells at
+            /// the order's limit price, or a market order's protection price: a BUY can
+            /// fill more at better prices, or less when the book runs out, and a SELL sells
+            /// at most this. The executed quantity is the order's cumulative filled
+            /// quantity (cum_qty_scaled in GetOrder) or the sum of its fills
+            /// (GetUserTrades, or the fills of its private order events).
             ///
             /// Field 5: `resolved_base_qty_scaled`
             #[must_use]
@@ -41350,7 +41435,14 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchCreateOrdersRequest places multiple orders in one request.
+        /// BatchCreateOrdersRequest places multiple orders in one request. A request can
+        /// be refused as a whole before admission, admitting nothing: for example an
+        /// invalid request_id or number of items, an item whose fields cannot be decoded
+        /// over REST (a malformed decimal, or more than one execution or sizing field),
+        /// or a failed authentication, permission or receive-window check. Once a
+        /// request reaches admission, each item is admitted or rejected on its own,
+        /// never all-or-nothing: a rejected item does not stop the other items from
+        /// being admitted.
         #[derive(Clone, Debug, Default)]
         pub struct BatchCreateOrdersRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -44616,6 +44708,11 @@ pub mod __buffa {
         }
         /// BatchReplaceOrdersRequest modifies same-symbol orders as one quote refresh:
         /// each item is amended in place or replaced as ModifyOrder decides by default.
+        /// A request can be refused as a whole before admission, changing nothing: for
+        /// example an invalid request_id or number of items, an item that names no
+        /// order, supplies no patch field or breaks a field rule, or a failed
+        /// authentication, permission or receive-window check. Once a request reaches
+        /// admission, each item is admitted or rejected on its own.
         /// Identical retries replay the admission result for 60 seconds from acceptance;
         /// a different payload under the same key conflicts. Use a fresh key for a new batch.
         /// Read the batch's status with GetBatchReplaceStatus within the same window;
@@ -46403,7 +46500,12 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchCancelOrdersRequest cancels multiple orders by explicit ID.
+        /// BatchCancelOrdersRequest cancels multiple orders by explicit ID. A request
+        /// can be refused as a whole before admission, canceling nothing: for example an
+        /// invalid request_id or number of items, an item that sets both order_id and
+        /// client_order_id or neither, or a failed authentication, permission or
+        /// receive-window check. Once a request reaches admission, each item's
+        /// cancellation is accepted or rejected on its own.
         #[derive(Clone, Debug, Default)]
         pub struct BatchCancelOrdersRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys

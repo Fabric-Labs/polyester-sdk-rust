@@ -2892,8 +2892,8 @@ pub trait ApiKeyService: Send + Sync + 'static {
     /// Give a strategy bot its trade key on its own sub-account, in one
     /// all-or-nothing change: a sub-account policy that allows spot trading
     /// only, within limits, bound to the sub-account; an API policy that allows
-    /// spot trading over the same markets and reading the sub-account's orders,
-    /// balances and profit and loss; and a STRATEGY_BOT key with
+    /// spot trading over the same markets and reading the sub-account's orders
+    /// and balances; and a STRATEGY_BOT key with
     /// public_key_ed25519, bound to that API policy and linked to
     /// strategy_bot_id. Neither policy allows an action that moves value out of
     /// the account.
@@ -4150,6 +4150,2631 @@ where
                 &self.config,
                 API_KEY_SERVICE_SERVICE_NAME,
                 "EndStrategyBotAccess",
+                request,
+                options,
+            )
+            .await
+    }
+}
+
+///Shorthand for `OwnedView<ListMfaFactorsRequestView<'static>>`.
+pub type OwnedListMfaFactorsRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListMFAFactorsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListMfaFactorsResponseView<'static>>`.
+pub type OwnedListMfaFactorsResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<BeginTotpEnrollmentRequestView<'static>>`.
+pub type OwnedBeginTotpEnrollmentRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<BeginTotpEnrollmentResponseView<'static>>`.
+pub type OwnedBeginTotpEnrollmentResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<FinishTotpEnrollmentRequestView<'static>>`.
+pub type OwnedFinishTotpEnrollmentRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<FinishTotpEnrollmentResponseView<'static>>`.
+pub type OwnedFinishTotpEnrollmentResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<BeginPasskeyEnrollmentRequestView<'static>>`.
+pub type OwnedBeginPasskeyEnrollmentRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<BeginPasskeyEnrollmentResponseView<'static>>`.
+pub type OwnedBeginPasskeyEnrollmentResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<FinishPasskeyEnrollmentRequestView<'static>>`.
+pub type OwnedFinishPasskeyEnrollmentRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<FinishPasskeyEnrollmentResponseView<'static>>`.
+pub type OwnedFinishPasskeyEnrollmentResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<BeginMfaChallengeRequestView<'static>>`.
+pub type OwnedBeginMfaChallengeRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginMFAChallengeRequestView<'static>,
+>;
+///Shorthand for `OwnedView<BeginMfaChallengeResponseView<'static>>`.
+pub type OwnedBeginMfaChallengeResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<'static>,
+>;
+///Shorthand for `OwnedView<VerifyTotpChallengeRequestView<'static>>`.
+pub type OwnedVerifyTotpChallengeRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::VerifyTOTPChallengeRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CompleteMfaChallengeResponseView<'static>>`.
+pub type OwnedCompleteMfaChallengeResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<'static>,
+>;
+///Shorthand for `OwnedView<FinishPasskeyChallengeRequestView<'static>>`.
+pub type OwnedFinishPasskeyChallengeRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::FinishPasskeyChallengeRequestView<'static>,
+>;
+///Shorthand for `OwnedView<VerifyRecoveryCodeChallengeRequestView<'static>>`.
+pub type OwnedVerifyRecoveryCodeChallengeRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::VerifyRecoveryCodeChallengeRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateMfaFactorRequestView<'static>>`.
+pub type OwnedUpdateMfaFactorRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::UpdateMFAFactorRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateMfaFactorResponseView<'static>>`.
+pub type OwnedUpdateMfaFactorResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteMfaFactorRequestView<'static>>`.
+pub type OwnedDeleteMfaFactorRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DeleteMFAFactorRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteMfaFactorResponseView<'static>>`.
+pub type OwnedDeleteMfaFactorResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<'static>,
+>;
+///Shorthand for `OwnedView<RegenerateRecoveryCodesRequestView<'static>>`.
+pub type OwnedRegenerateRecoveryCodesRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RegenerateRecoveryCodesResponseView<'static>>`.
+pub type OwnedRegenerateRecoveryCodesResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ClaimFreshStepUpRequestView<'static>>`.
+pub type OwnedClaimFreshStepUpRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ClaimFreshStepUpResponseView<'static>>`.
+pub type OwnedClaimFreshStepUpResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ConsumeFreshStepUpRequestView<'static>>`.
+pub type OwnedConsumeFreshStepUpRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ConsumeFreshStepUpResponseView<'static>>`.
+pub type OwnedConsumeFreshStepUpResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ReleaseFreshStepUpRequestView<'static>>`.
+pub type OwnedReleaseFreshStepUpRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ReleaseFreshStepUpResponseView<'static>>`.
+pub type OwnedReleaseFreshStepUpResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'static>,
+>;
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListMFAFactorsResponse>
+for crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListMFAFactorsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginTOTPEnrollmentResponse>
+for crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginTOTPEnrollmentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishTOTPEnrollmentResponse>
+for crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishTOTPEnrollmentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginPasskeyEnrollmentResponse>
+for crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginPasskeyEnrollmentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishPasskeyEnrollmentResponse>
+for crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishPasskeyEnrollmentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginMFAChallengeResponse>
+for crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginMFAChallengeResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::CompleteMFAChallengeResponse>
+for crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::CompleteMFAChallengeResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::UpdateMFAFactorResponse>
+for crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::UpdateMFAFactorResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DeleteMFAFactorResponse>
+for crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DeleteMFAFactorResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::RegenerateRecoveryCodesResponse>
+for crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::RegenerateRecoveryCodesResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ClaimFreshStepUpResponse>
+for crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ClaimFreshStepUpResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ConsumeFreshStepUpResponse>
+for crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ConsumeFreshStepUpResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ReleaseFreshStepUpResponse>
+for crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ReleaseFreshStepUpResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+/// Full service name for this service.
+pub const MFA_SERVICE_SERVICE_NAME: &str = "auth.v1.MFAService";
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListMFAFactors` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_LIST_MFA_FACTORS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/ListMFAFactors",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `BeginTOTPEnrollment` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_BEGIN_TOTP_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/BeginTOTPEnrollment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `FinishTOTPEnrollment` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_FINISH_TOTP_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/FinishTOTPEnrollment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `BeginPasskeyEnrollment` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_BEGIN_PASSKEY_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/BeginPasskeyEnrollment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `FinishPasskeyEnrollment` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_FINISH_PASSKEY_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/FinishPasskeyEnrollment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `BeginMFAChallenge` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_BEGIN_MFA_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/BeginMFAChallenge",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `VerifyTOTPChallenge` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_VERIFY_TOTP_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/VerifyTOTPChallenge",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `FinishPasskeyChallenge` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_FINISH_PASSKEY_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/FinishPasskeyChallenge",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `VerifyRecoveryCodeChallenge` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_VERIFY_RECOVERY_CODE_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/VerifyRecoveryCodeChallenge",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `UpdateMFAFactor` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_UPDATE_MFA_FACTOR_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/UpdateMFAFactor",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `DeleteMFAFactor` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_DELETE_MFA_FACTOR_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/DeleteMFAFactor",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `RegenerateRecoveryCodes` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_REGENERATE_RECOVERY_CODES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/RegenerateRecoveryCodes",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ClaimFreshStepUp` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_CLAIM_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/ClaimFreshStepUp",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ConsumeFreshStepUp` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_CONSUME_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/ConsumeFreshStepUp",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ReleaseFreshStepUp` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/ReleaseFreshStepUp",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// MFA management service for enrollment, challenges, fresh step-up proofs, and recovery codes.
+///
+/// # Implementing handlers
+///
+/// Implement methods with plain `async fn`; the returned future satisfies
+/// the `Send` bound automatically.
+///
+/// **Unary and server-streaming requests** arrive as
+/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
+/// view of the request plus its body, valid for the duration of the call.
+/// Fields are read directly (`request.name` is a `&str` into the decoded
+/// buffer) and the borrow may be held across `.await` points. Anything
+/// that must outlive the call — `tokio::spawn`, channels, server state,
+/// or data captured by a returned response stream — takes owned data:
+/// call `request.to_owned_message()` (or copy the specific fields)
+/// first.
+///
+/// **Client-streaming and bidi requests** arrive as
+/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
+/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
+/// Each item owns its decoded buffer and is `Send + 'static`, so items
+/// can be buffered or moved into spawned tasks; read fields zero-copy
+/// through the generated accessor methods (`item.name()`) or `.view()`,
+/// convert with `.to_owned_message()`, or yield an item back unchanged —
+/// `StreamMessage<M>` implements `Encodable<M>`.
+///
+/// Request types resolved through `extern_path` (e.g. well-known types
+/// from another crate) use the same wrappers; the crate that owns the
+/// type must be generated with buffa ≥ 0.8.0 and views enabled so the
+/// backing `HasMessageView` impl exists.
+///
+/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
+/// generated `OutView<'_>` / `OwnedOutView`,
+/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
+/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
+/// non-`'static` view internally and pass the bytes across the handler
+/// boundary. View bodies are not emitted for output types mapped via
+/// `extern_path` (the impl would be an orphan); return owned for
+/// WKT/extern outputs.
+///
+/// Server-streaming and bidi-streaming methods return
+/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
+/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
+/// the request's lifetime (unary methods use `use<'a, Self>` and may
+/// borrow from `&self`), so stream items must be `'static` and cannot
+/// borrow from the request. To stream view-encoded data, encode each
+/// item inside the stream body and yield
+/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
+/// example` doc.
+#[allow(clippy::type_complexity)]
+pub trait MfaService: Send + Sync + 'static {
+    /// List the caller's enrolled MFA factors.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_mfa_factors<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ListMFAFactorsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ListMFAFactorsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Start authenticator-app enrollment.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn begin_totp_enrollment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::BeginTOTPEnrollmentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Finish authenticator-app enrollment.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn finish_totp_enrollment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::FinishTOTPEnrollmentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Start passkey enrollment.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn begin_passkey_enrollment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::BeginPasskeyEnrollmentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Finish passkey enrollment.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn finish_passkey_enrollment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::FinishPasskeyEnrollmentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Start an MFA challenge for session elevation or fresh step-up.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn begin_mfa_challenge<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::BeginMFAChallengeRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::BeginMFAChallengeResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Verify an MFA challenge with an authenticator-app code.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn verify_totp_challenge<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::VerifyTOTPChallengeRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::CompleteMFAChallengeResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Verify an MFA challenge with a passkey.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn finish_passkey_challenge<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::FinishPasskeyChallengeRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::CompleteMFAChallengeResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Verify an MFA challenge with a recovery code.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn verify_recovery_code_challenge<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::CompleteMFAChallengeResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Update an enrolled MFA factor label.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_mfa_factor<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::UpdateMFAFactorRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::UpdateMFAFactorResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Delete an enrolled MFA factor.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_mfa_factor<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::DeleteMFAFactorRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::DeleteMFAFactorResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Rotate the caller's recovery codes.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn regenerate_recovery_codes<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::RegenerateRecoveryCodesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Claim a fresh step-up proof for one protected request.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn claim_fresh_step_up<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ClaimFreshStepUpRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ClaimFreshStepUpResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Consume a claimed fresh step-up proof after the protected request succeeds.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn consume_fresh_step_up<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ConsumeFreshStepUpRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ConsumeFreshStepUpResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Release a claimed fresh step-up proof when the protected request does not complete.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn release_fresh_step_up<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ReleaseFreshStepUpRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ReleaseFreshStepUpResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+}
+/// Extension trait for registering a service implementation with a Router.
+///
+/// This trait is automatically implemented for all types that implement the service trait.
+/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
+/// top-down registration; `register` remains available for compatibility
+/// and cases where the service-first call shape is more convenient.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+///
+/// let service = Arc::new(MyServiceImpl);
+/// let router = service.register(Router::new());
+/// ```
+pub trait MfaServiceExt: MfaService {
+    /// Register this service implementation with a Router.
+    ///
+    /// Takes ownership of the `Arc<Self>` and returns a new Router with
+    /// this service's methods registered.
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router;
+}
+impl<S: MfaService> MfaServiceExt for S {
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router {
+        router
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "ListMFAFactors",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ListMFAFactorsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ListMFAFactorsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_mfa_factors(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ListMFAFactorsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_LIST_MFA_FACTORS_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "BeginTOTPEnrollment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.begin_totp_enrollment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::BeginTOTPEnrollmentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_BEGIN_TOTP_ENROLLMENT_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "FinishTOTPEnrollment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.finish_totp_enrollment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::FinishTOTPEnrollmentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_FINISH_TOTP_ENROLLMENT_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "BeginPasskeyEnrollment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.begin_passkey_enrollment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::BeginPasskeyEnrollmentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_BEGIN_PASSKEY_ENROLLMENT_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "FinishPasskeyEnrollment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.finish_passkey_enrollment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::FinishPasskeyEnrollmentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_FINISH_PASSKEY_ENROLLMENT_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "BeginMFAChallenge",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::BeginMFAChallengeRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::BeginMFAChallengeRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.begin_mfa_challenge(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::BeginMFAChallengeResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_BEGIN_MFA_CHALLENGE_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "VerifyTOTPChallenge",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::VerifyTOTPChallengeRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::VerifyTOTPChallengeRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.verify_totp_challenge(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::CompleteMFAChallengeResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_VERIFY_TOTP_CHALLENGE_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "FinishPasskeyChallenge",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::FinishPasskeyChallengeRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::FinishPasskeyChallengeRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.finish_passkey_challenge(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::CompleteMFAChallengeResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_FINISH_PASSKEY_CHALLENGE_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "VerifyRecoveryCodeChallenge",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::VerifyRecoveryCodeChallengeRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.verify_recovery_code_challenge(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::CompleteMFAChallengeResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_VERIFY_RECOVERY_CODE_CHALLENGE_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "UpdateMFAFactor",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::UpdateMFAFactorRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::UpdateMFAFactorRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_mfa_factor(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::UpdateMFAFactorResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_UPDATE_MFA_FACTOR_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "DeleteMFAFactor",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::DeleteMFAFactorRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::DeleteMFAFactorRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_mfa_factor(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::DeleteMFAFactorResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_DELETE_MFA_FACTOR_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "RegenerateRecoveryCodes",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.regenerate_recovery_codes(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::RegenerateRecoveryCodesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_REGENERATE_RECOVERY_CODES_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "ClaimFreshStepUp",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ClaimFreshStepUpRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.claim_fresh_step_up(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ClaimFreshStepUpResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_CLAIM_FRESH_STEP_UP_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "ConsumeFreshStepUp",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ConsumeFreshStepUpRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.consume_fresh_step_up(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ConsumeFreshStepUpResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_CONSUME_FRESH_STEP_UP_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "ReleaseFreshStepUp",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ReleaseFreshStepUpRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.release_fresh_step_up(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ReleaseFreshStepUpResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC)
+    }
+}
+/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
+#[doc(hidden)]
+pub struct MfaServiceRegisterMarker;
+impl<S: MfaService> ::connectrpc::ServiceRegister<MfaServiceRegisterMarker>
+for ::std::sync::Arc<S> {
+    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
+        <S as MfaServiceExt>::register(self, router)
+    }
+}
+/// Monomorphic dispatcher for `MfaService`.
+///
+/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use connectrpc::ConnectRpcService;
+///
+/// let server = MfaServiceServer::new(MyImpl);
+/// let service = ConnectRpcService::new(server);
+/// // hand `service` to axum/hyper as a fallback_service
+/// ```
+pub struct MfaServiceServer<T> {
+    inner: ::std::sync::Arc<T>,
+}
+impl<T: MfaService> MfaServiceServer<T> {
+    /// Wrap a service implementation in a monomorphic dispatcher.
+    pub fn new(service: T) -> Self {
+        Self {
+            inner: ::std::sync::Arc::new(service),
+        }
+    }
+    /// Wrap an already-`Arc`'d service implementation.
+    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
+        Self { inner }
+    }
+}
+impl<T> Clone for MfaServiceServer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: ::std::sync::Arc::clone(&self.inner),
+        }
+    }
+}
+impl<T: MfaService> ::connectrpc::Dispatcher for MfaServiceServer<T> {
+    #[inline]
+    fn lookup(
+        &self,
+        path: &str,
+    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
+        let method = path.strip_prefix("auth.v1.MFAService/")?;
+        match method {
+            "ListMFAFactors" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_LIST_MFA_FACTORS_SPEC),
+                )
+            }
+            "BeginTOTPEnrollment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_BEGIN_TOTP_ENROLLMENT_SPEC),
+                )
+            }
+            "FinishTOTPEnrollment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_FINISH_TOTP_ENROLLMENT_SPEC),
+                )
+            }
+            "BeginPasskeyEnrollment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_BEGIN_PASSKEY_ENROLLMENT_SPEC),
+                )
+            }
+            "FinishPasskeyEnrollment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_FINISH_PASSKEY_ENROLLMENT_SPEC),
+                )
+            }
+            "BeginMFAChallenge" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_BEGIN_MFA_CHALLENGE_SPEC),
+                )
+            }
+            "VerifyTOTPChallenge" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_VERIFY_TOTP_CHALLENGE_SPEC),
+                )
+            }
+            "FinishPasskeyChallenge" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_FINISH_PASSKEY_CHALLENGE_SPEC),
+                )
+            }
+            "VerifyRecoveryCodeChallenge" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_VERIFY_RECOVERY_CODE_CHALLENGE_SPEC),
+                )
+            }
+            "UpdateMFAFactor" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_UPDATE_MFA_FACTOR_SPEC),
+                )
+            }
+            "DeleteMFAFactor" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_DELETE_MFA_FACTOR_SPEC),
+                )
+            }
+            "RegenerateRecoveryCodes" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_REGENERATE_RECOVERY_CODES_SPEC),
+                )
+            }
+            "ClaimFreshStepUp" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_CLAIM_FRESH_STEP_UP_SPEC),
+                )
+            }
+            "ConsumeFreshStepUp" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_CONSUME_FRESH_STEP_UP_SPEC),
+                )
+            }
+            "ReleaseFreshStepUp" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC),
+                )
+            }
+            _ => None,
+        }
+    }
+    fn call_unary(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::Payload,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            "ListMFAFactors" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ListMFAFactorsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ListMFAFactorsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ListMFAFactorsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_mfa_factors(ctx, req)
+                        .await?
+                        .encode::<crate::proto::auth::v1::ListMFAFactorsResponse>(format)
+                })
+            }
+            "BeginTOTPEnrollment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
+                    >::from_parts(&req, &body);
+                    svc.begin_totp_enrollment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::BeginTOTPEnrollmentResponse,
+                        >(format)
+                })
+            }
+            "FinishTOTPEnrollment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
+                    >::from_parts(&req, &body);
+                    svc.finish_totp_enrollment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::FinishTOTPEnrollmentResponse,
+                        >(format)
+                })
+            }
+            "BeginPasskeyEnrollment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
+                    >::from_parts(&req, &body);
+                    svc.begin_passkey_enrollment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::BeginPasskeyEnrollmentResponse,
+                        >(format)
+                })
+            }
+            "FinishPasskeyEnrollment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
+                    >::from_parts(&req, &body);
+                    svc.finish_passkey_enrollment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::FinishPasskeyEnrollmentResponse,
+                        >(format)
+                })
+            }
+            "BeginMFAChallenge" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::BeginMFAChallengeRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::BeginMFAChallengeRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::BeginMFAChallengeRequest,
+                    >::from_parts(&req, &body);
+                    svc.begin_mfa_challenge(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::BeginMFAChallengeResponse,
+                        >(format)
+                })
+            }
+            "VerifyTOTPChallenge" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::VerifyTOTPChallengeRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::VerifyTOTPChallengeRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::VerifyTOTPChallengeRequest,
+                    >::from_parts(&req, &body);
+                    svc.verify_totp_challenge(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::CompleteMFAChallengeResponse,
+                        >(format)
+                })
+            }
+            "FinishPasskeyChallenge" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::FinishPasskeyChallengeRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::FinishPasskeyChallengeRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::FinishPasskeyChallengeRequest,
+                    >::from_parts(&req, &body);
+                    svc.finish_passkey_challenge(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::CompleteMFAChallengeResponse,
+                        >(format)
+                })
+            }
+            "VerifyRecoveryCodeChallenge" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::VerifyRecoveryCodeChallengeRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
+                    >::from_parts(&req, &body);
+                    svc.verify_recovery_code_challenge(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::CompleteMFAChallengeResponse,
+                        >(format)
+                })
+            }
+            "UpdateMFAFactor" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::UpdateMFAFactorRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::UpdateMFAFactorRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::UpdateMFAFactorRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_mfa_factor(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::UpdateMFAFactorResponse,
+                        >(format)
+                })
+            }
+            "DeleteMFAFactor" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::DeleteMFAFactorRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::DeleteMFAFactorRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::DeleteMFAFactorRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_mfa_factor(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::DeleteMFAFactorResponse,
+                        >(format)
+                })
+            }
+            "RegenerateRecoveryCodes" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
+                    >::from_parts(&req, &body);
+                    svc.regenerate_recovery_codes(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::RegenerateRecoveryCodesResponse,
+                        >(format)
+                })
+            }
+            "ClaimFreshStepUp" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ClaimFreshStepUpRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ClaimFreshStepUpRequest,
+                    >::from_parts(&req, &body);
+                    svc.claim_fresh_step_up(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ClaimFreshStepUpResponse,
+                        >(format)
+                })
+            }
+            "ConsumeFreshStepUp" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ConsumeFreshStepUpRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ConsumeFreshStepUpRequest,
+                    >::from_parts(&req, &body);
+                    svc.consume_fresh_step_up(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ConsumeFreshStepUpResponse,
+                        >(format)
+                })
+            }
+            "ReleaseFreshStepUp" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ReleaseFreshStepUpRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ReleaseFreshStepUpRequest,
+                    >::from_parts(&req, &body);
+                    svc.release_fresh_step_up(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ReleaseFreshStepUpResponse,
+                        >(format)
+                })
+            }
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_server_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::buffa::bytes::Bytes,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+    fn call_client_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_bidi_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+}
+/// Client for this service.
+///
+/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
+/// `Http2Connection` — it has honest `poll_ready` and composes with
+/// `tower::balance` for multi-connection load balancing. For **Connect
+/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
+///
+/// # Working with the response
+///
+/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
+/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
+/// message, so field access is zero-copy:
+///
+/// ```rust,ignore
+/// let resp = client.list_mfa_factors(request).await?;
+/// let name: &str = resp.view().name;  // borrow into the response buffer
+/// ```
+///
+/// If you need the owned struct (e.g. to store or pass by value), use
+/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
+///
+/// ```rust,ignore
+/// let owned = client.list_mfa_factors(request).await?.into_owned();
+/// ```
+///
+/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
+/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
+/// goes through `.reborrow()`. Streaming responses yield one
+/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
+/// `.message().await` — read fields zero-copy through the generated accessor
+/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
+#[derive(Clone)]
+pub struct MfaServiceClient<T> {
+    transport: T,
+    config: ::connectrpc::client::ClientConfig,
+}
+impl<T> MfaServiceClient<T>
+where
+    T: ::connectrpc::client::ClientTransport,
+    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
+{
+    /// Create a new client with the given transport and configuration.
+    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
+        Self { transport, config }
+    }
+    /// Get the client configuration.
+    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
+        &self.config
+    }
+    /// Get a mutable reference to the client configuration.
+    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
+        &mut self.config
+    }
+    /// Call the ListMFAFactors RPC. Sends a request to /auth.v1.MFAService/ListMFAFactors.
+    pub async fn list_mfa_factors(
+        &self,
+        request: crate::proto::auth::v1::ListMFAFactorsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_mfa_factors_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListMFAFactors RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_mfa_factors_with_options(
+        &self,
+        request: crate::proto::auth::v1::ListMFAFactorsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "ListMFAFactors",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the BeginTOTPEnrollment RPC. Sends a request to /auth.v1.MFAService/BeginTOTPEnrollment.
+    pub async fn begin_totp_enrollment(
+        &self,
+        request: crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.begin_totp_enrollment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the BeginTOTPEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn begin_totp_enrollment_with_options(
+        &self,
+        request: crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "BeginTOTPEnrollment",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the FinishTOTPEnrollment RPC. Sends a request to /auth.v1.MFAService/FinishTOTPEnrollment.
+    pub async fn finish_totp_enrollment(
+        &self,
+        request: crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.finish_totp_enrollment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the FinishTOTPEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn finish_totp_enrollment_with_options(
+        &self,
+        request: crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "FinishTOTPEnrollment",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the BeginPasskeyEnrollment RPC. Sends a request to /auth.v1.MFAService/BeginPasskeyEnrollment.
+    pub async fn begin_passkey_enrollment(
+        &self,
+        request: crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.begin_passkey_enrollment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the BeginPasskeyEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn begin_passkey_enrollment_with_options(
+        &self,
+        request: crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "BeginPasskeyEnrollment",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the FinishPasskeyEnrollment RPC. Sends a request to /auth.v1.MFAService/FinishPasskeyEnrollment.
+    pub async fn finish_passkey_enrollment(
+        &self,
+        request: crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.finish_passkey_enrollment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the FinishPasskeyEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn finish_passkey_enrollment_with_options(
+        &self,
+        request: crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "FinishPasskeyEnrollment",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the BeginMFAChallenge RPC. Sends a request to /auth.v1.MFAService/BeginMFAChallenge.
+    pub async fn begin_mfa_challenge(
+        &self,
+        request: crate::proto::auth::v1::BeginMFAChallengeRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.begin_mfa_challenge_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the BeginMFAChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn begin_mfa_challenge_with_options(
+        &self,
+        request: crate::proto::auth::v1::BeginMFAChallengeRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "BeginMFAChallenge",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the VerifyTOTPChallenge RPC. Sends a request to /auth.v1.MFAService/VerifyTOTPChallenge.
+    pub async fn verify_totp_challenge(
+        &self,
+        request: crate::proto::auth::v1::VerifyTOTPChallengeRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.verify_totp_challenge_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the VerifyTOTPChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn verify_totp_challenge_with_options(
+        &self,
+        request: crate::proto::auth::v1::VerifyTOTPChallengeRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "VerifyTOTPChallenge",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the FinishPasskeyChallenge RPC. Sends a request to /auth.v1.MFAService/FinishPasskeyChallenge.
+    pub async fn finish_passkey_challenge(
+        &self,
+        request: crate::proto::auth::v1::FinishPasskeyChallengeRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.finish_passkey_challenge_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the FinishPasskeyChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn finish_passkey_challenge_with_options(
+        &self,
+        request: crate::proto::auth::v1::FinishPasskeyChallengeRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "FinishPasskeyChallenge",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the VerifyRecoveryCodeChallenge RPC. Sends a request to /auth.v1.MFAService/VerifyRecoveryCodeChallenge.
+    pub async fn verify_recovery_code_challenge(
+        &self,
+        request: crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.verify_recovery_code_challenge_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the VerifyRecoveryCodeChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn verify_recovery_code_challenge_with_options(
+        &self,
+        request: crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "VerifyRecoveryCodeChallenge",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateMFAFactor RPC. Sends a request to /auth.v1.MFAService/UpdateMFAFactor.
+    pub async fn update_mfa_factor(
+        &self,
+        request: crate::proto::auth::v1::UpdateMFAFactorRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_mfa_factor_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateMFAFactor RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_mfa_factor_with_options(
+        &self,
+        request: crate::proto::auth::v1::UpdateMFAFactorRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "UpdateMFAFactor",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteMFAFactor RPC. Sends a request to /auth.v1.MFAService/DeleteMFAFactor.
+    pub async fn delete_mfa_factor(
+        &self,
+        request: crate::proto::auth::v1::DeleteMFAFactorRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_mfa_factor_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteMFAFactor RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_mfa_factor_with_options(
+        &self,
+        request: crate::proto::auth::v1::DeleteMFAFactorRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "DeleteMFAFactor",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RegenerateRecoveryCodes RPC. Sends a request to /auth.v1.MFAService/RegenerateRecoveryCodes.
+    pub async fn regenerate_recovery_codes(
+        &self,
+        request: crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.regenerate_recovery_codes_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RegenerateRecoveryCodes RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn regenerate_recovery_codes_with_options(
+        &self,
+        request: crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "RegenerateRecoveryCodes",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ClaimFreshStepUp RPC. Sends a request to /auth.v1.MFAService/ClaimFreshStepUp.
+    pub async fn claim_fresh_step_up(
+        &self,
+        request: crate::proto::auth::v1::ClaimFreshStepUpRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.claim_fresh_step_up_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ClaimFreshStepUp RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn claim_fresh_step_up_with_options(
+        &self,
+        request: crate::proto::auth::v1::ClaimFreshStepUpRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "ClaimFreshStepUp",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ConsumeFreshStepUp RPC. Sends a request to /auth.v1.MFAService/ConsumeFreshStepUp.
+    pub async fn consume_fresh_step_up(
+        &self,
+        request: crate::proto::auth::v1::ConsumeFreshStepUpRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.consume_fresh_step_up_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ConsumeFreshStepUp RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn consume_fresh_step_up_with_options(
+        &self,
+        request: crate::proto::auth::v1::ConsumeFreshStepUpRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "ConsumeFreshStepUp",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ReleaseFreshStepUp RPC. Sends a request to /auth.v1.MFAService/ReleaseFreshStepUp.
+    pub async fn release_fresh_step_up(
+        &self,
+        request: crate::proto::auth::v1::ReleaseFreshStepUpRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.release_fresh_step_up_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReleaseFreshStepUp RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn release_fresh_step_up_with_options(
+        &self,
+        request: crate::proto::auth::v1::ReleaseFreshStepUpRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "ReleaseFreshStepUp",
                 request,
                 options,
             )
@@ -10359,2631 +12984,6 @@ where
     }
 }
 
-///Shorthand for `OwnedView<ListMfaFactorsRequestView<'static>>`.
-pub type OwnedListMfaFactorsRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ListMFAFactorsRequestView<'static>,
->;
-///Shorthand for `OwnedView<ListMfaFactorsResponseView<'static>>`.
-pub type OwnedListMfaFactorsResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'static>,
->;
-///Shorthand for `OwnedView<BeginTotpEnrollmentRequestView<'static>>`.
-pub type OwnedBeginTotpEnrollmentRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentRequestView<'static>,
->;
-///Shorthand for `OwnedView<BeginTotpEnrollmentResponseView<'static>>`.
-pub type OwnedBeginTotpEnrollmentResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<'static>,
->;
-///Shorthand for `OwnedView<FinishTotpEnrollmentRequestView<'static>>`.
-pub type OwnedFinishTotpEnrollmentRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentRequestView<'static>,
->;
-///Shorthand for `OwnedView<FinishTotpEnrollmentResponseView<'static>>`.
-pub type OwnedFinishTotpEnrollmentResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<'static>,
->;
-///Shorthand for `OwnedView<BeginPasskeyEnrollmentRequestView<'static>>`.
-pub type OwnedBeginPasskeyEnrollmentRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentRequestView<'static>,
->;
-///Shorthand for `OwnedView<BeginPasskeyEnrollmentResponseView<'static>>`.
-pub type OwnedBeginPasskeyEnrollmentResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<'static>,
->;
-///Shorthand for `OwnedView<FinishPasskeyEnrollmentRequestView<'static>>`.
-pub type OwnedFinishPasskeyEnrollmentRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentRequestView<'static>,
->;
-///Shorthand for `OwnedView<FinishPasskeyEnrollmentResponseView<'static>>`.
-pub type OwnedFinishPasskeyEnrollmentResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<'static>,
->;
-///Shorthand for `OwnedView<BeginMfaChallengeRequestView<'static>>`.
-pub type OwnedBeginMfaChallengeRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginMFAChallengeRequestView<'static>,
->;
-///Shorthand for `OwnedView<BeginMfaChallengeResponseView<'static>>`.
-pub type OwnedBeginMfaChallengeResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<'static>,
->;
-///Shorthand for `OwnedView<VerifyTotpChallengeRequestView<'static>>`.
-pub type OwnedVerifyTotpChallengeRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::VerifyTOTPChallengeRequestView<'static>,
->;
-///Shorthand for `OwnedView<CompleteMfaChallengeResponseView<'static>>`.
-pub type OwnedCompleteMfaChallengeResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<'static>,
->;
-///Shorthand for `OwnedView<FinishPasskeyChallengeRequestView<'static>>`.
-pub type OwnedFinishPasskeyChallengeRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::FinishPasskeyChallengeRequestView<'static>,
->;
-///Shorthand for `OwnedView<VerifyRecoveryCodeChallengeRequestView<'static>>`.
-pub type OwnedVerifyRecoveryCodeChallengeRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::VerifyRecoveryCodeChallengeRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<UpdateMfaFactorRequestView<'static>>`.
-pub type OwnedUpdateMfaFactorRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::UpdateMFAFactorRequestView<'static>,
->;
-///Shorthand for `OwnedView<UpdateMfaFactorResponseView<'static>>`.
-pub type OwnedUpdateMfaFactorResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<'static>,
->;
-///Shorthand for `OwnedView<DeleteMfaFactorRequestView<'static>>`.
-pub type OwnedDeleteMfaFactorRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::DeleteMFAFactorRequestView<'static>,
->;
-///Shorthand for `OwnedView<DeleteMfaFactorResponseView<'static>>`.
-pub type OwnedDeleteMfaFactorResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<'static>,
->;
-///Shorthand for `OwnedView<RegenerateRecoveryCodesRequestView<'static>>`.
-pub type OwnedRegenerateRecoveryCodesRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesRequestView<'static>,
->;
-///Shorthand for `OwnedView<RegenerateRecoveryCodesResponseView<'static>>`.
-pub type OwnedRegenerateRecoveryCodesResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<'static>,
->;
-///Shorthand for `OwnedView<ClaimFreshStepUpRequestView<'static>>`.
-pub type OwnedClaimFreshStepUpRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpRequestView<'static>,
->;
-///Shorthand for `OwnedView<ClaimFreshStepUpResponseView<'static>>`.
-pub type OwnedClaimFreshStepUpResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<'static>,
->;
-///Shorthand for `OwnedView<ConsumeFreshStepUpRequestView<'static>>`.
-pub type OwnedConsumeFreshStepUpRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpRequestView<'static>,
->;
-///Shorthand for `OwnedView<ConsumeFreshStepUpResponseView<'static>>`.
-pub type OwnedConsumeFreshStepUpResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<'static>,
->;
-///Shorthand for `OwnedView<ReleaseFreshStepUpRequestView<'static>>`.
-pub type OwnedReleaseFreshStepUpRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpRequestView<'static>,
->;
-///Shorthand for `OwnedView<ReleaseFreshStepUpResponseView<'static>>`.
-pub type OwnedReleaseFreshStepUpResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'static>,
->;
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ListMFAFactorsResponse>
-for crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ListMFAFactorsResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginTOTPEnrollmentResponse>
-for crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginTOTPEnrollmentResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishTOTPEnrollmentResponse>
-for crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishTOTPEnrollmentResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginPasskeyEnrollmentResponse>
-for crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginPasskeyEnrollmentResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishPasskeyEnrollmentResponse>
-for crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::FinishPasskeyEnrollmentResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginMFAChallengeResponse>
-for crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::BeginMFAChallengeResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::CompleteMFAChallengeResponse>
-for crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::CompleteMFAChallengeResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::UpdateMFAFactorResponse>
-for crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::UpdateMFAFactorResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::DeleteMFAFactorResponse>
-for crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::DeleteMFAFactorResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::RegenerateRecoveryCodesResponse>
-for crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::RegenerateRecoveryCodesResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ClaimFreshStepUpResponse>
-for crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ClaimFreshStepUpResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ConsumeFreshStepUpResponse>
-for crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ConsumeFreshStepUpResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ReleaseFreshStepUpResponse>
-for crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ReleaseFreshStepUpResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-/// Full service name for this service.
-pub const MFA_SERVICE_SERVICE_NAME: &str = "auth.v1.MFAService";
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListMFAFactors` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_LIST_MFA_FACTORS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/ListMFAFactors",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `BeginTOTPEnrollment` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_BEGIN_TOTP_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/BeginTOTPEnrollment",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `FinishTOTPEnrollment` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_FINISH_TOTP_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/FinishTOTPEnrollment",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `BeginPasskeyEnrollment` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_BEGIN_PASSKEY_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/BeginPasskeyEnrollment",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `FinishPasskeyEnrollment` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_FINISH_PASSKEY_ENROLLMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/FinishPasskeyEnrollment",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `BeginMFAChallenge` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_BEGIN_MFA_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/BeginMFAChallenge",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `VerifyTOTPChallenge` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_VERIFY_TOTP_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/VerifyTOTPChallenge",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `FinishPasskeyChallenge` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_FINISH_PASSKEY_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/FinishPasskeyChallenge",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `VerifyRecoveryCodeChallenge` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_VERIFY_RECOVERY_CODE_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/VerifyRecoveryCodeChallenge",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `UpdateMFAFactor` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_UPDATE_MFA_FACTOR_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/UpdateMFAFactor",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `DeleteMFAFactor` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_DELETE_MFA_FACTOR_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/DeleteMFAFactor",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `RegenerateRecoveryCodes` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_REGENERATE_RECOVERY_CODES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/RegenerateRecoveryCodes",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `ClaimFreshStepUp` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_CLAIM_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/ClaimFreshStepUp",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `ConsumeFreshStepUp` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_CONSUME_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/ConsumeFreshStepUp",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `ReleaseFreshStepUp` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/ReleaseFreshStepUp",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// MFA management service for enrollment, challenges, fresh step-up proofs, and recovery codes.
-///
-/// # Implementing handlers
-///
-/// Implement methods with plain `async fn`; the returned future satisfies
-/// the `Send` bound automatically.
-///
-/// **Unary and server-streaming requests** arrive as
-/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
-/// view of the request plus its body, valid for the duration of the call.
-/// Fields are read directly (`request.name` is a `&str` into the decoded
-/// buffer) and the borrow may be held across `.await` points. Anything
-/// that must outlive the call — `tokio::spawn`, channels, server state,
-/// or data captured by a returned response stream — takes owned data:
-/// call `request.to_owned_message()` (or copy the specific fields)
-/// first.
-///
-/// **Client-streaming and bidi requests** arrive as
-/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
-/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
-/// Each item owns its decoded buffer and is `Send + 'static`, so items
-/// can be buffered or moved into spawned tasks; read fields zero-copy
-/// through the generated accessor methods (`item.name()`) or `.view()`,
-/// convert with `.to_owned_message()`, or yield an item back unchanged —
-/// `StreamMessage<M>` implements `Encodable<M>`.
-///
-/// Request types resolved through `extern_path` (e.g. well-known types
-/// from another crate) use the same wrappers; the crate that owns the
-/// type must be generated with buffa ≥ 0.8.0 and views enabled so the
-/// backing `HasMessageView` impl exists.
-///
-/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
-/// generated `OutView<'_>` / `OwnedOutView`,
-/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
-/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
-/// non-`'static` view internally and pass the bytes across the handler
-/// boundary. View bodies are not emitted for output types mapped via
-/// `extern_path` (the impl would be an orphan); return owned for
-/// WKT/extern outputs.
-///
-/// Server-streaming and bidi-streaming methods return
-/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
-/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
-/// the request's lifetime (unary methods use `use<'a, Self>` and may
-/// borrow from `&self`), so stream items must be `'static` and cannot
-/// borrow from the request. To stream view-encoded data, encode each
-/// item inside the stream body and yield
-/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
-/// example` doc.
-#[allow(clippy::type_complexity)]
-pub trait MfaService: Send + Sync + 'static {
-    /// List the caller's enrolled MFA factors.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn list_mfa_factors<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::ListMFAFactorsRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::ListMFAFactorsResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Start authenticator-app enrollment.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn begin_totp_enrollment<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::BeginTOTPEnrollmentResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Finish authenticator-app enrollment.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn finish_totp_enrollment<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::FinishTOTPEnrollmentResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Start passkey enrollment.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn begin_passkey_enrollment<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::BeginPasskeyEnrollmentResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Finish passkey enrollment.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn finish_passkey_enrollment<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::FinishPasskeyEnrollmentResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Start an MFA challenge for session elevation or fresh step-up.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn begin_mfa_challenge<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::BeginMFAChallengeRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::BeginMFAChallengeResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Verify an MFA challenge with an authenticator-app code.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn verify_totp_challenge<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::VerifyTOTPChallengeRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::CompleteMFAChallengeResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Verify an MFA challenge with a passkey.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn finish_passkey_challenge<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::FinishPasskeyChallengeRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::CompleteMFAChallengeResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Verify an MFA challenge with a recovery code.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn verify_recovery_code_challenge<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::CompleteMFAChallengeResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Update an enrolled MFA factor label.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn update_mfa_factor<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::UpdateMFAFactorRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::UpdateMFAFactorResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Delete an enrolled MFA factor.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn delete_mfa_factor<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::DeleteMFAFactorRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::DeleteMFAFactorResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Rotate the caller's recovery codes.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn regenerate_recovery_codes<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::RegenerateRecoveryCodesResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Claim a fresh step-up proof for one protected request.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn claim_fresh_step_up<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::ClaimFreshStepUpRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::ClaimFreshStepUpResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Consume a claimed fresh step-up proof after the protected request succeeds.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn consume_fresh_step_up<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::ConsumeFreshStepUpRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::ConsumeFreshStepUpResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Release a claimed fresh step-up proof when the protected request does not complete.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn release_fresh_step_up<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::ReleaseFreshStepUpRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::ReleaseFreshStepUpResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-}
-/// Extension trait for registering a service implementation with a Router.
-///
-/// This trait is automatically implemented for all types that implement the service trait.
-/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
-/// top-down registration; `register` remains available for compatibility
-/// and cases where the service-first call shape is more convenient.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use std::sync::Arc;
-///
-/// let service = Arc::new(MyServiceImpl);
-/// let router = service.register(Router::new());
-/// ```
-pub trait MfaServiceExt: MfaService {
-    /// Register this service implementation with a Router.
-    ///
-    /// Takes ownership of the `Arc<Self>` and returns a new Router with
-    /// this service's methods registered.
-    fn register(
-        self: ::std::sync::Arc<Self>,
-        router: ::connectrpc::Router,
-    ) -> ::connectrpc::Router;
-}
-impl<S: MfaService> MfaServiceExt for S {
-    fn register(
-        self: ::std::sync::Arc<Self>,
-        router: ::connectrpc::Router,
-    ) -> ::connectrpc::Router {
-        router
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "ListMFAFactors",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::ListMFAFactorsRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::ListMFAFactorsRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.list_mfa_factors(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::ListMFAFactorsResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_LIST_MFA_FACTORS_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "BeginTOTPEnrollment",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.begin_totp_enrollment(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::BeginTOTPEnrollmentResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_BEGIN_TOTP_ENROLLMENT_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "FinishTOTPEnrollment",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.finish_totp_enrollment(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::FinishTOTPEnrollmentResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_FINISH_TOTP_ENROLLMENT_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "BeginPasskeyEnrollment",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.begin_passkey_enrollment(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::BeginPasskeyEnrollmentResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_BEGIN_PASSKEY_ENROLLMENT_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "FinishPasskeyEnrollment",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.finish_passkey_enrollment(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::FinishPasskeyEnrollmentResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_FINISH_PASSKEY_ENROLLMENT_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "BeginMFAChallenge",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::BeginMFAChallengeRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::BeginMFAChallengeRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.begin_mfa_challenge(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::BeginMFAChallengeResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_BEGIN_MFA_CHALLENGE_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "VerifyTOTPChallenge",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::VerifyTOTPChallengeRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::VerifyTOTPChallengeRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.verify_totp_challenge(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::CompleteMFAChallengeResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_VERIFY_TOTP_CHALLENGE_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "FinishPasskeyChallenge",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::FinishPasskeyChallengeRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::FinishPasskeyChallengeRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.finish_passkey_challenge(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::CompleteMFAChallengeResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_FINISH_PASSKEY_CHALLENGE_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "VerifyRecoveryCodeChallenge",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::VerifyRecoveryCodeChallengeRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.verify_recovery_code_challenge(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::CompleteMFAChallengeResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_VERIFY_RECOVERY_CODE_CHALLENGE_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "UpdateMFAFactor",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::UpdateMFAFactorRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::UpdateMFAFactorRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.update_mfa_factor(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::UpdateMFAFactorResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_UPDATE_MFA_FACTOR_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "DeleteMFAFactor",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::DeleteMFAFactorRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::DeleteMFAFactorRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.delete_mfa_factor(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::DeleteMFAFactorResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_DELETE_MFA_FACTOR_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "RegenerateRecoveryCodes",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.regenerate_recovery_codes(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::RegenerateRecoveryCodesResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_REGENERATE_RECOVERY_CODES_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "ClaimFreshStepUp",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::ClaimFreshStepUpRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.claim_fresh_step_up(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::ClaimFreshStepUpResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_CLAIM_FRESH_STEP_UP_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "ConsumeFreshStepUp",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::ConsumeFreshStepUpRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.consume_fresh_step_up(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::ConsumeFreshStepUpResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_CONSUME_FRESH_STEP_UP_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "ReleaseFreshStepUp",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::ReleaseFreshStepUpRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.release_fresh_step_up(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::ReleaseFreshStepUpResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC)
-    }
-}
-/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
-#[doc(hidden)]
-pub struct MfaServiceRegisterMarker;
-impl<S: MfaService> ::connectrpc::ServiceRegister<MfaServiceRegisterMarker>
-for ::std::sync::Arc<S> {
-    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
-        <S as MfaServiceExt>::register(self, router)
-    }
-}
-/// Monomorphic dispatcher for `MfaService`.
-///
-/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use connectrpc::ConnectRpcService;
-///
-/// let server = MfaServiceServer::new(MyImpl);
-/// let service = ConnectRpcService::new(server);
-/// // hand `service` to axum/hyper as a fallback_service
-/// ```
-pub struct MfaServiceServer<T> {
-    inner: ::std::sync::Arc<T>,
-}
-impl<T: MfaService> MfaServiceServer<T> {
-    /// Wrap a service implementation in a monomorphic dispatcher.
-    pub fn new(service: T) -> Self {
-        Self {
-            inner: ::std::sync::Arc::new(service),
-        }
-    }
-    /// Wrap an already-`Arc`'d service implementation.
-    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
-        Self { inner }
-    }
-}
-impl<T> Clone for MfaServiceServer<T> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: ::std::sync::Arc::clone(&self.inner),
-        }
-    }
-}
-impl<T: MfaService> ::connectrpc::Dispatcher for MfaServiceServer<T> {
-    #[inline]
-    fn lookup(
-        &self,
-        path: &str,
-    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
-        let method = path.strip_prefix("auth.v1.MFAService/")?;
-        match method {
-            "ListMFAFactors" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_LIST_MFA_FACTORS_SPEC),
-                )
-            }
-            "BeginTOTPEnrollment" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_BEGIN_TOTP_ENROLLMENT_SPEC),
-                )
-            }
-            "FinishTOTPEnrollment" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_FINISH_TOTP_ENROLLMENT_SPEC),
-                )
-            }
-            "BeginPasskeyEnrollment" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_BEGIN_PASSKEY_ENROLLMENT_SPEC),
-                )
-            }
-            "FinishPasskeyEnrollment" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_FINISH_PASSKEY_ENROLLMENT_SPEC),
-                )
-            }
-            "BeginMFAChallenge" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_BEGIN_MFA_CHALLENGE_SPEC),
-                )
-            }
-            "VerifyTOTPChallenge" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_VERIFY_TOTP_CHALLENGE_SPEC),
-                )
-            }
-            "FinishPasskeyChallenge" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_FINISH_PASSKEY_CHALLENGE_SPEC),
-                )
-            }
-            "VerifyRecoveryCodeChallenge" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_VERIFY_RECOVERY_CODE_CHALLENGE_SPEC),
-                )
-            }
-            "UpdateMFAFactor" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_UPDATE_MFA_FACTOR_SPEC),
-                )
-            }
-            "DeleteMFAFactor" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_DELETE_MFA_FACTOR_SPEC),
-                )
-            }
-            "RegenerateRecoveryCodes" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_REGENERATE_RECOVERY_CODES_SPEC),
-                )
-            }
-            "ClaimFreshStepUp" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_CLAIM_FRESH_STEP_UP_SPEC),
-                )
-            }
-            "ConsumeFreshStepUp" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_CONSUME_FRESH_STEP_UP_SPEC),
-                )
-            }
-            "ReleaseFreshStepUp" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC),
-                )
-            }
-            _ => None,
-        }
-    }
-    fn call_unary(
-        &self,
-        path: &str,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::Payload,
-        format: ::connectrpc::CodecFormat,
-    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
-        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
-            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
-        };
-        let _ = (&ctx, &request, &format);
-        match method {
-            "ListMFAFactors" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::ListMFAFactorsRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::ListMFAFactorsRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::ListMFAFactorsRequest,
-                    >::from_parts(&req, &body);
-                    svc.list_mfa_factors(ctx, req)
-                        .await?
-                        .encode::<crate::proto::auth::v1::ListMFAFactorsResponse>(format)
-                })
-            }
-            "BeginTOTPEnrollment" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
-                    >::from_parts(&req, &body);
-                    svc.begin_totp_enrollment(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::BeginTOTPEnrollmentResponse,
-                        >(format)
-                })
-            }
-            "FinishTOTPEnrollment" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
-                    >::from_parts(&req, &body);
-                    svc.finish_totp_enrollment(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::FinishTOTPEnrollmentResponse,
-                        >(format)
-                })
-            }
-            "BeginPasskeyEnrollment" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
-                    >::from_parts(&req, &body);
-                    svc.begin_passkey_enrollment(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::BeginPasskeyEnrollmentResponse,
-                        >(format)
-                })
-            }
-            "FinishPasskeyEnrollment" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
-                    >::from_parts(&req, &body);
-                    svc.finish_passkey_enrollment(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::FinishPasskeyEnrollmentResponse,
-                        >(format)
-                })
-            }
-            "BeginMFAChallenge" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::BeginMFAChallengeRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::BeginMFAChallengeRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::BeginMFAChallengeRequest,
-                    >::from_parts(&req, &body);
-                    svc.begin_mfa_challenge(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::BeginMFAChallengeResponse,
-                        >(format)
-                })
-            }
-            "VerifyTOTPChallenge" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::VerifyTOTPChallengeRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::VerifyTOTPChallengeRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::VerifyTOTPChallengeRequest,
-                    >::from_parts(&req, &body);
-                    svc.verify_totp_challenge(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::CompleteMFAChallengeResponse,
-                        >(format)
-                })
-            }
-            "FinishPasskeyChallenge" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::FinishPasskeyChallengeRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::FinishPasskeyChallengeRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::FinishPasskeyChallengeRequest,
-                    >::from_parts(&req, &body);
-                    svc.finish_passkey_challenge(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::CompleteMFAChallengeResponse,
-                        >(format)
-                })
-            }
-            "VerifyRecoveryCodeChallenge" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::VerifyRecoveryCodeChallengeRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
-                    >::from_parts(&req, &body);
-                    svc.verify_recovery_code_challenge(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::CompleteMFAChallengeResponse,
-                        >(format)
-                })
-            }
-            "UpdateMFAFactor" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::UpdateMFAFactorRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::UpdateMFAFactorRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::UpdateMFAFactorRequest,
-                    >::from_parts(&req, &body);
-                    svc.update_mfa_factor(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::UpdateMFAFactorResponse,
-                        >(format)
-                })
-            }
-            "DeleteMFAFactor" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::DeleteMFAFactorRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::DeleteMFAFactorRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::DeleteMFAFactorRequest,
-                    >::from_parts(&req, &body);
-                    svc.delete_mfa_factor(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::DeleteMFAFactorResponse,
-                        >(format)
-                })
-            }
-            "RegenerateRecoveryCodes" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
-                    >::from_parts(&req, &body);
-                    svc.regenerate_recovery_codes(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::RegenerateRecoveryCodesResponse,
-                        >(format)
-                })
-            }
-            "ClaimFreshStepUp" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::ClaimFreshStepUpRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::ClaimFreshStepUpRequest,
-                    >::from_parts(&req, &body);
-                    svc.claim_fresh_step_up(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::ClaimFreshStepUpResponse,
-                        >(format)
-                })
-            }
-            "ConsumeFreshStepUp" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::ConsumeFreshStepUpRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::ConsumeFreshStepUpRequest,
-                    >::from_parts(&req, &body);
-                    svc.consume_fresh_step_up(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::ConsumeFreshStepUpResponse,
-                        >(format)
-                })
-            }
-            "ReleaseFreshStepUp" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::ReleaseFreshStepUpRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::ReleaseFreshStepUpRequest,
-                    >::from_parts(&req, &body);
-                    svc.release_fresh_step_up(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::auth::v1::ReleaseFreshStepUpResponse,
-                        >(format)
-                })
-            }
-            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
-        }
-    }
-    fn call_server_streaming(
-        &self,
-        path: &str,
-        ctx: ::connectrpc::RequestContext,
-        request: ::buffa::bytes::Bytes,
-        format: ::connectrpc::CodecFormat,
-    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
-        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
-            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
-        };
-        let _ = (&ctx, &request, &format);
-        match method {
-            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
-        }
-    }
-    fn call_client_streaming(
-        &self,
-        path: &str,
-        ctx: ::connectrpc::RequestContext,
-        requests: ::connectrpc::dispatcher::codegen::RequestStream,
-        format: ::connectrpc::CodecFormat,
-    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
-        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
-            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
-        };
-        let _ = (&ctx, &requests, &format);
-        match method {
-            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
-        }
-    }
-    fn call_bidi_streaming(
-        &self,
-        path: &str,
-        ctx: ::connectrpc::RequestContext,
-        requests: ::connectrpc::dispatcher::codegen::RequestStream,
-        format: ::connectrpc::CodecFormat,
-    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
-        let Some(method) = path.strip_prefix("auth.v1.MFAService/") else {
-            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
-        };
-        let _ = (&ctx, &requests, &format);
-        match method {
-            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
-        }
-    }
-}
-/// Client for this service.
-///
-/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
-/// `Http2Connection` — it has honest `poll_ready` and composes with
-/// `tower::balance` for multi-connection load balancing. For **Connect
-/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
-///
-/// # Working with the response
-///
-/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
-/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
-/// message, so field access is zero-copy:
-///
-/// ```rust,ignore
-/// let resp = client.list_mfa_factors(request).await?;
-/// let name: &str = resp.view().name;  // borrow into the response buffer
-/// ```
-///
-/// If you need the owned struct (e.g. to store or pass by value), use
-/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
-///
-/// ```rust,ignore
-/// let owned = client.list_mfa_factors(request).await?.into_owned();
-/// ```
-///
-/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
-/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
-/// goes through `.reborrow()`. Streaming responses yield one
-/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
-/// `.message().await` — read fields zero-copy through the generated accessor
-/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
-#[derive(Clone)]
-pub struct MfaServiceClient<T> {
-    transport: T,
-    config: ::connectrpc::client::ClientConfig,
-}
-impl<T> MfaServiceClient<T>
-where
-    T: ::connectrpc::client::ClientTransport,
-    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
-{
-    /// Create a new client with the given transport and configuration.
-    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
-        Self { transport, config }
-    }
-    /// Get the client configuration.
-    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
-        &self.config
-    }
-    /// Get a mutable reference to the client configuration.
-    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
-        &mut self.config
-    }
-    /// Call the ListMFAFactors RPC. Sends a request to /auth.v1.MFAService/ListMFAFactors.
-    pub async fn list_mfa_factors(
-        &self,
-        request: crate::proto::auth::v1::ListMFAFactorsRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.list_mfa_factors_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the ListMFAFactors RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn list_mfa_factors_with_options(
-        &self,
-        request: crate::proto::auth::v1::ListMFAFactorsRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "ListMFAFactors",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the BeginTOTPEnrollment RPC. Sends a request to /auth.v1.MFAService/BeginTOTPEnrollment.
-    pub async fn begin_totp_enrollment(
-        &self,
-        request: crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.begin_totp_enrollment_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the BeginTOTPEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn begin_totp_enrollment_with_options(
-        &self,
-        request: crate::proto::auth::v1::BeginTOTPEnrollmentRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::BeginTOTPEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "BeginTOTPEnrollment",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the FinishTOTPEnrollment RPC. Sends a request to /auth.v1.MFAService/FinishTOTPEnrollment.
-    pub async fn finish_totp_enrollment(
-        &self,
-        request: crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.finish_totp_enrollment_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the FinishTOTPEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn finish_totp_enrollment_with_options(
-        &self,
-        request: crate::proto::auth::v1::FinishTOTPEnrollmentRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::FinishTOTPEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "FinishTOTPEnrollment",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the BeginPasskeyEnrollment RPC. Sends a request to /auth.v1.MFAService/BeginPasskeyEnrollment.
-    pub async fn begin_passkey_enrollment(
-        &self,
-        request: crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.begin_passkey_enrollment_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the BeginPasskeyEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn begin_passkey_enrollment_with_options(
-        &self,
-        request: crate::proto::auth::v1::BeginPasskeyEnrollmentRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::BeginPasskeyEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "BeginPasskeyEnrollment",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the FinishPasskeyEnrollment RPC. Sends a request to /auth.v1.MFAService/FinishPasskeyEnrollment.
-    pub async fn finish_passkey_enrollment(
-        &self,
-        request: crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.finish_passkey_enrollment_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the FinishPasskeyEnrollment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn finish_passkey_enrollment_with_options(
-        &self,
-        request: crate::proto::auth::v1::FinishPasskeyEnrollmentRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::FinishPasskeyEnrollmentResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "FinishPasskeyEnrollment",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the BeginMFAChallenge RPC. Sends a request to /auth.v1.MFAService/BeginMFAChallenge.
-    pub async fn begin_mfa_challenge(
-        &self,
-        request: crate::proto::auth::v1::BeginMFAChallengeRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.begin_mfa_challenge_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the BeginMFAChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn begin_mfa_challenge_with_options(
-        &self,
-        request: crate::proto::auth::v1::BeginMFAChallengeRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::BeginMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "BeginMFAChallenge",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the VerifyTOTPChallenge RPC. Sends a request to /auth.v1.MFAService/VerifyTOTPChallenge.
-    pub async fn verify_totp_challenge(
-        &self,
-        request: crate::proto::auth::v1::VerifyTOTPChallengeRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.verify_totp_challenge_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the VerifyTOTPChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn verify_totp_challenge_with_options(
-        &self,
-        request: crate::proto::auth::v1::VerifyTOTPChallengeRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "VerifyTOTPChallenge",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the FinishPasskeyChallenge RPC. Sends a request to /auth.v1.MFAService/FinishPasskeyChallenge.
-    pub async fn finish_passkey_challenge(
-        &self,
-        request: crate::proto::auth::v1::FinishPasskeyChallengeRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.finish_passkey_challenge_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the FinishPasskeyChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn finish_passkey_challenge_with_options(
-        &self,
-        request: crate::proto::auth::v1::FinishPasskeyChallengeRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "FinishPasskeyChallenge",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the VerifyRecoveryCodeChallenge RPC. Sends a request to /auth.v1.MFAService/VerifyRecoveryCodeChallenge.
-    pub async fn verify_recovery_code_challenge(
-        &self,
-        request: crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.verify_recovery_code_challenge_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the VerifyRecoveryCodeChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn verify_recovery_code_challenge_with_options(
-        &self,
-        request: crate::proto::auth::v1::VerifyRecoveryCodeChallengeRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::CompleteMFAChallengeResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "VerifyRecoveryCodeChallenge",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the UpdateMFAFactor RPC. Sends a request to /auth.v1.MFAService/UpdateMFAFactor.
-    pub async fn update_mfa_factor(
-        &self,
-        request: crate::proto::auth::v1::UpdateMFAFactorRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.update_mfa_factor_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the UpdateMFAFactor RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn update_mfa_factor_with_options(
-        &self,
-        request: crate::proto::auth::v1::UpdateMFAFactorRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::UpdateMFAFactorResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "UpdateMFAFactor",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the DeleteMFAFactor RPC. Sends a request to /auth.v1.MFAService/DeleteMFAFactor.
-    pub async fn delete_mfa_factor(
-        &self,
-        request: crate::proto::auth::v1::DeleteMFAFactorRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.delete_mfa_factor_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the DeleteMFAFactor RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn delete_mfa_factor_with_options(
-        &self,
-        request: crate::proto::auth::v1::DeleteMFAFactorRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::DeleteMFAFactorResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "DeleteMFAFactor",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the RegenerateRecoveryCodes RPC. Sends a request to /auth.v1.MFAService/RegenerateRecoveryCodes.
-    pub async fn regenerate_recovery_codes(
-        &self,
-        request: crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.regenerate_recovery_codes_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the RegenerateRecoveryCodes RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn regenerate_recovery_codes_with_options(
-        &self,
-        request: crate::proto::auth::v1::RegenerateRecoveryCodesRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::RegenerateRecoveryCodesResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "RegenerateRecoveryCodes",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the ClaimFreshStepUp RPC. Sends a request to /auth.v1.MFAService/ClaimFreshStepUp.
-    pub async fn claim_fresh_step_up(
-        &self,
-        request: crate::proto::auth::v1::ClaimFreshStepUpRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.claim_fresh_step_up_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the ClaimFreshStepUp RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn claim_fresh_step_up_with_options(
-        &self,
-        request: crate::proto::auth::v1::ClaimFreshStepUpRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ClaimFreshStepUpResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "ClaimFreshStepUp",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the ConsumeFreshStepUp RPC. Sends a request to /auth.v1.MFAService/ConsumeFreshStepUp.
-    pub async fn consume_fresh_step_up(
-        &self,
-        request: crate::proto::auth::v1::ConsumeFreshStepUpRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.consume_fresh_step_up_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the ConsumeFreshStepUp RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn consume_fresh_step_up_with_options(
-        &self,
-        request: crate::proto::auth::v1::ConsumeFreshStepUpRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ConsumeFreshStepUpResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "ConsumeFreshStepUp",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the ReleaseFreshStepUp RPC. Sends a request to /auth.v1.MFAService/ReleaseFreshStepUp.
-    pub async fn release_fresh_step_up(
-        &self,
-        request: crate::proto::auth::v1::ReleaseFreshStepUpRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.release_fresh_step_up_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the ReleaseFreshStepUp RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn release_fresh_step_up_with_options(
-        &self,
-        request: crate::proto::auth::v1::ReleaseFreshStepUpRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "ReleaseFreshStepUp",
-                request,
-                options,
-            )
-            .await
-    }
-}
-
 ///Shorthand for `OwnedView<CreateWalletChallengeRequestView<'static>>`.
 pub type OwnedCreateWalletChallengeRequestView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::CreateWalletChallengeRequestView<'static>,
@@ -16625,10 +16625,12 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     /// proof in the X-Auth-Step-Up header: AUTH_MFA_NOT_ENROLLED means enroll MFA
     /// first; AUTH_STEP_UP_REQUIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean
     /// complete a new fresh step-up and retry.
-    /// The new verification fails with error_code AUTH_SOCIAL_ACCOUNT_COOLDOWN when
-    /// the verified account was unlinked from another Polyester account less than
-    /// 30 days ago, and AUTH_SOCIAL_CHANGE_LIMIT_REACHED when it would replace a
-    /// link within 30 days of the last change; retry_after says when.
+    /// The new verification fails with error_code SOCIAL_ACCOUNT_COOLDOWN (in
+    /// ConnectRPC, AUTH_SOCIAL_ACCOUNT_COOLDOWN) when the verified account was
+    /// unlinked from another Polyester account less than 30 days ago, and
+    /// SOCIAL_CHANGE_LIMIT_REACHED (AUTH_SOCIAL_CHANGE_LIMIT_REACHED) when it
+    /// would replace a link within 30 days of the last change; retry_after says
+    /// when.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

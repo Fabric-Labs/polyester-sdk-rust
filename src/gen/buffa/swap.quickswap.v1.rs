@@ -747,11 +747,15 @@ pub enum QuickSwapReason {
     LATE_DEPOSIT = 9i32,
     /// The deposit is below the published min_deposit_amount, or its credit after
     /// the deposit network fee is below the smallest order the route's market
-    /// accepts. It is not executed: it is returned to return_address, and the
-    /// QuickSwap shows RETURNING and RETURNED with this reason. Only a deposit
-    /// that reaches the source network's minimum deposit
-    /// (AssetChainVariant.deposit_min_amount) is returned; one below it is not
-    /// detected and never appears on the QuickSwap. A deposit that
+    /// accepts or, for a bridge, below one base unit of the destination token.
+    /// It is not executed: it is returned to return_address, and the
+    /// QuickSwap shows RETURNING and RETURNED with this reason. When that
+    /// return is below the withdrawal minimum of its asset and network, no
+    /// withdrawal is made: the QuickSwap ends RETURNED with
+    /// REFUND_BELOW_MINIMUM, its return withdrawal NOT_SENT, and the deposit
+    /// keeps this reason. Only a deposit that reaches the source network's
+    /// minimum deposit (AssetChainVariant.deposit_min_amount) is returned; one
+    /// below it is not detected and never appears on the QuickSwap. A deposit that
     /// cannot be returned on the network it was received on is held (HELD with
     /// this reason); the broker contacts Polyester broker support with the
     /// swap_id.
@@ -4563,7 +4567,12 @@ pub struct QuickSwapQuote {
     /// any smaller deposit is lost. It differs from
     /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
     /// quotes. For a TWAP it is the slice count times the smallest deposit one
-    /// slice takes, and at least a market execution's minimum.
+    /// slice takes, and at least a market execution's minimum. The deposit
+    /// network fee is charged on the actual deposit and can exceed the quoted
+    /// one: a bridge deposit of at least this amount whose credit after that
+    /// fee is below one base unit of the destination token is also not
+    /// executed (DEPOSIT_BELOW_MINIMUM, see that reason for how its return
+    /// ends).
     ///
     /// Field 5: `min_deposit_amount`
     #[serde(
@@ -49122,7 +49131,12 @@ pub mod __buffa {
             /// any smaller deposit is lost. It differs from
             /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
             /// quotes. For a TWAP it is the slice count times the smallest deposit one
-            /// slice takes, and at least a market execution's minimum.
+            /// slice takes, and at least a market execution's minimum. The deposit
+            /// network fee is charged on the actual deposit and can exceed the quoted
+            /// one: a bridge deposit of at least this amount whose credit after that
+            /// fee is below one base unit of the destination token is also not
+            /// executed (DEPOSIT_BELOW_MINIMUM, see that reason for how its return
+            /// ends).
             ///
             /// Field 5: `min_deposit_amount`
             pub min_deposit_amount: ::buffa::MessageFieldView<
@@ -50056,7 +50070,12 @@ pub mod __buffa {
             /// any smaller deposit is lost. It differs from
             /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
             /// quotes. For a TWAP it is the slice count times the smallest deposit one
-            /// slice takes, and at least a market execution's minimum.
+            /// slice takes, and at least a market execution's minimum. The deposit
+            /// network fee is charged on the actual deposit and can exceed the quoted
+            /// one: a bridge deposit of at least this amount whose credit after that
+            /// fee is below one base unit of the destination token is also not
+            /// executed (DEPOSIT_BELOW_MINIMUM, see that reason for how its return
+            /// ends).
             ///
             /// Field 5: `min_deposit_amount`
             #[must_use]

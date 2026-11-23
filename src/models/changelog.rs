@@ -33,6 +33,9 @@ pub const CHANGELOG_SURFACE_QUICKSWAP: &str = "quickswap";
 pub const CHANGELOG_SURFACE_REWARDS: &str = "rewards";
 /// The AI assistant: chats, approvals, memories and preferences.
 pub const CHANGELOG_SURFACE_ASSISTANT: &str = "assistant";
+/// Trading bots: strategies you build, backtest and share, and bots running
+/// them live.
+pub const CHANGELOG_SURFACE_TRADING_BOTS: &str = "trading_bots";
 
 /// Environment labels.
 pub const CHANGELOG_ENVIRONMENT_DEVNET: &str = "devnet";

@@ -2463,6 +2463,43 @@ on Unix-like targets, truncated to 100 ns intervals on Windows. Order snapshots 
 `get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
 When incomplete rows are included, the current open candle is prepended.
 
+`market_data.get_index_price_candles` and `get_index_price_candles_with` read a
+market's index price candles (`marketdata.v1.MarketDataService/GetIndexPriceCandles`),
+public and unsigned: one continuous series of composite reference candles before
+the bucket containing the pair's listing, and index price candles from that
+bucket on. Each `IndexPriceCandle` carries its OHLC at the pair's
+`reference_price_scale` and its `source` (`"reference"` or `"index"`); there is
+no volume. Candles are closed only and newest first, and a missing `ts_sec` is a
+gap. Timeframes are read as the other candle calls read them, except that one
+second (`"1s"`) has no index price candles and is refused before sending.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::GetIndexPriceCandlesOpts;
+
+let mut opts = GetIndexPriceCandlesOpts {
+    symbol: Some("BTC-USDT".into()),
+    timeframe: "1h".into(),
+    start: Some(1_767_225_600),
+    end: Some(1_769_904_000),
+    limit: Some(1000),
+    ..Default::default()
+};
+loop {
+    let page = client.market_data.get_index_price_candles_with(opts.clone()).await?;
+    for candle in &page.candles {
+        println!("{} {} {} ({})", candle.ts_sec, candle.open, candle.close, candle.source);
+    }
+    if page.next_page_token.is_empty() {
+        break;
+    }
+    // Older candles: the same symbol, timeframe and bounds, with the token.
+    opts.page_token = Some(page.next_page_token);
+}
+# Ok(())
+# }
+```
+
 `market_data.list_asset_info(&asset_ids)` returns team-maintained asset
 information (`marketdata.v1.MarketDataService/ListAssetInfo`), public and
 unsigned: a plain-text `description`, official links (`website_url`,

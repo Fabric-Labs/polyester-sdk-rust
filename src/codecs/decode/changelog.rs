@@ -328,6 +328,14 @@ mod tests {
         })
         .unwrap();
         assert_eq!(section.surface, "assistant");
+        let change = change_from_proto(&Change {
+            surfaces: vec![Surface::TRADING_BOTS.into()],
+            ..Default::default()
+        });
+        assert_eq!(
+            change.surfaces,
+            vec![crate::models::CHANGELOG_SURFACE_TRADING_BOTS]
+        );
     }
 
     /// A republished post keeps its slug and first publication time, and
