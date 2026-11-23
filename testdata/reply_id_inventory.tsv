@@ -22,10 +22,13 @@ ai.v1.BalancesTable.account_id	not_required	reference to an account; 0 or empty 
 ai.v1.CancelTriggerPreview.symbol_id	not_required	reference to a market
 ai.v1.CancelTriggerPreview.trigger_id	not_required	reference to another order, trigger or batch; 0 when none
 ai.v1.Conversation.conversation_id	required	
+ai.v1.ConversationAccount.subaccount_id	not_required	reference to an account; 0 for the main account
 ai.v1.DepositAddressCard.account_id	not_required	reference to an account; 0 or empty where the contract allows
 ai.v1.DepositAddressCard.asset_id	not_required	reference to an asset
 ai.v1.DestinationsSuggested.tool_call_id	not_required	reference to another object; 0 or empty when none
 ai.v1.DisplaySettingAction.tool_call_id	not_required	reference to another object; 0 or empty when none
+ai.v1.DraftVersion.strategy_id	not_required	reference to another object; 0 or empty when none
+ai.v1.DraftVersion.version_id	not_required	reference to another object; 0 or empty when none
 ai.v1.EquityHistoryChart.account_id	not_required	reference to an account; 0 or empty where the contract allows
 ai.v1.MemoriesRecalled.tool_call_id	not_required	reference to another object; 0 or empty when none
 ai.v1.Memory.conversation_id	not_required	reference to another object; 0 or empty when none
@@ -59,9 +62,26 @@ alerts.v1.PriceAlert.alert_id	required
 alerts.v1.PriceAlert.symbol_id	not_required	reference to a market
 auth.v1.AccountScopeRef.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
 auth.v1.AccountScopeRef.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
-auth.v1.ActivityEvent.actor_account_id	not_required	reference to an account; 0 or empty where the contract allows
-auth.v1.ActivityEvent.actor_api_key_id	not_required	reference to an API key; 0 for a session
+auth.v1.ActivityActor.account_id	not_required	reference to an account; absent for the system and an unauthenticated request
+auth.v1.ActivityActor.api_key_id	not_required	reference to an API key; set for an API key actor only
+auth.v1.ActivityApiKeyDetails.strategy_bot_id	not_required	optional reference; set only for a strategy bot key
+auth.v1.ActivityBrokerAllowlistDetails.destination_chain_id	not_required	reference to a chain
 auth.v1.ActivityEvent.subaccount_id	not_required	reference to an account; 0 for the main account's own events
+auth.v1.ActivityIdChange.from_id	not_required	previous value of a changed reference; empty when none
+auth.v1.ActivityIdChange.to_id	not_required	new value of a changed reference; empty when none
+auth.v1.ActivityInviteDetails.grantee_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.ActivityItem.account_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.address_book_entry_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.api_key_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.api_policy_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.broker_allowlist_change_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.connected_app_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.invite_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.mfa_factor_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.subaccount_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityItem.subaccount_policy_id	not_required	the item's ID, one of the oneof; empty for an item with a name but no ID
+auth.v1.ActivityPolicyDetails.source_template_id	not_required	optional reference; 0 or empty means none
+auth.v1.ActivityPolicyDetails.strategy_bot_id	not_required	optional reference; 0 or empty means none
 auth.v1.AddressBookEntry.address_book_entry_id	required	
 auth.v1.AddressBookTag.tag_id	required	
 auth.v1.AddressBookTagSummary.tag_id	required	
@@ -200,6 +220,7 @@ marketdata.v1.AssetInfo.asset_id	not_required	reference to an asset
 marketdata.v1.Candle.symbol_id	not_required	reference to a market
 marketdata.v1.GetCandlesColumnsResponse.symbol_id	not_required	reference to a market
 marketdata.v1.GetCandlesResponse.symbol_id	not_required	reference to a market
+marketdata.v1.GetIndexPriceCandlesResponse.symbol_id	not_required	reference to a market
 marketdata.v1.GetOrderbookHeatmapResponse.symbol_id	not_required	reference to a market
 marketdata.v1.GetTradesResponse.complete_through_trade_id	not_required	paging cursor; 0 is valid
 marketdata.v1.GetTradesResponse.next_after_trade_id	not_required	paging cursor; 0 is valid
@@ -287,7 +308,6 @@ strategies.v1.Bot.bot_id	required
 strategies.v1.Bot.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 strategies.v1.Bot.version_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.BotFunding.subaccount_id	not_required	reference to an account; 0 for the main account
-strategies.v1.BotOrder.order_id	required	
 strategies.v1.BotVersion.version_id	required	
 strategies.v1.DeployProposalSummary.funding_subaccount_id	not_required	reference to an account; 0 for the main account
 strategies.v1.DeployProposalSummary.strategy_id	not_required	reference to another object; 0 or empty when none
@@ -306,8 +326,10 @@ strategies.v1.RunScenariosResponse.version_id	required
 strategies.v1.StartBacktestResponse.backtest_id	required	
 strategies.v1.Strategy.head_version_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.Strategy.strategy_id	required	
+strategies.v1.StrategyBacktest.version_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.StrategyBot.bot_id	required	
 strategies.v1.StrategyDuplicateOrigin.source_version_id	not_required	reference to another object; 0 or empty when none
+strategies.v1.StrategyNotes.strategy_id	required	
 strategies.v1.StrategyOrigin.template_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.StrategyRevision.version_id	required	
 strategies.v1.StrategyTemplate.template_id	required	

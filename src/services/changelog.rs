@@ -62,7 +62,7 @@ pub struct ListChangelogChangesOptions {
     pub categories: Vec<String>,
     /// Keep only changes whose `action_required` matches.
     pub action_required: Option<bool>,
-    /// `CHANGELOG_SURFACE_*` labels, at most 11.
+    /// `CHANGELOG_SURFACE_*` labels, at most 12.
     pub surfaces: Vec<String>,
     /// `CHANGELOG_AUDIENCE_*` labels. Changes addressed to all users always
     /// match.
@@ -375,7 +375,7 @@ where
 }
 
 /// Most `surfaces` a `list_changes` filter takes, one per surface.
-const MAX_SURFACE_FILTERS: usize = 11;
+const MAX_SURFACE_FILTERS: usize = 12;
 
 fn list_changes_request(opts: ListChangelogChangesOptions) -> Result<ListChangesRequest> {
     if opts.surfaces.len() > MAX_SURFACE_FILTERS {
@@ -562,15 +562,16 @@ mod tests {
             ]
         );
         let err = list_changes_request(ListChangelogChangesOptions {
-            surfaces: vec!["api".into(); 12],
+            surfaces: vec!["api".into(); 13],
             ..Default::default()
         })
         .unwrap_err();
         assert!(matches!(err, Error::Validation(_)), "{err:?}");
     }
 
-    /// The assistant is the eleventh product area: a filter names it, and
-    /// one surface each fits a single filter.
+    /// The assistant is the eleventh product area and trading bots the
+    /// twelfth: a filter names each, and one surface each fits a single
+    /// filter.
     #[test]
     fn list_changes_request_filters_by_the_assistant() {
         use buffa::Enumeration;
@@ -585,19 +586,28 @@ mod tests {
             vec![buffa::EnumValue::from(Surface::ASSISTANT)]
         );
         assert_eq!(Surface::ASSISTANT.to_i32(), 11);
+        let req = list_changes_request(ListChangelogChangesOptions {
+            surfaces: vec![crate::models::CHANGELOG_SURFACE_TRADING_BOTS.into()],
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            req.surfaces,
+            vec![buffa::EnumValue::from(Surface::TRADING_BOTS)]
+        );
 
         let every: Vec<String> = Surface::values()
             .iter()
             .filter(|surface| **surface != Surface::SURFACE_UNSPECIFIED)
             .map(|surface| surface.proto_name().to_ascii_lowercase())
             .collect();
-        assert_eq!(every.len(), 11);
+        assert_eq!(every.len(), 12);
         let req = list_changes_request(ListChangelogChangesOptions {
             surfaces: every,
             ..Default::default()
         })
         .unwrap();
-        assert_eq!(req.surfaces.len(), 11);
+        assert_eq!(req.surfaces.len(), 12);
     }
 
     #[test]

@@ -376,6 +376,11 @@ mod tests {
             ),
             (
                 marketdata,
+                "GetIndexPriceCandlesRequest",
+                format!("max {CANDLES_LIMIT_MAX}."),
+            ),
+            (
+                marketdata,
                 "GetOrderbookHeatmapRequest",
                 format!("(min {HEATMAP_LIMIT_MIN}, max {HEATMAP_LIMIT_MAX})"),
             ),
