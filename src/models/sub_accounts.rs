@@ -137,7 +137,7 @@ pub struct SubAccountInvitesList {
     pub invites: Vec<SubAccountInvite>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SubAccountActivityEvent {
     pub event_type: String,
     pub ts_ms: i64,
@@ -268,6 +268,25 @@ pub struct ActivityItem {
     pub name: String,
 }
 
+/// A time in an activity event's details, exactly as the contract's
+/// `google.protobuf.Timestamp` sends it: seconds since the Unix epoch (UTC)
+/// and the nanoseconds within that second.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub struct ActivityTime {
+    pub seconds: i64,
+    pub nanos: i32,
+}
+
+impl From<ActivityTime> for Timestamp {
+    fn from(time: ActivityTime) -> Self {
+        Timestamp {
+            seconds: time.seconds,
+            nanos: time.nanos,
+            ..Default::default()
+        }
+    }
+}
+
 /// A value before and after an activity event. What an unset value reads as
 /// is documented on each field that holds one.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -359,7 +378,7 @@ pub enum ActivityAllowlistAction {
 /// other APIs keep the contract's own types as sent: an unset value reads as
 /// its `..._UNSPECIFIED` variant, and a value newer than this SDK as
 /// [`EnumValue::Unknown`] with its number.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ActivityDetails {
     /// An account change.
@@ -411,7 +430,7 @@ pub struct ActivitySessionDetails {
 }
 
 /// What an API key event changed.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ActivityApiKeyDetails {
     pub label: Option<ActivityChange<String>>,
     pub status: Option<ActivityChange<EnumValue<pb::ApiKeyStatus>>>,
@@ -422,7 +441,7 @@ pub struct ActivityApiKeyDetails {
     /// masked like the event's IP for callers who may not see IP addresses.
     pub ip_allowlist: Option<ActivityListChange<String>>,
     /// The key's expiry.
-    pub expires_at: Option<ActivityChange<Option<Timestamp>>>,
+    pub expires_at: Option<ActivityChange<Option<ActivityTime>>>,
     /// The API key policy bound to the key, as base58 IDs.
     pub api_policy_id: Option<ActivityChange<Option<String>>>,
     /// The strategy bot the key belongs to, as a base58 ID, for a strategy
@@ -431,7 +450,7 @@ pub struct ActivityApiKeyDetails {
 }
 
 /// What a policy event changed.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ActivityPolicyDetails {
     pub name: Option<ActivityChange<String>>,
     pub description: Option<ActivityChange<String>>,
@@ -447,9 +466,9 @@ pub struct ActivityPolicyDetails {
     pub trading_halted: Option<ActivityChange<bool>>,
     pub locked: Option<ActivityChange<bool>>,
     /// The policy's review time.
-    pub review_at: Option<ActivityChange<Option<Timestamp>>>,
+    pub review_at: Option<ActivityChange<Option<ActivityTime>>>,
     /// The policy's expiry.
-    pub expires_at: Option<ActivityChange<Option<Timestamp>>>,
+    pub expires_at: Option<ActivityChange<Option<ActivityTime>>>,
     /// The AI assistant key preset the policy follows.
     pub assistant_preset: EnumValue<pb::AssistantKeyPreset>,
     /// The template the policy was copied from, as a base58 ID.
@@ -531,7 +550,7 @@ pub struct ActivitySecurityDetails {
     pub recovery_codes_rotated: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SubAccountActivityList {
     pub events: Vec<SubAccountActivityEvent>,
     pub next_page_token: String,
@@ -539,7 +558,7 @@ pub struct SubAccountActivityList {
 
 /// One event of the whole account's activity feed, from
 /// [`crate::services::SubAccountsService::list_account_activity`].
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct AccountActivityEvent {
     /// `<entity>:<action>` in lowercase, as [`SubAccountActivityEvent`]
     /// names it, such as `"api_key:created"`.
@@ -568,7 +587,7 @@ pub struct AccountActivityEvent {
 }
 
 /// One page of the whole account's activity feed, newest first.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct AccountActivityList {
     pub events: Vec<AccountActivityEvent>,
     /// Cursor for the next page; empty when there is none.
