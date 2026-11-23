@@ -7,12 +7,13 @@ use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{TsNs, format_price_ticks, format_qty_scaled};
 use crate::errors::{Error, Result};
 use crate::models::{
-    Candle, CandlesResult, MarketTrade, MarketTradesResult, PairOrderLimits, PriceBand, SpotAsset,
-    SpotConfig, TradeEpochEnd,
+    Candle, CandlesResult, IndexPriceCandle, IndexPriceCandlesResult, MarketTrade,
+    MarketTradesResult, PairOrderLimits, PriceBand, SpotAsset, SpotConfig, TradeEpochEnd,
 };
 use crate::proto::marketdata::v1::{
-    CandlePoint, GetCandlesColumnsResponse, GetCandlesResponse, GetSpotConfigResponse,
-    GetTradesResponse, MarketTrade as ProtoMarketTrade, PairConfig, Timeframe,
+    CandlePoint, GetCandlesColumnsResponse, GetCandlesResponse, GetIndexPriceCandlesResponse,
+    GetSpotConfigResponse, GetTradesResponse, IndexPriceCandleSource,
+    MarketTrade as ProtoMarketTrade, PairConfig, Timeframe,
 };
 
 /// Decode a spot config. Fails when an order limit is not a decimal string.
@@ -360,6 +361,59 @@ pub fn candles_columns_from_proto(
     })
 }
 
+/// Decode one page of `GetIndexPriceCandles` into rows, newest first as the
+/// server orders them. `price_scale` is the pair's `reference_price_scale`.
+/// Columns of another length than `ts_sec` are refused.
+pub fn index_price_candles_from_proto(
+    msg: &GetIndexPriceCandlesResponse,
+    price_scale: u32,
+) -> Result<IndexPriceCandlesResult> {
+    let rows = msg.ts_sec.len();
+    let lengths = [
+        msg.open.len(),
+        msg.high.len(),
+        msg.low.len(),
+        msg.close.len(),
+        msg.source.len(),
+    ];
+    if lengths.iter().any(|len| *len != rows) {
+        return Err(Error::transport(format!(
+            "invalid GetIndexPriceCandles response lengths: ts_sec={rows}, open={}, high={}, low={}, close={}, source={}",
+            msg.open.len(),
+            msg.high.len(),
+            msg.low.len(),
+            msg.close.len(),
+            msg.source.len()
+        )));
+    }
+    let price = |value: i64| {
+        format_qty_scaled(value, price_scale)
+            .map_err(|e| Error::validation(format!("index price candle scale invalid: {e}")))
+    };
+    let mut candles = Vec::with_capacity(rows);
+    for (i, &ts) in msg.ts_sec.iter().enumerate() {
+        candles.push(IndexPriceCandle {
+            ts_sec: ts as i64,
+            open: price(msg.open[i])?,
+            high: price(msg.high[i])?,
+            low: price(msg.low[i])?,
+            close: price(msg.close[i])?,
+            source: match msg.source[i].as_known() {
+                Some(IndexPriceCandleSource::INDEX_PRICE_CANDLE_SOURCE_REFERENCE) => "reference",
+                Some(IndexPriceCandleSource::INDEX_PRICE_CANDLE_SOURCE_INDEX) => "index",
+                _ => "unspecified",
+            }
+            .to_owned(),
+        });
+    }
+    Ok(IndexPriceCandlesResult {
+        symbol_id: msg.symbol_id,
+        timeframe: enum_value_timeframe(msg.timeframe),
+        candles,
+        next_page_token: msg.next_page_token.clone(),
+    })
+}
+
 fn reference_candles_from_columns(
     msg: &GetCandlesColumnsResponse,
     volume_scale: u32,
@@ -427,6 +481,67 @@ fn reference_candles_from_columns(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Index price candles keep the server's newest-first order, read their
+    /// prices at the given scale and their source as a label, and refuse
+    /// columns of unequal length.
+    #[test]
+    fn index_price_candles_read_rows_at_the_reference_price_scale() {
+        let msg = GetIndexPriceCandlesResponse {
+            symbol_id: 3,
+            timeframe: Timeframe::Day1.into(),
+            ts_sec: vec![172_800, 86_400],
+            open: vec![150, -5],
+            high: vec![175, 0],
+            low: vec![100, -10],
+            close: vec![125, 1],
+            source: vec![
+                IndexPriceCandleSource::INDEX_PRICE_CANDLE_SOURCE_INDEX.into(),
+                IndexPriceCandleSource::INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED.into(),
+            ],
+            next_page_token: "next".into(),
+            ..Default::default()
+        };
+        let got = index_price_candles_from_proto(&msg, 2).unwrap();
+        assert_eq!(
+            (
+                got.symbol_id,
+                got.timeframe.as_str(),
+                got.next_page_token.as_str()
+            ),
+            (3, "1d", "next")
+        );
+        let rows: Vec<_> = got
+            .candles
+            .iter()
+            .map(|c| {
+                (
+                    c.ts_sec,
+                    c.open.as_str(),
+                    c.high.as_str(),
+                    c.low.as_str(),
+                    c.close.as_str(),
+                    c.source.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                (172_800, "1.5", "1.75", "1", "1.25", "index"),
+                (86_400, "-0.05", "0", "-0.1", "0.01", "unspecified"),
+            ]
+        );
+
+        let empty =
+            index_price_candles_from_proto(&GetIndexPriceCandlesResponse::default(), 9).unwrap();
+        assert!(empty.candles.is_empty() && empty.next_page_token.is_empty());
+
+        let mut short = msg.clone();
+        short.source.pop();
+        let err = index_price_candles_from_proto(&short, 2).unwrap_err();
+        assert!(err.to_string().contains("source=1"), "{err}");
+    }
 
     fn limited_pair(symbol_id: u32, symbol: &str) -> PairConfig {
         PairConfig {

@@ -8,8 +8,9 @@
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
 use polyester::models::{
-    GetCandlesOpts, GetOrderOpts, GetTradesOpts, ListOpenOrdersOpts, ListOrderHistoryOpts,
-    ListTriggerEventsOpts, ListTriggersOpts, ListUserTradesOpts, OrderKey, SubAccountScope,
+    GetCandlesOpts, GetIndexPriceCandlesOpts, GetOrderOpts, GetTradesOpts, ListOpenOrdersOpts,
+    ListOrderHistoryOpts, ListTriggerEventsOpts, ListTriggersOpts, ListUserTradesOpts, OrderKey,
+    SubAccountScope,
 };
 use polyester::proto::auth::v1::{
     GetAddressBookViewRequest, ListAddressBookEntriesRequest,
@@ -240,6 +241,22 @@ async fn page_sizes_the_contract_refuses_are_never_sent() {
     assert_refused(
         "market_data.get_candles_columns",
         c.market_data.get_candles_columns(candles()).await,
+    );
+    assert_refused(
+        "market_data.get_index_price_candles_with",
+        c.market_data
+            .get_index_price_candles_with(GetIndexPriceCandlesOpts {
+                symbol_id: Some(1),
+                limit: Some(10_001),
+                ..Default::default()
+            })
+            .await,
+    );
+    assert_refused(
+        "market_data.get_index_price_candles",
+        c.market_data
+            .get_index_price_candles("BTC-USDT", "1h", Some(10_001))
+            .await,
     );
     assert_refused(
         "market_overview.list",

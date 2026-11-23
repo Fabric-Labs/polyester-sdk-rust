@@ -13,8 +13,8 @@ use super::hardening_support::{HttpScript, MockHttpServer};
 use buffa::Message as _;
 use polyester::models::{
     CancelAllAfterOpts, CancelAllTriggersOpts, CancelOrderParams, GetCandlesOpts,
-    ListAlertsOptions, ListTriggersOpts, ListUserTradesOpts, ModifyTriggerParams, OrderKey,
-    ProfitAndLossWindow, ResumeTriggerParams, SubAccountScope,
+    GetIndexPriceCandlesOpts, ListAlertsOptions, ListTriggersOpts, ListUserTradesOpts,
+    ModifyTriggerParams, OrderKey, ProfitAndLossWindow, ResumeTriggerParams, SubAccountScope,
 };
 use polyester::proto::orders::v1::{
     CancelAllAfterRequest, CancelAllAfterResponse, cancel_all_after_response,
@@ -380,6 +380,22 @@ async fn candle_calls_refuse_an_unknown_timeframe_before_sending() {
             )
             .await
             .map(|r| r.map(drop)),
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                md.get_index_price_candles("BTC-USDT", timeframe, None),
+            )
+            .await
+            .map(|r| r.map(drop)),
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                md.get_index_price_candles_with(GetIndexPriceCandlesOpts {
+                    symbol: Some("BTC-USDT".into()),
+                    timeframe: timeframe.into(),
+                    ..Default::default()
+                }),
+            )
+            .await
+            .map(|r| r.map(drop)),
         ];
         for (i, err) in errs.into_iter().enumerate() {
             let err = err
@@ -387,6 +403,42 @@ async fn candle_calls_refuse_an_unknown_timeframe_before_sending() {
                 .expect_err("refused");
             assert!(
                 matches!(err, Error::Validation(_)),
+                "{timeframe:?} call {i}: {err}"
+            );
+        }
+        assert_eq!(s.sent(), 0, "{timeframe:?}: nothing may be sent");
+    }
+}
+
+/// One second has no index price candles: the index price candle calls
+/// refuse it, in either spelling, before the catalog wait or any request.
+#[tokio::test]
+async fn index_price_candles_refuse_one_second_before_sending() {
+    for timeframe in ["1s", "SEC_1"] {
+        let s = server(true).await;
+        let md = &s.client.market_data;
+        let errs = [
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                md.get_index_price_candles("BTC-USDT", timeframe, None),
+            )
+            .await,
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                md.get_index_price_candles_with(GetIndexPriceCandlesOpts {
+                    symbol: Some("BTC-USDT".into()),
+                    timeframe: timeframe.into(),
+                    ..Default::default()
+                }),
+            )
+            .await,
+        ];
+        for (i, err) in errs.into_iter().enumerate() {
+            let err = err
+                .unwrap_or_else(|_| panic!("{timeframe:?} call {i}: waited for the catalogs"))
+                .expect_err("refused");
+            assert!(
+                matches!(&err, Error::Validation(msg) if msg.contains("one second")),
                 "{timeframe:?} call {i}: {err}"
             );
         }

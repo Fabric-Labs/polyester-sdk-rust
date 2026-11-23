@@ -785,3 +785,171 @@ async fn candle_columns_reference_rows_are_always_closed() {
         }
     }
 }
+
+const INDEX_PRICE_CANDLES: &str = "/marketdata.v1.MarketDataService/GetIndexPriceCandles";
+
+// Index price candles send the resolved market, the timeframe, the page size,
+// both bounds and the page token, unsigned, and read the reply's columns as
+// rows at the pair's reference price scale, newest first, each with its source.
+#[tokio::test]
+async fn index_price_candles_send_the_request_and_read_the_columns() {
+    use polyester::models::{GetIndexPriceCandlesOpts, IndexPriceCandle};
+    use polyester::proto::marketdata::v1::{
+        GetIndexPriceCandlesRequest, GetIndexPriceCandlesResponse, IndexPriceCandleSource,
+    };
+
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let seen = sent.clone();
+    let http = MockHttpServer::spawn(move |request| match request.path.as_str() {
+        SPOT_CONFIG => connect_proto_ok(&spot_config()),
+        ZIPPER_CONFIG => connect_proto_ok(&zipper_config()),
+        INDEX_PRICE_CANDLES => {
+            seen.lock().unwrap().push((
+                GetIndexPriceCandlesRequest::decode_from_slice(&request.body).unwrap(),
+                request
+                    .headers
+                    .iter()
+                    .any(|(name, _)| name.starts_with("x-api-")),
+            ));
+            connect_proto_ok(&GetIndexPriceCandlesResponse {
+                symbol_id: 1,
+                timeframe: Timeframe::Hour1.into(),
+                ts_sec: vec![7_200, 3_600, 0],
+                open: vec![95_012_500_000_000, 94_990_000_000_000, 1],
+                high: vec![95_120_000_000_000, 95_020_000_000_000, 1],
+                low: vec![94_980_250_000_000, 94_975_000_000_000, 1],
+                close: vec![95_101_000_000_000, 95_012_500_000_000, 1],
+                source: vec![
+                    IndexPriceCandleSource::INDEX_PRICE_CANDLE_SOURCE_INDEX.into(),
+                    IndexPriceCandleSource::INDEX_PRICE_CANDLE_SOURCE_REFERENCE.into(),
+                    buffa::EnumValue::from(99),
+                ],
+                next_page_token: "older".into(),
+                ..Default::default()
+            })
+        }
+        _ => HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: "ws://127.0.0.1:9".into(),
+        hydrate_catalogs: true,
+        timeout: Duration::from_secs(2),
+        ..Default::default()
+    })
+    .unwrap();
+    client.wait_for_catalogs().await.unwrap();
+
+    let got = client
+        .market_data
+        .get_index_price_candles_with(GetIndexPriceCandlesOpts {
+            symbol: Some("BTC-USDT".into()),
+            timeframe: "HOUR_1".into(),
+            limit: Some(3),
+            start: Some(0),
+            end: Some(7_200),
+            page_token: Some("token".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let candle =
+        |ts_sec, open: &str, high: &str, low: &str, close: &str, source: &str| IndexPriceCandle {
+            ts_sec,
+            open: open.into(),
+            high: high.into(),
+            low: low.into(),
+            close: close.into(),
+            source: source.into(),
+        };
+    assert_eq!(
+        got.candles,
+        [
+            candle(7_200, "95012.5", "95120", "94980.25", "95101", "index"),
+            candle(3_600, "94990", "95020", "94975", "95012.5", "reference"),
+            candle(
+                0,
+                "0.000000001",
+                "0.000000001",
+                "0.000000001",
+                "0.000000001",
+                "unspecified"
+            ),
+        ]
+    );
+    assert_eq!(
+        (
+            got.symbol_id,
+            got.timeframe.as_str(),
+            got.next_page_token.as_str()
+        ),
+        (1, "1h", "older")
+    );
+
+    // The plain call asks for the server's default page size and no bounds.
+    client
+        .market_data
+        .get_index_price_candles("BTC-USDT", "1d", None)
+        .await
+        .unwrap();
+
+    let sent = sent.lock().unwrap().clone();
+    assert_eq!(sent.len(), 2);
+    let (with, signed) = &sent[0];
+    assert!(!signed, "a public read is never signed");
+    assert_eq!(with.symbol_id, 1);
+    assert_eq!(with.timeframe.as_known(), Some(Timeframe::Hour1));
+    assert_eq!(with.limit, 3);
+    assert_eq!(with.start_time.as_option().map(|t| t.seconds), Some(0));
+    assert_eq!(with.end_time.as_option().map(|t| t.seconds), Some(7_200));
+    assert_eq!(with.page_token, "token");
+    let (plain, _) = &sent[1];
+    assert_eq!(plain.timeframe.as_known(), Some(Timeframe::Day1));
+    assert_eq!(plain.limit, 0);
+    assert!(plain.start_time.as_option().is_none() && plain.end_time.as_option().is_none());
+    assert!(plain.page_token.is_empty());
+}
+
+// A reply whose columns disagree in length is refused, not read short.
+#[tokio::test]
+async fn index_price_candles_refuse_misaligned_columns() {
+    use polyester::proto::marketdata::v1::GetIndexPriceCandlesResponse;
+
+    let http = MockHttpServer::spawn(move |request| match request.path.as_str() {
+        SPOT_CONFIG => connect_proto_ok(&spot_config()),
+        ZIPPER_CONFIG => connect_proto_ok(&zipper_config()),
+        INDEX_PRICE_CANDLES => connect_proto_ok(&GetIndexPriceCandlesResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            ts_sec: vec![60, 0],
+            open: vec![1, 1],
+            high: vec![1, 1],
+            low: vec![1, 1],
+            close: vec![1],
+            source: Vec::new(),
+            ..Default::default()
+        }),
+        _ => HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: "ws://127.0.0.1:9".into(),
+        hydrate_catalogs: true,
+        timeout: Duration::from_secs(2),
+        ..Default::default()
+    })
+    .unwrap();
+    client.wait_for_catalogs().await.unwrap();
+    let err = client
+        .market_data
+        .get_index_price_candles("BTC-USDT", "1m", None)
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("GetIndexPriceCandles response lengths"),
+        "{err}"
+    );
+}

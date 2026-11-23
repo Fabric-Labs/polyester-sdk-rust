@@ -157,22 +157,16 @@ pub struct AccountActivityEvent {
     /// When the event occurred, in Unix milliseconds (UTC).
     pub ts_ms: i64,
     /// Client channel the event came from, such as `"web"`, `"mobile"` or
-    /// `"api"`; empty when unspecified.
+    /// `"api"`, or `"system"` for an event Polyester recorded by itself;
+    /// empty when unspecified.
     pub source: String,
     /// Sub-account the event belongs to, as a base58 ID; `None` for an event
     /// of the main account itself.
     pub subaccount_id: Option<String>,
-    /// Account that performed the action, as a base58 ID; `None` when the
-    /// server named none.
-    pub actor_account_id: Option<String>,
-    /// API key the actor used, as a base58 ID; `None` when it used a session.
-    pub actor_api_key_id: Option<String>,
     /// Origin IP address, masked for callers other than the owner and admins.
     pub ip: String,
     /// User agent of the event, when available.
     pub user_agent: String,
-    /// Structured event details as a JSON string, kept as sent.
-    pub payload_json: String,
 }
 
 /// One page of the whole account's activity feed, newest first.
