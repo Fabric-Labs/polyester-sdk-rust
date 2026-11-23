@@ -268,25 +268,6 @@ pub struct ActivityItem {
     pub name: String,
 }
 
-/// A time in an activity event's details, exactly as the contract's
-/// `google.protobuf.Timestamp` sends it: seconds since the Unix epoch (UTC)
-/// and the nanoseconds within that second.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub struct ActivityTime {
-    pub seconds: i64,
-    pub nanos: i32,
-}
-
-impl From<ActivityTime> for Timestamp {
-    fn from(time: ActivityTime) -> Self {
-        Timestamp {
-            seconds: time.seconds,
-            nanos: time.nanos,
-            ..Default::default()
-        }
-    }
-}
-
 /// A value before and after an activity event. What an unset value reads as
 /// is documented on each field that holds one.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -430,7 +411,7 @@ pub struct ActivitySessionDetails {
 }
 
 /// What an API key event changed.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ActivityApiKeyDetails {
     pub label: Option<ActivityChange<String>>,
     pub status: Option<ActivityChange<EnumValue<pb::ApiKeyStatus>>>,
@@ -441,7 +422,7 @@ pub struct ActivityApiKeyDetails {
     /// masked like the event's IP for callers who may not see IP addresses.
     pub ip_allowlist: Option<ActivityListChange<String>>,
     /// The key's expiry.
-    pub expires_at: Option<ActivityChange<Option<ActivityTime>>>,
+    pub expires_at: Option<ActivityChange<Option<Timestamp>>>,
     /// The API key policy bound to the key, as base58 IDs.
     pub api_policy_id: Option<ActivityChange<Option<String>>>,
     /// The strategy bot the key belongs to, as a base58 ID, for a strategy
@@ -449,8 +430,12 @@ pub struct ActivityApiKeyDetails {
     pub strategy_bot_id: Option<String>,
 }
 
+// Every field compares reflexively (a `Timestamp` is two integers), so the
+// equality is total and the activity events keep `Eq`.
+impl Eq for ActivityApiKeyDetails {}
+
 /// What a policy event changed.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ActivityPolicyDetails {
     pub name: Option<ActivityChange<String>>,
     pub description: Option<ActivityChange<String>>,
@@ -466,9 +451,9 @@ pub struct ActivityPolicyDetails {
     pub trading_halted: Option<ActivityChange<bool>>,
     pub locked: Option<ActivityChange<bool>>,
     /// The policy's review time.
-    pub review_at: Option<ActivityChange<Option<ActivityTime>>>,
+    pub review_at: Option<ActivityChange<Option<Timestamp>>>,
     /// The policy's expiry.
-    pub expires_at: Option<ActivityChange<Option<ActivityTime>>>,
+    pub expires_at: Option<ActivityChange<Option<Timestamp>>>,
     /// The AI assistant key preset the policy follows.
     pub assistant_preset: EnumValue<pb::AssistantKeyPreset>,
     /// The template the policy was copied from, as a base58 ID.
@@ -481,6 +466,10 @@ pub struct ActivityPolicyDetails {
     /// The strategy bot the policy was made for, as a base58 ID.
     pub strategy_bot_id: Option<String>,
 }
+
+// Every field compares reflexively (a `Timestamp` is two integers), so the
+// equality is total and the activity events keep `Eq`.
+impl Eq for ActivityPolicyDetails {}
 
 /// What a sub-account event changed.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

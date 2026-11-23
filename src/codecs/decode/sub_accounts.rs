@@ -14,7 +14,7 @@ use crate::models::{
     ActivityDetails, ActivityElevatedAction, ActivityInviteDetails, ActivityItem, ActivityItemId,
     ActivityListChange, ActivityMemberDetails, ActivityPolicyDetails, ActivitySecurityDetails,
     ActivitySessionDetails, ActivitySignInFailure, ActivitySignInMethod, ActivitySubaccountDetails,
-    ActivitySystemReason, ActivityTime, CreateSubaccountResult, GetSubaccountResult, SubAccount,
+    ActivitySystemReason, CreateSubaccountResult, GetSubaccountResult, SubAccount,
     SubAccountActivityEvent, SubAccountActivityList, SubAccountInvite, SubAccountInvitesList,
     SubAccountMember, SubAccountMembersList, SubAccountsList,
 };
@@ -286,11 +286,8 @@ fn optional_id(id: u64) -> Option<String> {
 /// A detail time as sent, at full precision; `None` when unset.
 fn optional_time(
     ts: &buffa::MessageField<buffa_types::google::protobuf::Timestamp>,
-) -> Option<ActivityTime> {
-    ts.as_option().map(|t| ActivityTime {
-        seconds: t.seconds,
-        nanos: t.nanos,
-    })
+) -> Option<buffa_types::google::protobuf::Timestamp> {
+    ts.as_option().cloned()
 }
 
 fn change<T, U>(from: T, to: T, read: impl Fn(T) -> U) -> ActivityChange<U> {
@@ -317,7 +314,7 @@ fn uint_change(msg: &buffa::MessageField<pb::ActivityUintChange>) -> Option<Acti
 
 fn time_change(
     msg: &buffa::MessageField<pb::ActivityTimeChange>,
-) -> Option<ActivityChange<Option<ActivityTime>>> {
+) -> Option<ActivityChange<Option<buffa_types::google::protobuf::Timestamp>>> {
     msg.as_option()
         .map(|c| change(&c.from, &c.to, optional_time))
 }
@@ -1041,7 +1038,7 @@ mod activity_tests {
         ActivityElevatedAction, ActivityInviteDetails, ActivityItem, ActivityItemId,
         ActivityListChange, ActivityMemberDetails, ActivityPolicyDetails, ActivitySecurityDetails,
         ActivitySessionDetails, ActivitySignInFailure, ActivitySignInMethod,
-        ActivitySubaccountDetails, ActivitySystemReason, ActivityTime,
+        ActivitySubaccountDetails, ActivitySystemReason,
     };
     use crate::proto::auth::v1 as pb;
     use buffa::EnumValue;
@@ -1141,17 +1138,16 @@ mod activity_tests {
         .into()
     }
 
-    fn ts(seconds: i64, nanos: i32) -> buffa::MessageField<Timestamp> {
+    fn stamp(seconds: i64, nanos: i32) -> Timestamp {
         Timestamp {
             seconds,
             nanos,
             ..Default::default()
         }
-        .into()
     }
 
-    fn stamp(seconds: i64, nanos: i32) -> ActivityTime {
-        ActivityTime { seconds, nanos }
+    fn ts(seconds: i64, nanos: i32) -> buffa::MessageField<Timestamp> {
+        stamp(seconds, nanos).into()
     }
 
     fn id_change(from_id: u64, to_id: u64) -> buffa::MessageField<pb::ActivityIdChange> {
@@ -1861,14 +1857,6 @@ mod activity_tests {
         assert_eq!(change.to, Some(stamp(1_794_700_000, 250_000_001)));
         assert_ne!(change.from, change.to);
         assert_eq!(
-            Timestamp::from(change.to.unwrap()),
-            Timestamp {
-                seconds: 1_794_700_000,
-                nanos: 250_000_001,
-                ..Default::default()
-            }
-        );
-        assert_eq!(
             expiry(999_999_999).to,
             Some(stamp(1_794_700_000, 999_999_999))
         );
@@ -1884,6 +1872,8 @@ mod activity_tests {
         eq::<SubAccountActivityEvent>();
         eq::<SubAccountActivityList>();
         eq::<ActivityDetails>();
+        eq::<ActivityApiKeyDetails>();
+        eq::<ActivityPolicyDetails>();
     }
 
     /// Unset and unknown values of the shared enums read as sent.
