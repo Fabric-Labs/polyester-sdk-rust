@@ -159,12 +159,16 @@ chain.lifecycle.v1.FlowSummaryView.flow_id	required
 chain.lifecycle.v1.FlowSummaryView.polyester_chain_id	not_required	reference to a chain
 chain.lifecycle.v1.FlowTxMatchView.flow_id	required	
 chain.lifecycle.v1.FlowTxMatchView.polyester_chain_id	not_required	reference to a chain
+chain.withdraw.v1.AutoWithdrawConversion.source_asset_id	not_required	reference to an asset
+chain.withdraw.v1.AutoWithdrawConversion.swap_id	not_required	reference to the swap; 0 when the asset was not converted
 chain.withdraw.v1.AutoWithdrawDestination.asset_id	not_required	reference to an asset
 chain.withdraw.v1.AutoWithdrawDestination.destination_chain_id	not_required	reference to a chain
 chain.withdraw.v1.AutoWithdrawPause.asset_id	not_required	reference to an asset
 chain.withdraw.v1.AutoWithdrawPreviewAsset.asset_id	not_required	reference to an asset
 chain.withdraw.v1.AutoWithdrawPreviewAsset.destination_chain_id	not_required	reference to a chain
+chain.withdraw.v1.AutoWithdrawPreviewConversion.payout_asset_id	not_required	reference to an asset
 chain.withdraw.v1.AutoWithdrawRule.created_by_account_id	not_required	reference to an account; 0 or empty where the contract allows
+chain.withdraw.v1.AutoWithdrawRule.payout_asset_id	not_required	reference to an asset; 0 pays every asset in kind
 chain.withdraw.v1.AutoWithdrawRule.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 chain.withdraw.v1.AutoWithdrawStep.asset_id	not_required	reference to an asset
 chain.withdraw.v1.AutoWithdrawStep.destination_chain_id	not_required	reference to a chain
@@ -309,6 +313,9 @@ strategies.v1.Bot.subaccount_id	not_required	reference to an account; 0 or empty
 strategies.v1.Bot.version_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.BotFunding.subaccount_id	not_required	reference to an account; 0 for the main account
 strategies.v1.BotVersion.version_id	required	
+strategies.v1.CommunityStrategy.listing_id	required	
+strategies.v1.CommunityStrategy.version_id	not_required	reference to the published version
+strategies.v1.CommunityStrategySummary.listing_id	required	
 strategies.v1.DeployProposalSummary.funding_subaccount_id	not_required	reference to an account; 0 for the main account
 strategies.v1.DeployProposalSummary.strategy_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.DeployProposalSummary.version_id	not_required	reference to another object; 0 or empty when none
@@ -329,6 +336,8 @@ strategies.v1.Strategy.strategy_id	required
 strategies.v1.StrategyBacktest.version_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.StrategyBot.bot_id	required	
 strategies.v1.StrategyDuplicateOrigin.source_version_id	not_required	reference to another object; 0 or empty when none
+strategies.v1.StrategyListing.listing_id	required	
+strategies.v1.StrategyListing.version_id	not_required	reference to the published version
 strategies.v1.StrategyNotes.strategy_id	required	
 strategies.v1.StrategyOrigin.template_id	not_required	reference to another object; 0 or empty when none
 strategies.v1.StrategyRevision.version_id	required	
@@ -406,11 +415,15 @@ swap.quickswap.v1.VaultPayoutRule.vault_account_id	not_required	reference to an 
 swap.quickswap.v1.Withdrawal.flow_id	not_required	reference to another object; 0 or empty when none
 swap.quickswap.v1.Withdrawal.zipped_asset_id	not_required	reference to an asset
 swap.v1.Swap.destination_asset_id	not_required	reference to an asset
+swap.v1.Swap.intermediate_asset_id	not_required	reference to an asset; 0 for a direct route
 swap.v1.Swap.source_asset_id	not_required	reference to an asset
 swap.v1.Swap.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 swap.v1.Swap.swap_id	required	
+swap.v1.SwapLeg.fee_asset_id	not_required	reference to an asset
+swap.v1.SwapLeg.symbol_id	not_required	reference to a market
 swap.v1.SwapOrder.order_id	not_required	reference to another order, trigger or batch; 0 when none
 swap.v1.SwapOrder.symbol_id	not_required	reference to a market
+swap.v1.SwapQuote.intermediate_asset_id	not_required	reference to an asset; 0 for a direct route
 swap.v1.SwapQuoteLeg.fee_asset_id	not_required	reference to an asset
 swap.v1.SwapQuoteLeg.symbol_id	not_required	reference to a market
 swap.v1.SwapTerms.destination_asset_id	not_required	reference to an asset

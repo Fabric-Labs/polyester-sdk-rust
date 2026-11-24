@@ -43,6 +43,9 @@ fn withdraw_destination_validation_code_label(
         Some(WithdrawDestinationValidationCode::DENYLISTED_ADDRESS) => {
             "denylisted_address".to_owned()
         }
+        Some(WithdrawDestinationValidationCode::SWAP_DEPOSIT_ADDRESS) => {
+            "swap_deposit_address".to_owned()
+        }
         None => format!("unknown_code_{}", value.to_i32()),
     }
 }
@@ -536,6 +539,10 @@ mod tests {
             (
                 WithdrawDestinationValidationCode::DENYLISTED_ADDRESS,
                 "denylisted_address",
+            ),
+            (
+                WithdrawDestinationValidationCode::SWAP_DEPOSIT_ADDRESS,
+                "swap_deposit_address",
             ),
         ];
         for (code, expected) in cases {

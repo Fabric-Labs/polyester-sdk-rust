@@ -675,6 +675,11 @@ pub mod withdraw_codes {
     /// suspended (REST `ROUTE_SUSPENDED`, Connect `failed_precondition`, HTTP
     /// 400); see [`super::Error::is_withdraw_route_suspended`].
     pub const ROUTE_SUSPENDED: &str = "ERROR_CODE_ROUTE_SUSPENDED";
+    /// The destination is a deposit address issued for a Quick Swap, which is
+    /// never a withdrawal destination (REST `DESTINATION_SWAP_DEPOSIT_ADDRESS`);
+    /// see [`super::Error::is_withdraw_destination_swap_deposit_address`].
+    pub const DESTINATION_SWAP_DEPOSIT_ADDRESS: &str =
+        "ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS";
     /// The withdrawal names a `destination_chain_id` that is not a Polyester
     /// chain ID, such as the network's native chain ID (`invalid_argument`,
     /// HTTP 400). Final: send `ZipperChainConfig::chain_id` from the deposit and
@@ -1865,6 +1870,19 @@ impl Error {
     /// while the route is `SUSPENDED` is refused the same way.
     pub fn is_withdraw_route_suspended(&self) -> bool {
         matches!(self, Self::Api { code, .. } if code == withdraw_codes::ROUTE_SUSPENDED)
+    }
+
+    /// True for `ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS` (REST
+    /// `DESTINATION_SWAP_DEPOSIT_ADDRESS`): the withdrawal, or an auto-withdraw
+    /// destination, names a deposit address issued for a Quick Swap. Such an
+    /// address is never a withdrawal destination: a withdrawal could reach it
+    /// after its swap stopped accepting deposits, and could then be neither
+    /// swapped nor returned. A Polyester account's own deposit address is not
+    /// affected. Nothing was reserved; on an auto-withdraw destination,
+    /// [`Self::withdraw_field_path`] names it. Final and not
+    /// [`Self::is_retryable`]: choose another destination.
+    pub fn is_withdraw_destination_swap_deposit_address(&self) -> bool {
+        matches!(self, Self::Api { code, .. } if code == withdraw_codes::DESTINATION_SWAP_DEPOSIT_ADDRESS)
     }
 
     /// With `AUTH_SOCIAL_ACCOUNT_COOLDOWN` or
@@ -4431,5 +4449,50 @@ mod tests {
         );
         assert_eq!(plain.withdraw_field_path(), None);
         assert_eq!(plain.withdraw_min_floor_e18(), None);
+    }
+
+    /// A destination that is a Quick Swap deposit address is a final refusal
+    /// that keeps the auto-withdraw destination it names, under either status
+    /// the service may answer it with.
+    #[test]
+    fn withdraw_swap_deposit_address_refusal_is_final() {
+        use crate::proto::chain::withdraw::v1::ErrorDetail as WithdrawErrorDetail;
+
+        for status in [ErrorCode::FailedPrecondition, ErrorCode::InvalidArgument] {
+            let err = map_connect_error(
+                ConnectError::new(status, "swap deposit address").with_detail(
+                    ErrorDetail::from_message(
+                        "chain.withdraw.v1.ErrorDetail",
+                        &WithdrawErrorDetail {
+                            code: WithdrawErrorCode::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS
+                                .into(),
+                            field_path: "destinations[0]".into(),
+                            ..Default::default()
+                        },
+                    ),
+                ),
+            );
+            assert!(
+                matches!(&err, Error::Api { code, .. } if code == withdraw_codes::DESTINATION_SWAP_DEPOSIT_ADDRESS),
+                "{err:?}"
+            );
+            assert!(err.is_withdraw_destination_swap_deposit_address());
+            assert_eq!(err.withdraw_field_path(), Some("destinations[0]"));
+            assert!(!err.is_retryable() && !err.mutation_outcome_unknown());
+            assert!(!err.is_withdraw_route_suspended());
+        }
+
+        let other = map_connect_error(
+            ConnectError::new(ErrorCode::InvalidArgument, "invalid").with_detail(
+                ErrorDetail::from_message(
+                    "chain.withdraw.v1.ErrorDetail",
+                    &WithdrawErrorDetail {
+                        code: WithdrawErrorCode::ERROR_CODE_DESTINATION_INVALID.into(),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert!(!other.is_withdraw_destination_swap_deposit_address());
     }
 }

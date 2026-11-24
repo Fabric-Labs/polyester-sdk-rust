@@ -3175,7 +3175,7 @@ mod tests {
         refused.error = ErrorDetail {
             code: ErrorCode::ERROR_CODE_PRICE_TICK_SIZE.into(),
             violations: vec![FieldViolation {
-                field_path: "items[1].new_attached_risk.take_profit.trigger_price_ticks".into(),
+                field_path: "new_attached_risk.take_profit.trigger_price_ticks".into(),
                 rule_id: "PRICE_TICK_SIZE".into(),
                 ..Default::default()
             }],
@@ -3210,7 +3210,7 @@ mod tests {
         );
         assert_eq!(
             rejected.violations[0].field_path,
-            "items[1].new_attached_risk.take_profit.trigger_price_ticks"
+            "new_attached_risk.take_profit.trigger_price_ticks"
         );
     }
 
