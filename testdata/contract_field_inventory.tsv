@@ -229,7 +229,7 @@ transfer.v1.GetDustConversionRequest.conversion_id	covered	dust.get_conversion(c
 transfer.v1.GetDustConversionRequest.subaccount_id	covered	dust.get_conversion(subaccount_id: SubAccountScope)
 transfer.v1.GetDustConversionResponse.conversion	covered	DustConversion (get_conversion result)
 transfer.v1.GetInternalTransferBatchRequest.request_id	covered	get_batch(request_id)
-transfer.v1.GetInternalTransferBatchRequest.idempotency_key	omitted	reading a batch by the key batch_create sent is not wrapped: get_batch reads it by request ID, and a batch_create whose answer was lost is resolved by sending the same key and legs again, which answers the batch's stored outcome
+transfer.v1.GetInternalTransferBatchRequest.idempotency_key	omitted	reading a batch by the key batch_create sent is not wrapped: get_batch reads it by request ID. Sending the same key and legs to batch_create again recovers the batch's stored outcome only while the caller may still move funds from every source account of the batch; a read by key needs instead the read permission on every source account
 transfer.v1.GetInternalTransferBatchResponse.legs	covered	InternalTransferBatchResult.legs (get_batch result)
 transfer.v1.GetInternalTransferBatchResponse.request_id	covered	InternalTransferBatchResult.request_id (get_batch result)
 transfer.v1.GetInternalTransferBatchResponse.status	covered	InternalTransferBatchResult.status (get_batch result)
