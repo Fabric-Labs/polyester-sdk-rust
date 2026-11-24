@@ -350,10 +350,25 @@ def stamp_python(root: Path, version: str) -> list[Path]:
     if count != 1:
         raise ReleaseError(f"expected one __version__ in {package}, found {count}")
     package.write_text(stamped, encoding="utf-8")
+    stamped_paths = [pyproject, package]
+    # The single-file request builders (pure.py) carry the version too, as an
+    # indented _VERSION inside their factory function; keep that indent.
+    pure = package.with_name("pure.py")
+    if pure.exists():
+        stamped, count = re.subn(
+            r'^([ \t]*)_VERSION\s*=\s*"[^"]*"[ \t]*$',
+            lambda match: f'{match.group(1)}_VERSION = "{version}"',
+            pure.read_text(encoding="utf-8"),
+            flags=re.MULTILINE,
+        )
+        if count != 1:
+            raise ReleaseError(f"expected one _VERSION in {pure}, found {count}")
+        pure.write_text(stamped, encoding="utf-8")
+        stamped_paths.append(pure)
     with pyproject.open("rb") as handle:
         if tomllib.load(handle)["project"]["version"] != version:
             raise ReleaseError("pyproject.toml does not read back the stamped version")
-    return [pyproject, package]
+    return stamped_paths
 
 
 def stamp_rust(root: Path, version: str) -> list[Path]:
