@@ -528,8 +528,12 @@ pub struct BatchCreateResultItem {
     pub stop_loss_trigger_id: Option<String>,
     /// Public ID of the attached trailing-stop trigger, when an accepted order has one.
     pub trailing_stop_trigger_id: Option<String>,
-    /// Field violations a rejection names, in the order the server sent them;
-    /// empty for an accepted item or a rejection that names no field.
+    /// Field violations a rejection names, in the order the server sent them,
+    /// as a `CreateOrderRequest` carrying the item would, under `order` and
+    /// without the item's index (for example `order.limit_gtc.price_ticks`;
+    /// REST: `order.limitGtc.price`): the item is this result's position in
+    /// `results`. Empty for an accepted item or a rejection that names no
+    /// field.
     pub violations: Vec<OrderFieldViolation>,
 }
 
@@ -963,8 +967,11 @@ pub struct BatchReplaceAdmissionItem {
     /// `ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID` and the server knows
     /// the holder; `None` otherwise.
     pub existing_order_id: Option<String>,
-    /// Field violations a rejection names, in the order the server sent them;
-    /// empty for an accepted item or a rejection that names no field.
+    /// Field violations a rejection names, in the order the server sent them,
+    /// as the request item names them and without its index (for example
+    /// `new_attached_risk.stop_loss` or `order_id`; REST:
+    /// `newAttachedRisk.stopLoss`): the item is `item_index`. Empty for an
+    /// accepted item or a rejection that names no field.
     pub violations: Vec<OrderFieldViolation>,
 }
 
