@@ -17,9 +17,13 @@ use std::fmt;
 pub struct StatementRow {
     /// Entry time (the `time` column), in UTC to the microsecond.
     pub time: Timestamp,
-    /// Stable entry identifier, an unsigned 128-bit integer as a decimal
-    /// string: the `transfer_id` of the entry's first leg on the account, as
-    /// the transfer history returns it.
+    /// Entry identifier, an unsigned 128-bit integer as a decimal string: the
+    /// `transfer_id` of the entry's first leg on the account within the
+    /// export's period, as the transfer history returns it. It is the same
+    /// whichever asset the export keeps. A period boundary can fall between
+    /// the legs of one entry: each export then holds its own part of it,
+    /// under the `transfer_id` of that part's first leg, so do not join rows
+    /// of different periods on `entry_id` alone.
     pub entry_id: String,
     /// The `type` column: `trade` for a trade's settlement and its fees,
     /// otherwise the entry's transfer reason, such as `deposit`, `withdraw`,
@@ -91,8 +95,10 @@ pub struct StatementExport {
     pub ready_at: Option<Timestamp>,
     /// When a `ready` file expires, 7 days after `ready_at`; `None` before.
     pub expires_at: Option<Timestamp>,
-    /// Why a `failed` export failed: `too_large` (more than 4,000,000
-    /// movements; split the period) or `unavailable` (create a new export);
+    /// Why a `failed` export failed: `too_large` (the period holds more than
+    /// 4,000,000 ledger movements of the account, counting every asset's even
+    /// when the export keeps one; split the period) or `unavailable` (create
+    /// a new export);
     /// `None` otherwise, `UNKNOWN(<n>)` for a reason this SDK does not know.
     pub failure_reason: Option<String>,
 }

@@ -407,6 +407,8 @@ pub enum AutoWithdrawRunState {
     /// Nothing was paid: every asset was below its minimum, no current price
     /// valued it, or the rule was no longer current.
     RUN_SKIPPED = 6i32,
+    /// The run's conversions into the payout asset are executing; payouts start once every conversion is final and settled.
+    RUN_CONVERTING = 7i32,
 }
 impl AutoWithdrawRunState {
     ///Idiomatic alias for [`Self::RUN_STATE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -430,6 +432,9 @@ impl AutoWithdrawRunState {
     ///Idiomatic alias for [`Self::RUN_SKIPPED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RunSkipped: Self = Self::RUN_SKIPPED;
+    ///Idiomatic alias for [`Self::RUN_CONVERTING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RunConverting: Self = Self::RUN_CONVERTING;
 }
 impl ::core::default::Default for AutoWithdrawRunState {
     fn default() -> Self {
@@ -535,6 +540,7 @@ impl ::buffa::Enumeration for AutoWithdrawRunState {
             4i32 => ::core::option::Option::Some(Self::RUN_PARTIALLY_FAILED),
             5i32 => ::core::option::Option::Some(Self::RUN_FAILED),
             6i32 => ::core::option::Option::Some(Self::RUN_SKIPPED),
+            7i32 => ::core::option::Option::Some(Self::RUN_CONVERTING),
             _ => ::core::option::Option::None,
         }
     }
@@ -550,6 +556,7 @@ impl ::buffa::Enumeration for AutoWithdrawRunState {
             Self::RUN_PARTIALLY_FAILED => "RUN_PARTIALLY_FAILED",
             Self::RUN_FAILED => "RUN_FAILED",
             Self::RUN_SKIPPED => "RUN_SKIPPED",
+            Self::RUN_CONVERTING => "RUN_CONVERTING",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -565,6 +572,7 @@ impl ::buffa::Enumeration for AutoWithdrawRunState {
             }
             "RUN_FAILED" => ::core::option::Option::Some(Self::RUN_FAILED),
             "RUN_SKIPPED" => ::core::option::Option::Some(Self::RUN_SKIPPED),
+            "RUN_CONVERTING" => ::core::option::Option::Some(Self::RUN_CONVERTING),
             _ => ::core::option::Option::None,
         }
     }
@@ -577,6 +585,7 @@ impl ::buffa::Enumeration for AutoWithdrawRunState {
             Self::RUN_PARTIALLY_FAILED,
             Self::RUN_FAILED,
             Self::RUN_SKIPPED,
+            Self::RUN_CONVERTING,
         ]
     }
 }
@@ -1834,6 +1843,32 @@ pub struct AutoWithdrawRule {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub created_by_account_id: u64,
+    /// Ledger asset every other asset with a balance is converted into, through
+    /// a Swap placed from the account, before the run pays it; zero pays every
+    /// asset in kind. When set, destinations has exactly one entry, for this
+    /// asset.
+    ///
+    /// Field 10: `payout_asset_id`
+    #[serde(
+        rename = "payoutAssetId",
+        alias = "payout_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub payout_asset_id: u32,
+    /// Duration of a conversion that runs as TWAP, in milliseconds, 60000 to
+    /// 3600000; zero means 300000. A conversion runs as TWAP when its USD value
+    /// exceeds 10,000 or its quoted price impact exceeds 0.5%, otherwise at
+    /// market.
+    ///
+    /// Field 11: `conversion_twap_duration_ms`
+    #[serde(
+        rename = "conversionTwapDurationMs",
+        alias = "conversion_twap_duration_ms",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub conversion_twap_duration_ms: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1850,6 +1885,8 @@ impl ::core::fmt::Debug for AutoWithdrawRule {
             .field("pause", &self.pause)
             .field("min_usd_value_e18", &self.min_usd_value_e18)
             .field("created_by_account_id", &self.created_by_account_id)
+            .field("payout_asset_id", &self.payout_asset_id)
+            .field("conversion_twap_duration_ms", &self.conversion_twap_duration_ms)
             .finish()
     }
 }
@@ -1930,6 +1967,18 @@ impl ::buffa::Message for AutoWithdrawRule {
         if self.created_by_account_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if self.payout_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.payout_asset_id) as u32;
+        }
+        if self.conversion_twap_duration_ms != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(
+                        self.conversion_twap_duration_ms,
+                    ) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1971,6 +2020,16 @@ impl ::buffa::Message for AutoWithdrawRule {
         }
         if self.created_by_account_id != 0u64 {
             ::buffa::types::put_fixed64_field(9u32, self.created_by_account_id, buf);
+        }
+        if self.payout_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(10u32, self.payout_asset_id, buf);
+        }
+        if self.conversion_twap_duration_ms != 0u64 {
+            ::buffa::types::put_uint64_field(
+                11u32,
+                self.conversion_twap_duration_ms,
+                buf,
+            );
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2066,6 +2125,20 @@ impl ::buffa::Message for AutoWithdrawRule {
                 )?;
                 self.created_by_account_id = ::buffa::types::decode_fixed64(buf)?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.payout_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.conversion_twap_duration_ms = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2083,6 +2156,8 @@ impl ::buffa::Message for AutoWithdrawRule {
         self.pause = ::buffa::MessageField::none();
         self.min_usd_value_e18 = ::buffa::MessageField::none();
         self.created_by_account_id = 0u64;
+        self.payout_asset_id = 0u32;
+        self.conversion_twap_duration_ms = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2176,6 +2251,36 @@ pub struct SetAutoWithdrawRuleRequest {
     pub min_usd_value_e18: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
+    /// Ledger asset every other asset with a balance is converted into, through
+    /// a Swap placed from the account, before the run pays it; zero pays every
+    /// asset in kind. When set, destinations has exactly one entry, for this
+    /// asset. Creating or resuming a rule with a payout asset also needs the
+    /// permission to swap on the account; on a broker vault that is the
+    /// permission to manage its payouts (the Owner and Finance roles). Pausing
+    /// it does not, and a run whose author lost it leaves the assets in kind
+    /// (policy_denied).
+    ///
+    /// Field 6: `payout_asset_id`
+    #[serde(
+        rename = "payoutAssetId",
+        alias = "payout_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub payout_asset_id: u32,
+    /// Duration of a conversion that runs as TWAP, in milliseconds, 60000 to
+    /// 3600000; zero means 300000. A conversion runs as TWAP when its USD value
+    /// exceeds 10,000 or its quoted price impact exceeds 0.5%, otherwise at
+    /// market.
+    ///
+    /// Field 7: `conversion_twap_duration_ms`
+    #[serde(
+        rename = "conversionTwapDurationMs",
+        alias = "conversion_twap_duration_ms",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub conversion_twap_duration_ms: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2188,6 +2293,8 @@ impl ::core::fmt::Debug for SetAutoWithdrawRuleRequest {
             .field("schedule", &self.schedule)
             .field("destinations", &self.destinations)
             .field("min_usd_value_e18", &self.min_usd_value_e18)
+            .field("payout_asset_id", &self.payout_asset_id)
+            .field("conversion_twap_duration_ms", &self.conversion_twap_duration_ms)
             .finish()
     }
 }
@@ -2248,6 +2355,18 @@ impl ::buffa::Message for SetAutoWithdrawRuleRequest {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.payout_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.payout_asset_id) as u32;
+        }
+        if self.conversion_twap_duration_ms != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(
+                        self.conversion_twap_duration_ms,
+                    ) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -2275,6 +2394,16 @@ impl ::buffa::Message for SetAutoWithdrawRuleRequest {
         if self.min_usd_value_e18.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.min_usd_value_e18.write_to(__cache, buf);
+        }
+        if self.payout_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(6u32, self.payout_asset_id, buf);
+        }
+        if self.conversion_twap_duration_ms != 0u64 {
+            ::buffa::types::put_uint64_field(
+                7u32,
+                self.conversion_twap_duration_ms,
+                buf,
+            );
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2334,6 +2463,20 @@ impl ::buffa::Message for SetAutoWithdrawRuleRequest {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.payout_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.conversion_twap_duration_ms = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2347,6 +2490,8 @@ impl ::buffa::Message for SetAutoWithdrawRuleRequest {
         self.schedule = ::buffa::MessageField::none();
         self.destinations.clear();
         self.min_usd_value_e18 = ::buffa::MessageField::none();
+        self.payout_asset_id = 0u32;
+        self.conversion_twap_duration_ms = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3178,7 +3323,9 @@ pub struct AutoWithdrawStep {
     /// route's supply_status in the deposit and withdraw config is MISSING or
     /// STALE; the funds stay for a later run), authority_revoked,
     /// gateway_capacity_insufficient (the funds stay for a later run),
-    /// withdrawal_released or withdrawal_failed; empty otherwise.
+    /// withdrawals_disabled (the environment does not allow withdrawals; the
+    /// funds stay on the account), withdrawal_released or withdrawal_failed;
+    /// empty otherwise.
     ///
     /// Field 7: `reason`
     #[serde(
@@ -3641,6 +3788,15 @@ pub struct AutoWithdrawRun {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub finished_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Conversions into the rule's payout asset, ordered by source_asset_id; empty for an in-kind rule.
+    ///
+    /// Field 9: `conversions`
+    #[serde(
+        rename = "conversions",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub conversions: ::buffa::alloc::vec::Vec<AutoWithdrawConversion>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3656,6 +3812,7 @@ impl ::core::fmt::Debug for AutoWithdrawRun {
             .field("steps", &self.steps)
             .field("created_at", &self.created_at)
             .field("finished_at", &self.finished_at)
+            .field("conversions", &self.conversions)
             .finish()
     }
 }
@@ -3731,6 +3888,14 @@ impl ::buffa::Message for AutoWithdrawRun {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        for v in &self.conversions {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3771,6 +3936,10 @@ impl ::buffa::Message for AutoWithdrawRun {
         if self.finished_at.is_set() {
             ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
             self.finished_at.write_to(__cache, buf);
+        }
+        for v in &self.conversions {
+            ::buffa::types::put_len_delimited_header(9u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3857,6 +4026,15 @@ impl ::buffa::Message for AutoWithdrawRun {
                     ctx,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.conversions.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3873,6 +4051,7 @@ impl ::buffa::Message for AutoWithdrawRun {
         self.steps.clear();
         self.created_at = ::buffa::MessageField::none();
         self.finished_at = ::buffa::MessageField::none();
+        self.conversions.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3903,6 +4082,489 @@ pub const __AUTO_WITHDRAW_RUN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     type_url: "type.googleapis.com/chain.withdraw.v1.AutoWithdrawRun",
     to_json: ::buffa::type_registry::any_to_json::<AutoWithdrawRun>,
     from_json: ::buffa::type_registry::any_from_json::<AutoWithdrawRun>,
+    is_wkt: false,
+};
+/// AutoWithdrawConversion is one asset a run converts into its rule's payout
+/// asset through a Swap placed from the account, before it pays.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AutoWithdrawConversion {
+    /// Ledger asset converted.
+    ///
+    /// Field 1: `source_asset_id`
+    #[serde(
+        rename = "sourceAssetId",
+        alias = "source_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub source_asset_id: u32,
+    /// Amount the conversion spends.
+    ///
+    /// Field 2: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// The Swap (swap.v1 GetSwap); zero when the asset was not converted.
+    ///
+    /// Field 3: `swap_id`
+    #[serde(
+        rename = "swapId",
+        alias = "swap_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub swap_id: u64,
+    /// Market or TWAP; unset when the asset was not converted.
+    ///
+    /// Field 4: `execution`
+    #[serde(
+        rename = "execution",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub execution: ::buffa::MessageField<super::super::super::swap::v1::Execution>,
+    /// Where the Swap stands; unset when the asset was not converted.
+    ///
+    /// Field 5: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<super::super::super::swap::v1::SwapStatus>,
+    /// Why a terminal Swap did not trade its whole amount; unset when it did or
+    /// when the asset was not converted.
+    ///
+    /// Field 6: `reason`
+    #[serde(
+        rename = "reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub reason: ::buffa::EnumValue<super::super::super::swap::v1::SwapReason>,
+    /// Whether the conversion is over: its Swap is terminal, or it was skipped.
+    ///
+    /// Field 7: `is_terminal`
+    #[serde(
+        rename = "isTerminal",
+        alias = "is_terminal",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub is_terminal: bool,
+    /// Source spent, settled.
+    ///
+    /// Field 8: `executed_amount_e18`
+    #[serde(
+        rename = "executedAmountE18",
+        alias = "executed_amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub executed_amount_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Stays on the account.
+    ///
+    /// Field 9: `unspent_amount_e18`
+    #[serde(
+        rename = "unspentAmountE18",
+        alias = "unspent_amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub unspent_amount_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Payout asset after fees.
+    ///
+    /// Field 10: `received_amount_e18`
+    #[serde(
+        rename = "receivedAmountE18",
+        alias = "received_amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub received_amount_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Per-leg spent, received and fee.
+    ///
+    /// Field 11: `legs`
+    #[serde(
+        rename = "legs",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub legs: ::buffa::alloc::vec::Vec<super::super::super::swap::v1::SwapLeg>,
+    /// Why the asset was not converted (route_unsupported, below_minimum,
+    /// above_maximum, conversion_unavailable, price_unavailable,
+    /// conversion_refused, rule_superseded or policy_denied); empty otherwise.
+    /// Its balance stays on the account.
+    ///
+    /// Field 12: `skip_reason`
+    #[serde(
+        rename = "skipReason",
+        alias = "skip_reason",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub skip_reason: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AutoWithdrawConversion {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AutoWithdrawConversion")
+            .field("source_asset_id", &self.source_asset_id)
+            .field("amount_e18", &self.amount_e18)
+            .field("swap_id", &self.swap_id)
+            .field("execution", &self.execution)
+            .field("status", &self.status)
+            .field("reason", &self.reason)
+            .field("is_terminal", &self.is_terminal)
+            .field("executed_amount_e18", &self.executed_amount_e18)
+            .field("unspent_amount_e18", &self.unspent_amount_e18)
+            .field("received_amount_e18", &self.received_amount_e18)
+            .field("legs", &self.legs)
+            .field("skip_reason", &self.skip_reason)
+            .finish()
+    }
+}
+impl AutoWithdrawConversion {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawConversion";
+}
+::buffa::impl_default_instance!(AutoWithdrawConversion);
+impl ::buffa::MessageName for AutoWithdrawConversion {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "AutoWithdrawConversion";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.AutoWithdrawConversion";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawConversion";
+}
+impl ::buffa::Message for AutoWithdrawConversion {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.source_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.source_asset_id) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.swap_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.execution.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.execution.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.is_terminal {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if self.executed_amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.executed_amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.unspent_amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.unspent_amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.received_amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.received_amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.legs {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.skip_reason.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.skip_reason) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.source_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.source_asset_id, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        if self.swap_id != 0u64 {
+            ::buffa::types::put_fixed64_field(3u32, self.swap_id, buf);
+        }
+        if self.execution.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.execution.write_to(__cache, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(6u32, val, buf);
+            }
+        }
+        if self.is_terminal {
+            ::buffa::types::put_bool_field(7u32, self.is_terminal, buf);
+        }
+        if self.executed_amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
+            self.executed_amount_e18.write_to(__cache, buf);
+        }
+        if self.unspent_amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(9u32, __cache.consume_next(), buf);
+            self.unspent_amount_e18.write_to(__cache, buf);
+        }
+        if self.received_amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
+            self.received_amount_e18.write_to(__cache, buf);
+        }
+        for v in &self.legs {
+            ::buffa::types::put_len_delimited_header(11u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.skip_reason.is_empty() {
+            ::buffa::types::put_string_field(12u32, &self.skip_reason, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.source_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.swap_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.execution.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.is_terminal = ::buffa::types::decode_bool(buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.executed_amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.unspent_amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.received_amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.legs.push(elem);
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.skip_reason, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.source_asset_id = 0u32;
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.swap_id = 0u64;
+        self.execution = ::buffa::MessageField::none();
+        self.status = ::buffa::EnumValue::from(0);
+        self.reason = ::buffa::EnumValue::from(0);
+        self.is_terminal = false;
+        self.executed_amount_e18 = ::buffa::MessageField::none();
+        self.unspent_amount_e18 = ::buffa::MessageField::none();
+        self.received_amount_e18 = ::buffa::MessageField::none();
+        self.legs.clear();
+        self.skip_reason.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AutoWithdrawConversion {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.AutoWithdrawConversion";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AutoWithdrawConversion {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AUTO_WITHDRAW_CONVERSION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.AutoWithdrawConversion",
+    to_json: ::buffa::type_registry::any_to_json::<AutoWithdrawConversion>,
+    from_json: ::buffa::type_registry::any_from_json::<AutoWithdrawConversion>,
     is_wkt: false,
 };
 /// ListAutoWithdrawRunsRequest pages through an account's runs, newest first.
@@ -4456,9 +5118,11 @@ pub struct AutoWithdrawPreviewAsset {
     /// no_destination (the rule pays no destination for the asset),
     /// destination_cooling_down (a broker vault pays a destination only once
     /// it has been on the vault's external withdraw whitelist for 24 hours;
-    /// see payable_from), above_max (the balance above max_amount_e18 stays)
-    /// or dust (less than one whole on-chain unit stays); empty when the whole
-    /// balance pays.
+    /// see payable_from), above_max (the balance above max_amount_e18 stays),
+    /// dust (less than one whole on-chain unit stays) or, on a rule with a
+    /// payout asset, converts (the asset is converted into the payout asset
+    /// instead; see conversion) or why it would not be converted (see
+    /// conversion.skip_reason); empty when the whole balance pays.
     ///
     /// Field 7: `hold_reason`
     #[serde(
@@ -4544,6 +5208,17 @@ pub struct AutoWithdrawPreviewAsset {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub payable_from: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Set on an asset the rule converts into its payout asset: what converting
+    /// its whole available balance is quoted to deliver now. Such an asset pays
+    /// nothing in kind (payable_e18 zero); its hold_reason is converts, or why
+    /// it would stay on the account.
+    ///
+    /// Field 14: `conversion`
+    #[serde(
+        rename = "conversion",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub conversion: ::buffa::MessageField<AutoWithdrawPreviewConversion>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4564,6 +5239,7 @@ impl ::core::fmt::Debug for AutoWithdrawPreviewAsset {
             .field("network_fee_e18", &self.network_fee_e18)
             .field("network_fee_sampled_at", &self.network_fee_sampled_at)
             .field("payable_from", &self.payable_from)
+            .field("conversion", &self.conversion)
             .finish()
     }
 }
@@ -4682,6 +5358,14 @@ impl ::buffa::Message for AutoWithdrawPreviewAsset {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.conversion.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.conversion.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -4739,6 +5423,10 @@ impl ::buffa::Message for AutoWithdrawPreviewAsset {
         if self.payable_from.is_set() {
             ::buffa::types::put_len_delimited_header(13u32, __cache.consume_next(), buf);
             self.payable_from.write_to(__cache, buf);
+        }
+        if self.conversion.is_set() {
+            ::buffa::types::put_len_delimited_header(14u32, __cache.consume_next(), buf);
+            self.conversion.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4880,6 +5568,17 @@ impl ::buffa::Message for AutoWithdrawPreviewAsset {
                     ctx,
                 )?;
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.conversion.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4901,6 +5600,7 @@ impl ::buffa::Message for AutoWithdrawPreviewAsset {
         self.network_fee_e18 = ::buffa::MessageField::none();
         self.network_fee_sampled_at = ::buffa::MessageField::none();
         self.payable_from = ::buffa::MessageField::none();
+        self.conversion = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4931,6 +5631,301 @@ pub const __AUTO_WITHDRAW_PREVIEW_ASSET_JSON_ANY: ::buffa::type_registry::JsonAn
     type_url: "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewAsset",
     to_json: ::buffa::type_registry::any_to_json::<AutoWithdrawPreviewAsset>,
     from_json: ::buffa::type_registry::any_from_json::<AutoWithdrawPreviewAsset>,
+    is_wkt: false,
+};
+/// AutoWithdrawPreviewConversion is the current quote for converting one
+/// asset into the rule's payout asset through a Swap placed from the account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AutoWithdrawPreviewConversion {
+    /// Payout asset the conversion delivers.
+    ///
+    /// Field 1: `payout_asset_id`
+    #[serde(
+        rename = "payoutAssetId",
+        alias = "payout_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub payout_asset_id: u32,
+    /// Expected payout asset after every leg's fee, estimated from the whole
+    /// amount at the current book depth; a TWAP's slices execute at the prices
+    /// of their own time.
+    ///
+    /// Field 2: `expected_amount_out_e18`
+    #[serde(
+        rename = "expectedAmountOutE18",
+        alias = "expected_amount_out_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expected_amount_out_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Least payout asset the conversion accepts: the expected amount less the
+    /// 1% slippage protection, estimated the same way.
+    ///
+    /// Field 3: `min_amount_out_e18`
+    #[serde(
+        rename = "minAmountOutE18",
+        alias = "min_amount_out_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub min_amount_out_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Quoted price impact of the whole amount, in basis points.
+    ///
+    /// Field 4: `price_impact_bps`
+    #[serde(
+        rename = "priceImpactBps",
+        alias = "price_impact_bps",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub price_impact_bps: u32,
+    /// How the run would execute the conversion: market, or TWAP over the
+    /// rule's conversion duration when its USD value exceeds 10,000 or its
+    /// price impact exceeds 0.5%. A TWAP whose slices would fall below the
+    /// route's minimum runs in fewer, longer slices, never fewer than two;
+    /// otherwise the asset is skipped with below_minimum.
+    ///
+    /// Field 5: `execution`
+    #[serde(
+        rename = "execution",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub execution: ::buffa::MessageField<super::super::super::swap::v1::Execution>,
+    /// Why the asset would not be converted now (route_unsupported, below_minimum, above_maximum, conversion_unavailable, price_unavailable); empty when it would. Its balance stays on the account.
+    ///
+    /// Field 6: `skip_reason`
+    #[serde(
+        rename = "skipReason",
+        alias = "skip_reason",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub skip_reason: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AutoWithdrawPreviewConversion {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AutoWithdrawPreviewConversion")
+            .field("payout_asset_id", &self.payout_asset_id)
+            .field("expected_amount_out_e18", &self.expected_amount_out_e18)
+            .field("min_amount_out_e18", &self.min_amount_out_e18)
+            .field("price_impact_bps", &self.price_impact_bps)
+            .field("execution", &self.execution)
+            .field("skip_reason", &self.skip_reason)
+            .finish()
+    }
+}
+impl AutoWithdrawPreviewConversion {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewConversion";
+}
+::buffa::impl_default_instance!(AutoWithdrawPreviewConversion);
+impl ::buffa::MessageName for AutoWithdrawPreviewConversion {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "AutoWithdrawPreviewConversion";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.AutoWithdrawPreviewConversion";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewConversion";
+}
+impl ::buffa::Message for AutoWithdrawPreviewConversion {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.payout_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.payout_asset_id) as u32;
+        }
+        if self.expected_amount_out_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expected_amount_out_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.min_amount_out_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.min_amount_out_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.price_impact_bps != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.price_impact_bps) as u32;
+        }
+        if self.execution.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.execution.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.skip_reason.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.skip_reason) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.payout_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.payout_asset_id, buf);
+        }
+        if self.expected_amount_out_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.expected_amount_out_e18.write_to(__cache, buf);
+        }
+        if self.min_amount_out_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.min_amount_out_e18.write_to(__cache, buf);
+        }
+        if self.price_impact_bps != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.price_impact_bps, buf);
+        }
+        if self.execution.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.execution.write_to(__cache, buf);
+        }
+        if !self.skip_reason.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.skip_reason, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.payout_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expected_amount_out_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.min_amount_out_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_impact_bps = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.execution.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.skip_reason, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.payout_asset_id = 0u32;
+        self.expected_amount_out_e18 = ::buffa::MessageField::none();
+        self.min_amount_out_e18 = ::buffa::MessageField::none();
+        self.price_impact_bps = 0u32;
+        self.execution = ::buffa::MessageField::none();
+        self.skip_reason.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AutoWithdrawPreviewConversion {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.AutoWithdrawPreviewConversion";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AutoWithdrawPreviewConversion {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AUTO_WITHDRAW_PREVIEW_CONVERSION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewConversion",
+    to_json: ::buffa::type_registry::any_to_json::<AutoWithdrawPreviewConversion>,
+    from_json: ::buffa::type_registry::any_from_json::<AutoWithdrawPreviewConversion>,
     is_wkt: false,
 };
 /// PreviewAutoWithdrawRunResponse previews the next run.
@@ -5392,6 +6387,13 @@ pub enum ErrorCode {
     /// Nothing was reserved; submit a new request once the status is NORMAL
     /// again.
     ERROR_CODE_ROUTE_SUSPENDED = 50i32,
+    /// The destination address is a deposit address issued for a QuickSwap,
+    /// which is never a withdrawal destination: a withdrawal could reach it
+    /// after its swap stopped accepting deposits, and could then be neither
+    /// swapped nor returned. Nothing was reserved. A Polyester account's own
+    /// deposit address is not affected. On an auto-withdraw destination,
+    /// ErrorDetail.field_path names the destination.
+    ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS = 51i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -5547,6 +6549,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_ROUTE_SUSPENDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RouteSuspended: Self = Self::ERROR_CODE_ROUTE_SUSPENDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DestinationSwapDepositAddress: Self = Self::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -5759,6 +6764,11 @@ impl ::buffa::Enumeration for ErrorCode {
                 )
             }
             50i32 => ::core::option::Option::Some(Self::ERROR_CODE_ROUTE_SUSPENDED),
+            51i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -5858,6 +6868,9 @@ impl ::buffa::Enumeration for ErrorCode {
                 "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN"
             }
             Self::ERROR_CODE_ROUTE_SUSPENDED => "ERROR_CODE_ROUTE_SUSPENDED",
+            Self::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS => {
+                "ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -6041,6 +7054,11 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_ROUTE_SUSPENDED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_ROUTE_SUSPENDED)
             }
+            "ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -6097,6 +7115,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_VERSION_CONFLICT,
             Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN,
             Self::ERROR_CODE_ROUTE_SUSPENDED,
+            Self::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS,
         ]
     }
 }
@@ -6266,6 +7285,12 @@ pub enum WithdrawDestinationValidationCode {
     TOKEN_CONTRACT = 5i32,
     /// The destination is blocked by Polyester's user-safety denylist.
     DENYLISTED_ADDRESS = 6i32,
+    /// The destination is a deposit address issued for a QuickSwap. A
+    /// withdrawal could reach it after its swap stopped accepting deposits,
+    /// and those funds could then be neither swapped nor returned, so it is
+    /// never a withdrawal destination. A Polyester account's own deposit
+    /// address is not affected.
+    SWAP_DEPOSIT_ADDRESS = 7i32,
 }
 impl WithdrawDestinationValidationCode {
     ///Idiomatic alias for [`Self::RESULT_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -6289,6 +7314,9 @@ impl WithdrawDestinationValidationCode {
     ///Idiomatic alias for [`Self::DENYLISTED_ADDRESS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const DenylistedAddress: Self = Self::DENYLISTED_ADDRESS;
+    ///Idiomatic alias for [`Self::SWAP_DEPOSIT_ADDRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SwapDepositAddress: Self = Self::SWAP_DEPOSIT_ADDRESS;
 }
 impl ::core::default::Default for WithdrawDestinationValidationCode {
     fn default() -> Self {
@@ -6400,6 +7428,7 @@ impl ::buffa::Enumeration for WithdrawDestinationValidationCode {
             4i32 => ::core::option::Option::Some(Self::POLYESTER_SMART_ACCOUNT),
             5i32 => ::core::option::Option::Some(Self::TOKEN_CONTRACT),
             6i32 => ::core::option::Option::Some(Self::DENYLISTED_ADDRESS),
+            7i32 => ::core::option::Option::Some(Self::SWAP_DEPOSIT_ADDRESS),
             _ => ::core::option::Option::None,
         }
     }
@@ -6415,6 +7444,7 @@ impl ::buffa::Enumeration for WithdrawDestinationValidationCode {
             Self::POLYESTER_SMART_ACCOUNT => "POLYESTER_SMART_ACCOUNT",
             Self::TOKEN_CONTRACT => "TOKEN_CONTRACT",
             Self::DENYLISTED_ADDRESS => "DENYLISTED_ADDRESS",
+            Self::SWAP_DEPOSIT_ADDRESS => "SWAP_DEPOSIT_ADDRESS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -6432,6 +7462,9 @@ impl ::buffa::Enumeration for WithdrawDestinationValidationCode {
             "DENYLISTED_ADDRESS" => {
                 ::core::option::Option::Some(Self::DENYLISTED_ADDRESS)
             }
+            "SWAP_DEPOSIT_ADDRESS" => {
+                ::core::option::Option::Some(Self::SWAP_DEPOSIT_ADDRESS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -6444,6 +7477,7 @@ impl ::buffa::Enumeration for WithdrawDestinationValidationCode {
             Self::POLYESTER_SMART_ACCOUNT,
             Self::TOKEN_CONTRACT,
             Self::DENYLISTED_ADDRESS,
+            Self::SWAP_DEPOSIT_ADDRESS,
         ]
     }
 }
@@ -11580,6 +12614,20 @@ pub mod __buffa {
             ///
             /// Field 9: `created_by_account_id`
             pub created_by_account_id: u64,
+            /// Ledger asset every other asset with a balance is converted into, through
+            /// a Swap placed from the account, before the run pays it; zero pays every
+            /// asset in kind. When set, destinations has exactly one entry, for this
+            /// asset.
+            ///
+            /// Field 10: `payout_asset_id`
+            pub payout_asset_id: u32,
+            /// Duration of a conversion that runs as TWAP, in milliseconds, 60000 to
+            /// 3600000; zero means 300000. A conversion runs as TWAP when its USD value
+            /// exceeds 10,000 or its quoted price impact exceeds 0.5%, otherwise at
+            /// market.
+            ///
+            /// Field 11: `conversion_twap_duration_ms`
+            pub conversion_twap_duration_ms: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AutoWithdrawRuleView<'a> {
@@ -11743,6 +12791,22 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.payout_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.conversion_twap_duration_ms = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -11828,6 +12892,8 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     created_by_account_id: self.created_by_account_id,
+                    payout_asset_id: self.payout_asset_id,
+                    conversion_twap_duration_ms: self.conversion_twap_duration_ms,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -11896,6 +12962,19 @@ pub mod __buffa {
                 if self.created_by_account_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                if self.payout_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.payout_asset_id)
+                                as u32;
+                }
+                if self.conversion_twap_duration_ms != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.conversion_twap_duration_ms,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -11960,6 +13039,16 @@ pub mod __buffa {
                     ::buffa::types::put_fixed64_field(
                         9u32,
                         self.created_by_account_id,
+                        buf,
+                    );
+                }
+                if self.payout_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(10u32, self.payout_asset_id, buf);
+                }
+                if self.conversion_twap_duration_ms != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        11u32,
+                        self.conversion_twap_duration_ms,
                         buf,
                     );
                 }
@@ -12039,6 +13128,24 @@ pub mod __buffa {
                             "createdByAccountId",
                             &::buffa::json_helpers::ProtoJson(
                                 &self.created_by_account_id,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.payout_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "payoutAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.payout_asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.conversion_twap_duration_ms,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "conversionTwapDurationMs",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.conversion_twap_duration_ms,
                             ),
                         )?;
                 }
@@ -12229,6 +13336,26 @@ pub mod __buffa {
             pub fn created_by_account_id(&self) -> u64 {
                 self.0.reborrow().created_by_account_id
             }
+            /// Ledger asset every other asset with a balance is converted into, through
+            /// a Swap placed from the account, before the run pays it; zero pays every
+            /// asset in kind. When set, destinations has exactly one entry, for this
+            /// asset.
+            ///
+            /// Field 10: `payout_asset_id`
+            #[must_use]
+            pub fn payout_asset_id(&self) -> u32 {
+                self.0.reborrow().payout_asset_id
+            }
+            /// Duration of a conversion that runs as TWAP, in milliseconds, 60000 to
+            /// 3600000; zero means 300000. A conversion runs as TWAP when its USD value
+            /// exceeds 10,000 or its quoted price impact exceeds 0.5%, otherwise at
+            /// market.
+            ///
+            /// Field 11: `conversion_twap_duration_ms`
+            #[must_use]
+            pub fn conversion_twap_duration_ms(&self) -> u64 {
+                self.0.reborrow().conversion_twap_duration_ms
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<AutoWithdrawRuleView<'static>>>
         for AutoWithdrawRuleOwnedView {
@@ -12300,6 +13427,24 @@ pub mod __buffa {
                     'a,
                 >,
             >,
+            /// Ledger asset every other asset with a balance is converted into, through
+            /// a Swap placed from the account, before the run pays it; zero pays every
+            /// asset in kind. When set, destinations has exactly one entry, for this
+            /// asset. Creating or resuming a rule with a payout asset also needs the
+            /// permission to swap on the account; on a broker vault that is the
+            /// permission to manage its payouts (the Owner and Finance roles). Pausing
+            /// it does not, and a run whose author lost it leaves the assets in kind
+            /// (policy_denied).
+            ///
+            /// Field 6: `payout_asset_id`
+            pub payout_asset_id: u32,
+            /// Duration of a conversion that runs as TWAP, in milliseconds, 60000 to
+            /// 3600000; zero means 300000. A conversion runs as TWAP when its USD value
+            /// exceeds 10,000 or its quoted price impact exceeds 0.5%, otherwise at
+            /// market.
+            ///
+            /// Field 7: `conversion_twap_duration_ms`
+            pub conversion_twap_duration_ms: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SetAutoWithdrawRuleRequestView<'a> {
@@ -12397,6 +13542,22 @@ pub mod __buffa {
                             }
                         }
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.payout_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.conversion_twap_duration_ms = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -12464,6 +13625,8 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    payout_asset_id: self.payout_asset_id,
+                    conversion_twap_duration_ms: self.conversion_twap_duration_ms,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -12511,6 +13674,19 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.payout_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.payout_asset_id)
+                                as u32;
+                }
+                if self.conversion_twap_duration_ms != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.conversion_twap_duration_ms,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -12551,6 +13727,16 @@ pub mod __buffa {
                         buf,
                     );
                     self.min_usd_value_e18.write_to(__cache, buf);
+                }
+                if self.payout_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(6u32, self.payout_asset_id, buf);
+                }
+                if self.conversion_twap_duration_ms != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        7u32,
+                        self.conversion_twap_duration_ms,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -12603,6 +13789,24 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("minUsdValueE18", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.payout_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "payoutAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.payout_asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.conversion_twap_duration_ms,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "conversionTwapDurationMs",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.conversion_twap_duration_ms,
+                            ),
+                        )?;
                 }
                 __map.end()
             }
@@ -12760,6 +13964,30 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().min_usd_value_e18
+            }
+            /// Ledger asset every other asset with a balance is converted into, through
+            /// a Swap placed from the account, before the run pays it; zero pays every
+            /// asset in kind. When set, destinations has exactly one entry, for this
+            /// asset. Creating or resuming a rule with a payout asset also needs the
+            /// permission to swap on the account; on a broker vault that is the
+            /// permission to manage its payouts (the Owner and Finance roles). Pausing
+            /// it does not, and a run whose author lost it leaves the assets in kind
+            /// (policy_denied).
+            ///
+            /// Field 6: `payout_asset_id`
+            #[must_use]
+            pub fn payout_asset_id(&self) -> u32 {
+                self.0.reborrow().payout_asset_id
+            }
+            /// Duration of a conversion that runs as TWAP, in milliseconds, 60000 to
+            /// 3600000; zero means 300000. A conversion runs as TWAP when its USD value
+            /// exceeds 10,000 or its quoted price impact exceeds 0.5%, otherwise at
+            /// market.
+            ///
+            /// Field 7: `conversion_twap_duration_ms`
+            #[must_use]
+            pub fn conversion_twap_duration_ms(&self) -> u64 {
+                self.0.reborrow().conversion_twap_duration_ms
             }
         }
         impl ::core::convert::From<
@@ -14438,7 +15666,9 @@ pub mod __buffa {
             /// route's supply_status in the deposit and withdraw config is MISSING or
             /// STALE; the funds stay for a later run), authority_revoked,
             /// gateway_capacity_insufficient (the funds stay for a later run),
-            /// withdrawal_released or withdrawal_failed; empty otherwise.
+            /// withdrawals_disabled (the environment does not allow withdrawals; the
+            /// funds stay on the account), withdrawal_released or withdrawal_failed;
+            /// empty otherwise.
             ///
             /// Field 7: `reason`
             pub reason: &'a str,
@@ -15151,7 +16381,9 @@ pub mod __buffa {
             /// route's supply_status in the deposit and withdraw config is MISSING or
             /// STALE; the funds stay for a later run), authority_revoked,
             /// gateway_capacity_insufficient (the funds stay for a later run),
-            /// withdrawal_released or withdrawal_failed; empty otherwise.
+            /// withdrawals_disabled (the environment does not allow withdrawals; the
+            /// funds stay on the account), withdrawal_released or withdrawal_failed;
+            /// empty otherwise.
             ///
             /// Field 7: `reason`
             #[must_use]
@@ -15288,6 +16520,13 @@ pub mod __buffa {
             /// Field 8: `finished_at`
             pub finished_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Conversions into the rule's payout asset, ordered by source_asset_id; empty for an in-kind rule.
+            ///
+            /// Field 9: `conversions`
+            pub conversions: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AutoWithdrawConversionView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -15442,6 +16681,21 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.conversions
+                            .push(
+                                <super::super::__buffa::view::AutoWithdrawConversionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -15504,6 +16758,11 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    conversions: self
+                        .conversions
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -15572,6 +16831,14 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                for v in &self.conversions {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15629,6 +16896,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.finished_at.write_to(__cache, buf);
+                }
+                for v in &self.conversions {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -15697,6 +16972,9 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("finishedAt", __v)?;
                     }
+                }
+                if !self.conversions.is_empty() {
+                    __map.serialize_entry("conversions", &*self.conversions)?;
                 }
                 __map.end()
             }
@@ -15872,6 +17150,18 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().finished_at
             }
+            /// Conversions into the rule's payout asset, ordered by source_asset_id; empty for an in-kind rule.
+            ///
+            /// Field 9: `conversions`
+            #[must_use]
+            pub fn conversions(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AutoWithdrawConversionView<'_>,
+            > {
+                &self.0.reborrow().conversions
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<AutoWithdrawRunView<'static>>>
         for AutoWithdrawRunOwnedView {
@@ -15896,6 +17186,919 @@ pub mod __buffa {
             type ViewHandle = AutoWithdrawRunOwnedView;
         }
         impl ::serde::Serialize for AutoWithdrawRunOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AutoWithdrawConversion is one asset a run converts into its rule's payout
+        /// asset through a Swap placed from the account, before it pays.
+        #[derive(Clone, Debug, Default)]
+        pub struct AutoWithdrawConversionView<'a> {
+            /// Ledger asset converted.
+            ///
+            /// Field 1: `source_asset_id`
+            pub source_asset_id: u32,
+            /// Amount the conversion spends.
+            ///
+            /// Field 2: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// The Swap (swap.v1 GetSwap); zero when the asset was not converted.
+            ///
+            /// Field 3: `swap_id`
+            pub swap_id: u64,
+            /// Market or TWAP; unset when the asset was not converted.
+            ///
+            /// Field 4: `execution`
+            pub execution: ::buffa::MessageFieldView<
+                super::super::super::super::super::swap::v1::__buffa::view::ExecutionView<
+                    'a,
+                >,
+            >,
+            /// Where the Swap stands; unset when the asset was not converted.
+            ///
+            /// Field 5: `status`
+            pub status: ::buffa::EnumValue<
+                super::super::super::super::super::swap::v1::SwapStatus,
+            >,
+            /// Why a terminal Swap did not trade its whole amount; unset when it did or
+            /// when the asset was not converted.
+            ///
+            /// Field 6: `reason`
+            pub reason: ::buffa::EnumValue<
+                super::super::super::super::super::swap::v1::SwapReason,
+            >,
+            /// Whether the conversion is over: its Swap is terminal, or it was skipped.
+            ///
+            /// Field 7: `is_terminal`
+            pub is_terminal: bool,
+            /// Source spent, settled.
+            ///
+            /// Field 8: `executed_amount_e18`
+            pub executed_amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Stays on the account.
+            ///
+            /// Field 9: `unspent_amount_e18`
+            pub unspent_amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Payout asset after fees.
+            ///
+            /// Field 10: `received_amount_e18`
+            pub received_amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Per-leg spent, received and fee.
+            ///
+            /// Field 11: `legs`
+            pub legs: ::buffa::RepeatedView<
+                'a,
+                super::super::super::super::super::swap::v1::__buffa::view::SwapLegView<
+                    'a,
+                >,
+            >,
+            /// Why the asset was not converted (route_unsupported, below_minimum,
+            /// above_maximum, conversion_unavailable, price_unavailable,
+            /// conversion_refused, rule_superseded or policy_denied); empty otherwise.
+            /// Its balance stays on the account.
+            ///
+            /// Field 12: `skip_reason`
+            pub skip_reason: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AutoWithdrawConversionView<'a> {
+            type Owned = super::super::AutoWithdrawConversion;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.source_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.swap_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.execution.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.execution = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::swap::v1::__buffa::view::ExecutionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.is_terminal = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.executed_amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.executed_amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.unspent_amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.unspent_amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.received_amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.received_amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.skip_reason = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.legs
+                            .push(
+                                <super::super::super::super::super::swap::v1::__buffa::view::SwapLegView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawConversion,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawConversion,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AutoWithdrawConversion {
+                    source_asset_id: self.source_asset_id,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    swap_id: self.swap_id,
+                    execution: match self.execution.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::swap::v1::Execution,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    status: self.status,
+                    reason: self.reason,
+                    is_terminal: self.is_terminal,
+                    executed_amount_e18: match self.executed_amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    unspent_amount_e18: match self.unspent_amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    received_amount_e18: match self.received_amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    legs: self
+                        .legs
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    skip_reason: self.skip_reason.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AutoWithdrawConversionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.source_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.source_asset_id)
+                                as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.swap_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.execution.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.execution.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.is_terminal {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if self.executed_amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.executed_amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.unspent_amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.unspent_amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.received_amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.received_amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.legs {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.skip_reason.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.skip_reason)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.source_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.source_asset_id, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                if self.swap_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(3u32, self.swap_id, buf);
+                }
+                if self.execution.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.execution.write_to(__cache, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(6u32, val, buf);
+                    }
+                }
+                if self.is_terminal {
+                    ::buffa::types::put_bool_field(7u32, self.is_terminal, buf);
+                }
+                if self.executed_amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        8u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.executed_amount_e18.write_to(__cache, buf);
+                }
+                if self.unspent_amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.unspent_amount_e18.write_to(__cache, buf);
+                }
+                if self.received_amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.received_amount_e18.write_to(__cache, buf);
+                }
+                for v in &self.legs {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.skip_reason.is_empty() {
+                    ::buffa::types::put_string_field(12u32, &self.skip_reason, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AutoWithdrawConversionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.source_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "sourceAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.source_asset_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.swap_id) {
+                    __map
+                        .serialize_entry(
+                            "swapId",
+                            &::buffa::json_helpers::ProtoJson(&self.swap_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.execution.as_option()
+                    {
+                        __map.serialize_entry("execution", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.reason) {
+                    __map.serialize_entry("reason", &self.reason)?;
+                }
+                if self.is_terminal {
+                    __map.serialize_entry("isTerminal", &self.is_terminal)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .executed_amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("executedAmountE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .unspent_amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("unspentAmountE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .received_amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("receivedAmountE18", __v)?;
+                    }
+                }
+                if !self.legs.is_empty() {
+                    __map.serialize_entry("legs", &*self.legs)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.skip_reason) {
+                    __map.serialize_entry("skipReason", self.skip_reason)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AutoWithdrawConversionView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "AutoWithdrawConversion";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.AutoWithdrawConversion";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawConversion";
+        }
+        ::buffa::impl_default_view_instance!(AutoWithdrawConversionView);
+        ::buffa::impl_view_reborrow!(AutoWithdrawConversionView);
+        /** Self-contained, `'static` owned view of a `AutoWithdrawConversion` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AutoWithdrawConversionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AutoWithdrawConversionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AutoWithdrawConversionOwnedView(
+            ::buffa::OwnedView<AutoWithdrawConversionView<'static>>,
+        );
+        impl AutoWithdrawConversionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawConversionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawConversionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AutoWithdrawConversion,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawConversionOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AutoWithdrawConversionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AutoWithdrawConversionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawConversion,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Ledger asset converted.
+            ///
+            /// Field 1: `source_asset_id`
+            #[must_use]
+            pub fn source_asset_id(&self) -> u32 {
+                self.0.reborrow().source_asset_id
+            }
+            /// Amount the conversion spends.
+            ///
+            /// Field 2: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+            /// The Swap (swap.v1 GetSwap); zero when the asset was not converted.
+            ///
+            /// Field 3: `swap_id`
+            #[must_use]
+            pub fn swap_id(&self) -> u64 {
+                self.0.reborrow().swap_id
+            }
+            /// Market or TWAP; unset when the asset was not converted.
+            ///
+            /// Field 4: `execution`
+            #[must_use]
+            pub fn execution(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::swap::v1::__buffa::view::ExecutionView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().execution
+            }
+            /// Where the Swap stands; unset when the asset was not converted.
+            ///
+            /// Field 5: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::super::swap::v1::SwapStatus,
+            > {
+                self.0.reborrow().status
+            }
+            /// Why a terminal Swap did not trade its whole amount; unset when it did or
+            /// when the asset was not converted.
+            ///
+            /// Field 6: `reason`
+            #[must_use]
+            pub fn reason(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::super::swap::v1::SwapReason,
+            > {
+                self.0.reborrow().reason
+            }
+            /// Whether the conversion is over: its Swap is terminal, or it was skipped.
+            ///
+            /// Field 7: `is_terminal`
+            #[must_use]
+            pub fn is_terminal(&self) -> bool {
+                self.0.reborrow().is_terminal
+            }
+            /// Source spent, settled.
+            ///
+            /// Field 8: `executed_amount_e18`
+            #[must_use]
+            pub fn executed_amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().executed_amount_e18
+            }
+            /// Stays on the account.
+            ///
+            /// Field 9: `unspent_amount_e18`
+            #[must_use]
+            pub fn unspent_amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().unspent_amount_e18
+            }
+            /// Payout asset after fees.
+            ///
+            /// Field 10: `received_amount_e18`
+            #[must_use]
+            pub fn received_amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().received_amount_e18
+            }
+            /// Per-leg spent, received and fee.
+            ///
+            /// Field 11: `legs`
+            #[must_use]
+            pub fn legs(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::super::super::super::swap::v1::__buffa::view::SwapLegView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().legs
+            }
+            /// Why the asset was not converted (route_unsupported, below_minimum,
+            /// above_maximum, conversion_unavailable, price_unavailable,
+            /// conversion_refused, rule_superseded or policy_denied); empty otherwise.
+            /// Its balance stays on the account.
+            ///
+            /// Field 12: `skip_reason`
+            #[must_use]
+            pub fn skip_reason(&self) -> &'_ str {
+                self.0.reborrow().skip_reason
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AutoWithdrawConversionView<'static>>,
+        > for AutoWithdrawConversionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AutoWithdrawConversionView<'static>>,
+            ) -> Self {
+                AutoWithdrawConversionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AutoWithdrawConversionOwnedView>
+        for ::buffa::OwnedView<AutoWithdrawConversionView<'static>> {
+            fn from(wrapper: AutoWithdrawConversionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AutoWithdrawConversionView<'static>>,
+        > for AutoWithdrawConversionOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AutoWithdrawConversionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AutoWithdrawConversion {
+            type View<'a> = AutoWithdrawConversionView<'a>;
+            type ViewHandle = AutoWithdrawConversionOwnedView;
+        }
+        impl ::serde::Serialize for AutoWithdrawConversionOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -16920,9 +19123,11 @@ pub mod __buffa {
             /// no_destination (the rule pays no destination for the asset),
             /// destination_cooling_down (a broker vault pays a destination only once
             /// it has been on the vault's external withdraw whitelist for 24 hours;
-            /// see payable_from), above_max (the balance above max_amount_e18 stays)
-            /// or dust (less than one whole on-chain unit stays); empty when the whole
-            /// balance pays.
+            /// see payable_from), above_max (the balance above max_amount_e18 stays),
+            /// dust (less than one whole on-chain unit stays) or, on a rule with a
+            /// payout asset, converts (the asset is converted into the payout asset
+            /// instead; see conversion) or why it would not be converted (see
+            /// conversion.skip_reason); empty when the whole balance pays.
             ///
             /// Field 7: `hold_reason`
             pub hold_reason: &'a str,
@@ -16981,6 +19186,15 @@ pub mod __buffa {
             /// Field 13: `payable_from`
             pub payable_from: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Set on an asset the rule converts into its payout asset: what converting
+            /// its whole available balance is quoted to deliver now. Such an asset pays
+            /// nothing in kind (payable_e18 zero); its hold_reason is converts, or why
+            /// it would stay on the account.
+            ///
+            /// Field 14: `conversion`
+            pub conversion: ::buffa::MessageFieldView<
+                super::super::__buffa::view::AutoWithdrawPreviewConversionView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -17270,6 +19484,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.conversion.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.conversion = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::AutoWithdrawPreviewConversionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -17372,6 +19611,14 @@ pub mod __buffa {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    conversion: match self.conversion.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::AutoWithdrawPreviewConversion,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -17487,6 +19734,14 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.conversion.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.conversion.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -17589,6 +19844,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.payable_from.write_to(__cache, buf);
+                }
+                if self.conversion.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.conversion.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -17707,6 +19970,14 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("payableFrom", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .conversion
+                        .as_option()
+                    {
+                        __map.serialize_entry("conversion", __v)?;
                     }
                 }
                 __map.end()
@@ -17879,9 +20150,11 @@ pub mod __buffa {
             /// no_destination (the rule pays no destination for the asset),
             /// destination_cooling_down (a broker vault pays a destination only once
             /// it has been on the vault's external withdraw whitelist for 24 hours;
-            /// see payable_from), above_max (the balance above max_amount_e18 stays)
-            /// or dust (less than one whole on-chain unit stays); empty when the whole
-            /// balance pays.
+            /// see payable_from), above_max (the balance above max_amount_e18 stays),
+            /// dust (less than one whole on-chain unit stays) or, on a rule with a
+            /// payout asset, converts (the asset is converted into the payout asset
+            /// instead; see conversion) or why it would not be converted (see
+            /// conversion.skip_reason); empty when the whole balance pays.
             ///
             /// Field 7: `hold_reason`
             #[must_use]
@@ -17974,6 +20247,20 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().payable_from
             }
+            /// Set on an asset the rule converts into its payout asset: what converting
+            /// its whole available balance is quoted to deliver now. Such an asset pays
+            /// nothing in kind (payable_e18 zero); its hold_reason is converts, or why
+            /// it would stay on the account.
+            ///
+            /// Field 14: `conversion`
+            #[must_use]
+            pub fn conversion(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::AutoWithdrawPreviewConversionView<'_>,
+            > {
+                &self.0.reborrow().conversion
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<AutoWithdrawPreviewAssetView<'static>>,
@@ -18004,6 +20291,605 @@ pub mod __buffa {
             type ViewHandle = AutoWithdrawPreviewAssetOwnedView;
         }
         impl ::serde::Serialize for AutoWithdrawPreviewAssetOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AutoWithdrawPreviewConversion is the current quote for converting one
+        /// asset into the rule's payout asset through a Swap placed from the account.
+        #[derive(Clone, Debug, Default)]
+        pub struct AutoWithdrawPreviewConversionView<'a> {
+            /// Payout asset the conversion delivers.
+            ///
+            /// Field 1: `payout_asset_id`
+            pub payout_asset_id: u32,
+            /// Expected payout asset after every leg's fee, estimated from the whole
+            /// amount at the current book depth; a TWAP's slices execute at the prices
+            /// of their own time.
+            ///
+            /// Field 2: `expected_amount_out_e18`
+            pub expected_amount_out_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Least payout asset the conversion accepts: the expected amount less the
+            /// 1% slippage protection, estimated the same way.
+            ///
+            /// Field 3: `min_amount_out_e18`
+            pub min_amount_out_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Quoted price impact of the whole amount, in basis points.
+            ///
+            /// Field 4: `price_impact_bps`
+            pub price_impact_bps: u32,
+            /// How the run would execute the conversion: market, or TWAP over the
+            /// rule's conversion duration when its USD value exceeds 10,000 or its
+            /// price impact exceeds 0.5%. A TWAP whose slices would fall below the
+            /// route's minimum runs in fewer, longer slices, never fewer than two;
+            /// otherwise the asset is skipped with below_minimum.
+            ///
+            /// Field 5: `execution`
+            pub execution: ::buffa::MessageFieldView<
+                super::super::super::super::super::swap::v1::__buffa::view::ExecutionView<
+                    'a,
+                >,
+            >,
+            /// Why the asset would not be converted now (route_unsupported, below_minimum, above_maximum, conversion_unavailable, price_unavailable); empty when it would. Its balance stays on the account.
+            ///
+            /// Field 6: `skip_reason`
+            pub skip_reason: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AutoWithdrawPreviewConversionView<'a> {
+            type Owned = super::super::AutoWithdrawPreviewConversion;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.payout_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expected_amount_out_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expected_amount_out_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.min_amount_out_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.min_amount_out_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_impact_bps = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.execution.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.execution = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::swap::v1::__buffa::view::ExecutionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.skip_reason = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawPreviewConversion,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawPreviewConversion,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AutoWithdrawPreviewConversion {
+                    payout_asset_id: self.payout_asset_id,
+                    expected_amount_out_e18: match self
+                        .expected_amount_out_e18
+                        .as_option()
+                    {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    min_amount_out_e18: match self.min_amount_out_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    price_impact_bps: self.price_impact_bps,
+                    execution: match self.execution.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::swap::v1::Execution,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    skip_reason: self.skip_reason.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AutoWithdrawPreviewConversionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.payout_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.payout_asset_id)
+                                as u32;
+                }
+                if self.expected_amount_out_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expected_amount_out_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.min_amount_out_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.min_amount_out_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.price_impact_bps != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.price_impact_bps)
+                                as u32;
+                }
+                if self.execution.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.execution.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.skip_reason.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.skip_reason)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.payout_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.payout_asset_id, buf);
+                }
+                if self.expected_amount_out_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expected_amount_out_e18.write_to(__cache, buf);
+                }
+                if self.min_amount_out_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.min_amount_out_e18.write_to(__cache, buf);
+                }
+                if self.price_impact_bps != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.price_impact_bps, buf);
+                }
+                if self.execution.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.execution.write_to(__cache, buf);
+                }
+                if !self.skip_reason.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.skip_reason, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AutoWithdrawPreviewConversionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.payout_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "payoutAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.payout_asset_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expected_amount_out_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("expectedAmountOutE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .min_amount_out_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("minAmountOutE18", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.price_impact_bps) {
+                    __map
+                        .serialize_entry(
+                            "priceImpactBps",
+                            &::buffa::json_helpers::ProtoJson(&self.price_impact_bps),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.execution.as_option()
+                    {
+                        __map.serialize_entry("execution", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.skip_reason) {
+                    __map.serialize_entry("skipReason", self.skip_reason)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AutoWithdrawPreviewConversionView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "AutoWithdrawPreviewConversion";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.AutoWithdrawPreviewConversion";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewConversion";
+        }
+        ::buffa::impl_default_view_instance!(AutoWithdrawPreviewConversionView);
+        ::buffa::impl_view_reborrow!(AutoWithdrawPreviewConversionView);
+        /** Self-contained, `'static` owned view of a `AutoWithdrawPreviewConversion` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AutoWithdrawPreviewConversionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AutoWithdrawPreviewConversionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AutoWithdrawPreviewConversionOwnedView(
+            ::buffa::OwnedView<AutoWithdrawPreviewConversionView<'static>>,
+        );
+        impl AutoWithdrawPreviewConversionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawPreviewConversionOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawPreviewConversionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AutoWithdrawPreviewConversion,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawPreviewConversionOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AutoWithdrawPreviewConversionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AutoWithdrawPreviewConversionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawPreviewConversion,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Payout asset the conversion delivers.
+            ///
+            /// Field 1: `payout_asset_id`
+            #[must_use]
+            pub fn payout_asset_id(&self) -> u32 {
+                self.0.reborrow().payout_asset_id
+            }
+            /// Expected payout asset after every leg's fee, estimated from the whole
+            /// amount at the current book depth; a TWAP's slices execute at the prices
+            /// of their own time.
+            ///
+            /// Field 2: `expected_amount_out_e18`
+            #[must_use]
+            pub fn expected_amount_out_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().expected_amount_out_e18
+            }
+            /// Least payout asset the conversion accepts: the expected amount less the
+            /// 1% slippage protection, estimated the same way.
+            ///
+            /// Field 3: `min_amount_out_e18`
+            #[must_use]
+            pub fn min_amount_out_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().min_amount_out_e18
+            }
+            /// Quoted price impact of the whole amount, in basis points.
+            ///
+            /// Field 4: `price_impact_bps`
+            #[must_use]
+            pub fn price_impact_bps(&self) -> u32 {
+                self.0.reborrow().price_impact_bps
+            }
+            /// How the run would execute the conversion: market, or TWAP over the
+            /// rule's conversion duration when its USD value exceeds 10,000 or its
+            /// price impact exceeds 0.5%. A TWAP whose slices would fall below the
+            /// route's minimum runs in fewer, longer slices, never fewer than two;
+            /// otherwise the asset is skipped with below_minimum.
+            ///
+            /// Field 5: `execution`
+            #[must_use]
+            pub fn execution(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::swap::v1::__buffa::view::ExecutionView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().execution
+            }
+            /// Why the asset would not be converted now (route_unsupported, below_minimum, above_maximum, conversion_unavailable, price_unavailable); empty when it would. Its balance stays on the account.
+            ///
+            /// Field 6: `skip_reason`
+            #[must_use]
+            pub fn skip_reason(&self) -> &'_ str {
+                self.0.reborrow().skip_reason
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AutoWithdrawPreviewConversionView<'static>>,
+        > for AutoWithdrawPreviewConversionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AutoWithdrawPreviewConversionView<'static>>,
+            ) -> Self {
+                AutoWithdrawPreviewConversionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AutoWithdrawPreviewConversionOwnedView>
+        for ::buffa::OwnedView<AutoWithdrawPreviewConversionView<'static>> {
+            fn from(wrapper: AutoWithdrawPreviewConversionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AutoWithdrawPreviewConversionView<'static>>,
+        > for AutoWithdrawPreviewConversionOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AutoWithdrawPreviewConversionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AutoWithdrawPreviewConversion {
+            type View<'a> = AutoWithdrawPreviewConversionView<'a>;
+            type ViewHandle = AutoWithdrawPreviewConversionOwnedView;
+        }
+        impl ::serde::Serialize for AutoWithdrawPreviewConversionOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -25375,10 +28261,12 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_AUTO_WITHDRAW_RULE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__AUTO_WITHDRAW_STEP_JSON_ANY);
         reg.register_json_any(super::__AUTO_WITHDRAW_RUN_JSON_ANY);
+        reg.register_json_any(super::__AUTO_WITHDRAW_CONVERSION_JSON_ANY);
         reg.register_json_any(super::__LIST_AUTO_WITHDRAW_RUNS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_AUTO_WITHDRAW_RUNS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__PREVIEW_AUTO_WITHDRAW_RUN_REQUEST_JSON_ANY);
         reg.register_json_any(super::__AUTO_WITHDRAW_PREVIEW_ASSET_JSON_ANY);
+        reg.register_json_any(super::__AUTO_WITHDRAW_PREVIEW_CONVERSION_JSON_ANY);
         reg.register_json_any(super::__PREVIEW_AUTO_WITHDRAW_RUN_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRADING_WITHDRAW_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_WALLET_TRADING_WITHDRAW_RESPONSE_JSON_ANY);
@@ -25451,6 +28339,10 @@ pub use self::__buffa::view::AutoWithdrawRunView;
 #[doc(inline)]
 pub use self::__buffa::view::AutoWithdrawRunOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::AutoWithdrawConversionView;
+#[doc(inline)]
+pub use self::__buffa::view::AutoWithdrawConversionOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::ListAutoWithdrawRunsRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::ListAutoWithdrawRunsRequestOwnedView;
@@ -25466,6 +28358,10 @@ pub use self::__buffa::view::PreviewAutoWithdrawRunRequestOwnedView;
 pub use self::__buffa::view::AutoWithdrawPreviewAssetView;
 #[doc(inline)]
 pub use self::__buffa::view::AutoWithdrawPreviewAssetOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AutoWithdrawPreviewConversionView;
+#[doc(inline)]
+pub use self::__buffa::view::AutoWithdrawPreviewConversionOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::PreviewAutoWithdrawRunResponseView;
 #[doc(inline)]

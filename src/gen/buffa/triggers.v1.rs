@@ -5995,7 +5995,28 @@ pub mod twap_trigger {
     pub use super::__buffa::view::oneof::twap_trigger::Execution as ExecutionView;
 }
 /// LadderTrigger configures the supported LINEAR limit-GTC ladder. All levels
-/// are admitted immediately and may rest concurrently.
+/// are admitted immediately as limit GTC orders and may rest concurrently.
+///
+/// Quantity: with N levels and the total quantity Q (qty_scaled), every level
+/// but the last gets Q / N rounded down to a multiple of the pair's step_size
+/// from GetSpotConfig, and the last level gets the rest, Q minus N - 1 times
+/// that share. All quantities are scaled by the pair's base_quantity_scale.
+/// For example, Q = 1000 over 3 levels with a step of 10 places 330, 330 and
+/// 340. Each level must be a valid order on its own: on the step size, at
+/// least min_qty_base, and at least min_notional_quote at its price; so Q
+/// must itself be a multiple of the step size. A share that rounds down to
+/// zero, or a level that is not a valid order, rejects the create with
+/// ERROR_CODE_LADDER_LEVEL_REJECTED, naming that level in level_index (0 for
+/// a share of zero) and why in cause_code. Nothing is created.
+///
+/// Prices: with S the number of tick_size steps from price_min_ticks to
+/// price_max_ticks, level i, counted from 0, is priced floor(i * S / (N - 1))
+/// steps above price_min_ticks. The first level is at price_min_ticks and the
+/// last at price_max_ticks, for either side. A range of fewer than N - 1 steps
+/// rejects the create with ERROR_CODE_LADDER_RANGE_TOO_NARROW.
+///
+/// To size a ladder from a quote amount, convert it to Q at these level
+/// prices and quantities before creating it.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -6288,9 +6309,10 @@ pub struct TriggerIntent {
     /// returns the same trigger, and a different intent with the same ID returns
     /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. After those 60 seconds the ID is
     /// free: a create that uses it is a new intent and creates a new trigger. To
-    /// learn the outcome of an earlier create after that window, read the
-    /// triggers with ListTriggers, which return each trigger's
-    /// client_trigger_id, instead of retrying the create. After a create fails
+    /// learn the outcome of an earlier create after that window, find it with
+    /// the ListTriggers client_trigger_id filter instead of retrying the create.
+    /// Use a new client trigger ID for every create, so a lookup never finds an
+    /// older trigger that used the same ID. After a create fails
     /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
     /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
     /// 1 to 36 bytes in UTF-8 (up to 36 ASCII characters); empty or longer IDs
@@ -6971,8 +6993,9 @@ pub mod trigger_intent {
 }
 /// CreateTriggerRequest submits one standalone trigger intent for admission.
 /// A create sent but not confirmed in time fails with
-/// TRIGGER_CREATE_OUTCOME_UNKNOWN: the trigger may have been created, so read
-/// the triggers for its client_trigger_id before retrying. UNAVAILABLE means
+/// TRIGGER_CREATE_OUTCOME_UNKNOWN: the trigger may have been created, so find
+/// it with the ListTriggers client_trigger_id filter before retrying.
+/// UNAVAILABLE means
 /// the trigger was not created.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -9134,6 +9157,33 @@ pub struct ListTriggersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub client_list_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Optional filter by client trigger ID: the triggers created with this
+    /// client_trigger_id, running or ended. Use it to find a trigger whose
+    /// create failed with TRIGGER_CREATE_OUTCOME_UNKNOWN. An ID is unique per
+    /// sub-account, pair and trigger type only while its trigger is active and
+    /// for 60 seconds after it ends; then a new create can use it again. So the
+    /// filter can match several triggers, newest first: add symbol_id and
+    /// trigger_type to keep one ID's scope. The newest of them is the latest
+    /// create with the ID, not necessarily the create being resolved, which may
+    /// not have taken effect: compare its created_at with when that create was
+    /// sent, or use a new client trigger ID for every create. An empty result
+    /// says only that no trigger of the filters' scope was created with the ID
+    /// before the read, or that it ended more than 24 hours ago: a create still
+    /// in flight can take effect after the read. To settle a create of unknown
+    /// outcome, retry the identical create with the same client trigger ID
+    /// within its window, which returns the trigger it created, if any, instead
+    /// of creating a second. An OCO's take-profit and stop-loss have no client
+    /// trigger ID: find them by client_list_id. 1 to 36 bytes in UTF-8, as
+    /// TriggerIntent.client_trigger_id: empty or longer IDs are rejected with
+    /// INVALID_ARGUMENT and ERROR_CODE_CLIENT_TRIGGER_ID_INVALID.
+    ///
+    /// Field 8: `client_trigger_id`
+    #[serde(
+        rename = "clientTriggerId",
+        alias = "client_trigger_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub client_trigger_id: ::core::option::Option<::buffa::alloc::string::String>,
     /// Maximum number of triggers to return. Defaults to 100 when omitted;
     /// maximum is 1000.
     ///
@@ -9170,6 +9220,7 @@ impl ::core::fmt::Debug for ListTriggersRequest {
             .field("parent_order_id", &self.parent_order_id)
             .field("order_list_id", &self.order_list_id)
             .field("client_list_id", &self.client_list_id)
+            .field("client_trigger_id", &self.client_trigger_id)
             .field("limit", &self.limit)
             .field("page_token", &self.page_token)
             .finish()
@@ -9212,6 +9263,16 @@ impl ListTriggersRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.client_list_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::client_trigger_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_client_trigger_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.client_trigger_id = Some(value.into());
         self
     }
 }
@@ -9263,6 +9324,9 @@ impl ::buffa::Message for ListTriggersRequest {
         if let Some(ref v) = self.client_list_id {
             size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
+        if let Some(ref v) = self.client_trigger_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         if self.limit != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
         }
@@ -9310,6 +9374,9 @@ impl ::buffa::Message for ListTriggersRequest {
         }
         if let Some(ref v) = self.client_list_id {
             ::buffa::types::put_string_field(7u32, v, buf);
+        }
+        if let Some(ref v) = self.client_trigger_id {
+            ::buffa::types::put_string_field(8u32, v, buf);
         }
         if self.limit != 0u32 {
             ::buffa::types::put_uint32_field(10u32, self.limit, buf);
@@ -9423,6 +9490,18 @@ impl ::buffa::Message for ListTriggersRequest {
                     buf,
                 )?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .client_trigger_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -9452,6 +9531,7 @@ impl ::buffa::Message for ListTriggersRequest {
         self.parent_order_id = ::core::option::Option::None;
         self.order_list_id = ::core::option::Option::None;
         self.client_list_id = ::core::option::Option::None;
+        self.client_trigger_id = ::core::option::Option::None;
         self.limit = 0u32;
         self.page_token.clear();
         self.__buffa_unknown_fields.clear();
@@ -21641,7 +21721,28 @@ pub mod __buffa {
             }
         }
         /// LadderTrigger configures the supported LINEAR limit-GTC ladder. All levels
-        /// are admitted immediately and may rest concurrently.
+        /// are admitted immediately as limit GTC orders and may rest concurrently.
+        ///
+        /// Quantity: with N levels and the total quantity Q (qty_scaled), every level
+        /// but the last gets Q / N rounded down to a multiple of the pair's step_size
+        /// from GetSpotConfig, and the last level gets the rest, Q minus N - 1 times
+        /// that share. All quantities are scaled by the pair's base_quantity_scale.
+        /// For example, Q = 1000 over 3 levels with a step of 10 places 330, 330 and
+        /// 340. Each level must be a valid order on its own: on the step size, at
+        /// least min_qty_base, and at least min_notional_quote at its price; so Q
+        /// must itself be a multiple of the step size. A share that rounds down to
+        /// zero, or a level that is not a valid order, rejects the create with
+        /// ERROR_CODE_LADDER_LEVEL_REJECTED, naming that level in level_index (0 for
+        /// a share of zero) and why in cause_code. Nothing is created.
+        ///
+        /// Prices: with S the number of tick_size steps from price_min_ticks to
+        /// price_max_ticks, level i, counted from 0, is priced floor(i * S / (N - 1))
+        /// steps above price_min_ticks. The first level is at price_min_ticks and the
+        /// last at price_max_ticks, for either side. A range of fewer than N - 1 steps
+        /// rejects the create with ERROR_CODE_LADDER_RANGE_TOO_NARROW.
+        ///
+        /// To size a ladder from a quote amount, convert it to Q at these level
+        /// prices and quantities before creating it.
         #[derive(Clone, Debug, Default)]
         pub struct LadderTriggerView<'a> {
             /// Child side. Required.
@@ -22083,9 +22184,10 @@ pub mod __buffa {
             /// returns the same trigger, and a different intent with the same ID returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. After those 60 seconds the ID is
             /// free: a create that uses it is a new intent and creates a new trigger. To
-            /// learn the outcome of an earlier create after that window, read the
-            /// triggers with ListTriggers, which return each trigger's
-            /// client_trigger_id, instead of retrying the create. After a create fails
+            /// learn the outcome of an earlier create after that window, find it with
+            /// the ListTriggers client_trigger_id filter instead of retrying the create.
+            /// Use a new client trigger ID for every create, so a lookup never finds an
+            /// older trigger that used the same ID. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             /// 1 to 36 bytes in UTF-8 (up to 36 ASCII characters); empty or longer IDs
@@ -22818,9 +22920,10 @@ pub mod __buffa {
             /// returns the same trigger, and a different intent with the same ID returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. After those 60 seconds the ID is
             /// free: a create that uses it is a new intent and creates a new trigger. To
-            /// learn the outcome of an earlier create after that window, read the
-            /// triggers with ListTriggers, which return each trigger's
-            /// client_trigger_id, instead of retrying the create. After a create fails
+            /// learn the outcome of an earlier create after that window, find it with
+            /// the ListTriggers client_trigger_id filter instead of retrying the create.
+            /// Use a new client trigger ID for every create, so a lookup never finds an
+            /// older trigger that used the same ID. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             /// 1 to 36 bytes in UTF-8 (up to 36 ASCII characters); empty or longer IDs
@@ -22874,8 +22977,9 @@ pub mod __buffa {
         }
         /// CreateTriggerRequest submits one standalone trigger intent for admission.
         /// A create sent but not confirmed in time fails with
-        /// TRIGGER_CREATE_OUTCOME_UNKNOWN: the trigger may have been created, so read
-        /// the triggers for its client_trigger_id before retrying. UNAVAILABLE means
+        /// TRIGGER_CREATE_OUTCOME_UNKNOWN: the trigger may have been created, so find
+        /// it with the ListTriggers client_trigger_id filter before retrying.
+        /// UNAVAILABLE means
         /// the trigger was not created.
         #[derive(Clone, Debug, Default)]
         pub struct CreateTriggerRequestView<'a> {
@@ -26886,6 +26990,28 @@ pub mod __buffa {
             ///
             /// Field 7: `client_list_id`
             pub client_list_id: ::core::option::Option<&'a str>,
+            /// Optional filter by client trigger ID: the triggers created with this
+            /// client_trigger_id, running or ended. Use it to find a trigger whose
+            /// create failed with TRIGGER_CREATE_OUTCOME_UNKNOWN. An ID is unique per
+            /// sub-account, pair and trigger type only while its trigger is active and
+            /// for 60 seconds after it ends; then a new create can use it again. So the
+            /// filter can match several triggers, newest first: add symbol_id and
+            /// trigger_type to keep one ID's scope. The newest of them is the latest
+            /// create with the ID, not necessarily the create being resolved, which may
+            /// not have taken effect: compare its created_at with when that create was
+            /// sent, or use a new client trigger ID for every create. An empty result
+            /// says only that no trigger of the filters' scope was created with the ID
+            /// before the read, or that it ended more than 24 hours ago: a create still
+            /// in flight can take effect after the read. To settle a create of unknown
+            /// outcome, retry the identical create with the same client trigger ID
+            /// within its window, which returns the trigger it created, if any, instead
+            /// of creating a second. An OCO's take-profit and stop-loss have no client
+            /// trigger ID: find them by client_list_id. 1 to 36 bytes in UTF-8, as
+            /// TriggerIntent.client_trigger_id: empty or longer IDs are rejected with
+            /// INVALID_ARGUMENT and ERROR_CODE_CLIENT_TRIGGER_ID_INVALID.
+            ///
+            /// Field 8: `client_trigger_id`
+            pub client_trigger_id: ::core::option::Option<&'a str>,
             /// Maximum number of triggers to return. Defaults to 100 when omitted;
             /// maximum is 1000.
             ///
@@ -26982,6 +27108,15 @@ pub mod __buffa {
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_trigger_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -27065,6 +27200,7 @@ pub mod __buffa {
                     parent_order_id: self.parent_order_id,
                     order_list_id: self.order_list_id,
                     client_list_id: self.client_list_id.map(|s| s.to_string()),
+                    client_trigger_id: self.client_trigger_id.map(|s| s.to_string()),
                     limit: self.limit,
                     page_token: self.page_token.to_string(),
                     __buffa_unknown_fields: self
@@ -27112,6 +27248,9 @@ pub mod __buffa {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
                 if let Some(ref v) = self.client_list_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if let Some(ref v) = self.client_trigger_id {
                     size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
                 if self.limit != 0u32 {
@@ -27165,6 +27304,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.client_list_id {
                     ::buffa::types::put_string_field(7u32, v, buf);
+                }
+                if let Some(ref v) = self.client_trigger_id {
+                    ::buffa::types::put_string_field(8u32, v, buf);
                 }
                 if self.limit != 0u32 {
                     ::buffa::types::put_uint32_field(10u32, self.limit, buf);
@@ -27235,6 +27377,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.client_list_id {
                     __map.serialize_entry("clientListId", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.client_trigger_id {
+                    __map.serialize_entry("clientTriggerId", __v)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
                     __map
@@ -27402,6 +27547,31 @@ pub mod __buffa {
             #[must_use]
             pub fn client_list_id(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().client_list_id
+            }
+            /// Optional filter by client trigger ID: the triggers created with this
+            /// client_trigger_id, running or ended. Use it to find a trigger whose
+            /// create failed with TRIGGER_CREATE_OUTCOME_UNKNOWN. An ID is unique per
+            /// sub-account, pair and trigger type only while its trigger is active and
+            /// for 60 seconds after it ends; then a new create can use it again. So the
+            /// filter can match several triggers, newest first: add symbol_id and
+            /// trigger_type to keep one ID's scope. The newest of them is the latest
+            /// create with the ID, not necessarily the create being resolved, which may
+            /// not have taken effect: compare its created_at with when that create was
+            /// sent, or use a new client trigger ID for every create. An empty result
+            /// says only that no trigger of the filters' scope was created with the ID
+            /// before the read, or that it ended more than 24 hours ago: a create still
+            /// in flight can take effect after the read. To settle a create of unknown
+            /// outcome, retry the identical create with the same client trigger ID
+            /// within its window, which returns the trigger it created, if any, instead
+            /// of creating a second. An OCO's take-profit and stop-loss have no client
+            /// trigger ID: find them by client_list_id. 1 to 36 bytes in UTF-8, as
+            /// TriggerIntent.client_trigger_id: empty or longer IDs are rejected with
+            /// INVALID_ARGUMENT and ERROR_CODE_CLIENT_TRIGGER_ID_INVALID.
+            ///
+            /// Field 8: `client_trigger_id`
+            #[must_use]
+            pub fn client_trigger_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().client_trigger_id
             }
             /// Maximum number of triggers to return. Defaults to 100 when omitted;
             /// maximum is 1000.
@@ -39777,13 +39947,18 @@ pub mod __buffa {
                     map.end()
                 }
             }
-            /// For a trailing stop, or a stop-loss or take-profit with a market child:
-            /// Optional price protection. Select either field with a zero value to clear
-            /// an existing max-slippage cap; omit the oneof to leave it unchanged. A
-            /// cleared cap on a market child falls back to the pair's default market
-            /// slippage. Changing the trigger price or the cap of a buy with a market
-            /// child re-sizes its reserved funds; a change that needs more funds than
-            /// are available is rejected and leaves the trigger unchanged.
+            /// For a trailing stop, or a standalone stop-loss or take-profit with a
+            /// market child: Optional price protection. Select either field with a zero
+            /// value to clear an existing max-slippage cap; omit the oneof to leave it
+            /// unchanged. A cleared cap on a market child falls back to the pair's
+            /// default market slippage. Changing the trigger price or the cap of a buy
+            /// with a market child re-sizes its reserved funds; a change that needs more
+            /// funds than are available is rejected and leaves the trigger unchanged.
+            /// A take-profit or stop-loss attached to an order, and either leg of an
+            /// OCO, takes no cap: its market child always uses the pair's default
+            /// market slippage. Setting either field for such a trigger rejects the
+            /// whole request with ERROR_CODE_TRIGGER_NOT_MODIFIABLE and leaves the
+            /// trigger unchanged; its trigger_price_ticks remains modifiable.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
                 MaxSlippageTicks(i64),

@@ -114,18 +114,24 @@ pub const SWAP_SERVICE_GET_SWAP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::s
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// SwapService converts one asset of an account's Trading balance into another
-/// through Polyester's spot order books. A Swap executes as immediate-or-cancel
-/// spot orders on the account, at the account's spot taker fee and with no
-/// other fee, protected by the end-to-end min_amount_out the caller accepts:
-/// any part that trades nets at least that rate, and anything that cannot stays
-/// on the account. Quotes are estimates and reserve nothing.
+/// through Polyester's spot order books, on the direct market or through USDT
+/// or USDC, at market or as a TWAP over up to 60 minutes. A Swap
+/// executes as immediate-or-cancel spot orders on the account, at the
+/// account's spot taker fee on each market and with no other fee, protected by
+/// the end-to-end min_amount_out the caller accepts: each order's price limit
+/// covers the taker fee scheduled within its window, so any part that trades
+/// nets at least that rate, and anything that cannot stays on the account. An
+/// order the exchange first accepts after its window (only under severe
+/// delay) may pay a later scheduled fee; if that takes a fill below the rate,
+/// the Swap finishes with MINIMUM_NOT_MET. Quotes are estimates and reserve
+/// nothing.
 /// Requests are authenticated with a session token or a signed API key. The
 /// caller needs the SWAP permission on the account: the trading roles grant it
 /// on sub-accounts, and API keys and sub-account policies must include the SWAP
 /// action. A Swap's orders also remain subject to the sub-account's spot
 /// trading policy.
-/// Follow a Swap with GetSwap until is_terminal is true; a direct Swap usually
-/// completes within seconds.
+/// Follow a Swap with GetSwap until is_terminal is true; a market Swap usually
+/// completes within seconds, a TWAP by its deadline.
 ///
 /// # Implementing handlers
 ///

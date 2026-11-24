@@ -7309,7 +7309,8 @@ pub const QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRAL_STATS_SPEC: ::connectrpc::Spe
 /// NOT_FOUND / REFERRAL_PARTNER_NOT_FOUND from every RPC but
 /// EnrollReferralPartner.
 /// A partner's code can be changed while it is not disabled, up to 9 times.
-/// The old code is retired and never given to anyone again; QuickSwaps
+/// The old code is reserved and never given to anyone else: links with it keep
+/// crediting the partner, at the program's current rates, and QuickSwaps
 /// already referred keep their partner.
 /// A partner reads the QuickSwaps it referred with ListReferredQuickSwaps
 /// and GetReferredQuickSwap, never another partner's or a QuickSwap without
@@ -7460,8 +7461,11 @@ pub trait QuickSwapReferralService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// SetReferralCode replaces the caller's referral code. The old code is
-    /// retired for good, so a partner can change its code at most 9 times (see
+    /// SetReferralCode replaces the caller's referral code. The old code keeps
+    /// crediting the caller: a QuickSwap request with it is referred to the
+    /// caller at the program's current rates, so links already shared keep
+    /// working. It stays reserved for good and is never given to another
+    /// partner, so a partner can change its code at most 9 times (see
     /// ReferralPartner.code_changes_remaining). Setting the current code again
     /// changes nothing.
     /// Errors:

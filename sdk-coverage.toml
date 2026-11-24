@@ -88,7 +88,7 @@ reason = "The subaccount role catalog is not wrapped. GetEffectiveSubaccountPerm
 
 [[allowlist]]
 procedure = "/ledger.read.v1.LedgerReadService/GetPortfolioEquityHistorySeries"
-reason = "Root portfolio equity history requires an interactive root-account session; API keys and subaccount-scoped sessions are not supported."
+reason = "Root portfolio equity history accepts a root-account session or a root-scoped API key with READ_BALANCES, but is not wrapped in this SDK yet; subaccount-scoped API keys are refused."
 
 [[allowlist]]
 procedure = "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot"

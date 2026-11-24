@@ -11991,6 +11991,344 @@ pub const __LIMIT_ORDER_PREVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<LimitOrderPreview>,
     is_wkt: false,
 };
+/// PeggedLimitOrderPreview is a limit order with a static peg: the exchange
+/// takes its price once, when it accepts the order, from one side of the book
+/// moved by a number of the pair's ticks, and never moves it with the book
+/// after. It never carries attached exits.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PeggedLimitOrderPreview {
+    /// The book side the price is taken from: BEST_BID or BEST_ASK.
+    ///
+    /// Field 1: `reference`
+    #[serde(
+        rename = "reference",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub reference: ::buffa::EnumValue<super::super::orders::v1::PegReference>,
+    /// Signed number of the pair's ticks added to that side's best price: 2 is
+    /// two ticks above it, -1 one tick below. Zero is the best price itself.
+    ///
+    /// Field 2: `offset_ticks`
+    #[serde(
+        rename = "offsetTicks",
+        alias = "offset_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub offset_ticks: i64,
+    /// The pair's tick size, an exact decimal string in the quote asset.
+    ///
+    /// Field 3: `tick_size`
+    #[serde(
+        rename = "tickSize",
+        alias = "tick_size",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub tick_size: ::buffa::alloc::string::String,
+    /// The price the peg gives at reference_price, the side's best price when
+    /// the preview read it: an exact decimal string in the quote asset. The
+    /// exchange takes it again when it accepts the order, so the order's price
+    /// can differ.
+    ///
+    /// Field 4: `current_price`
+    #[serde(
+        rename = "currentPrice",
+        alias = "current_price",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub current_price: ::buffa::alloc::string::String,
+    /// The order's bound, an exact decimal string in the quote asset: the most
+    /// a buy pays or the least a sell takes. The exchange checks the order's
+    /// minimums, maximums and funds at it, and refuses the order when the
+    /// price the peg gives passes it. It is not the order's price.
+    ///
+    /// Field 5: `bound_price`
+    #[serde(
+        rename = "boundPrice",
+        alias = "bound_price",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bound_price: ::buffa::alloc::string::String,
+    /// GTC, GTD, IOC or FOK.
+    ///
+    /// Field 6: `time_in_force`
+    #[serde(
+        rename = "timeInForce",
+        alias = "time_in_force",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub time_in_force: ::buffa::EnumValue<super::super::orders::v1::TimeInForce>,
+    /// When a GTD order expires. Omitted for other times in force.
+    ///
+    /// Field 7: `expire_at`
+    #[serde(
+        rename = "expireAt",
+        alias = "expire_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expire_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// True when the order is refused instead of trading at once.
+    ///
+    /// Field 8: `post_only`
+    #[serde(
+        rename = "postOnly",
+        alias = "post_only",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub post_only: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PeggedLimitOrderPreview {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PeggedLimitOrderPreview")
+            .field("reference", &self.reference)
+            .field("offset_ticks", &self.offset_ticks)
+            .field("tick_size", &self.tick_size)
+            .field("current_price", &self.current_price)
+            .field("bound_price", &self.bound_price)
+            .field("time_in_force", &self.time_in_force)
+            .field("expire_at", &self.expire_at)
+            .field("post_only", &self.post_only)
+            .finish()
+    }
+}
+impl PeggedLimitOrderPreview {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.PeggedLimitOrderPreview";
+}
+::buffa::impl_default_instance!(PeggedLimitOrderPreview);
+impl ::buffa::MessageName for PeggedLimitOrderPreview {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "PeggedLimitOrderPreview";
+    const FULL_NAME: &'static str = "ai.v1.PeggedLimitOrderPreview";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.PeggedLimitOrderPreview";
+}
+impl ::buffa::Message for PeggedLimitOrderPreview {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.reference.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.offset_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.offset_ticks) as u32;
+        }
+        if !self.tick_size.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.tick_size) as u32;
+        }
+        if !self.current_price.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.current_price) as u32;
+        }
+        if !self.bound_price.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.bound_price) as u32;
+        }
+        {
+            let val = self.time_in_force.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.expire_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expire_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.post_only {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.reference.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.offset_ticks != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.offset_ticks, buf);
+        }
+        if !self.tick_size.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.tick_size, buf);
+        }
+        if !self.current_price.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.current_price, buf);
+        }
+        if !self.bound_price.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.bound_price, buf);
+        }
+        {
+            let val = self.time_in_force.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(6u32, val, buf);
+            }
+        }
+        if self.expire_at.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.expire_at.write_to(__cache, buf);
+        }
+        if self.post_only {
+            ::buffa::types::put_bool_field(8u32, self.post_only, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reference = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.offset_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.tick_size, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.current_price, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bound_price, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.time_in_force = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expire_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.post_only = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.reference = ::buffa::EnumValue::from(0);
+        self.offset_ticks = 0i64;
+        self.tick_size.clear();
+        self.current_price.clear();
+        self.bound_price.clear();
+        self.time_in_force = ::buffa::EnumValue::from(0);
+        self.expire_at = ::buffa::MessageField::none();
+        self.post_only = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PeggedLimitOrderPreview {
+    const PROTO_FQN: &'static str = "ai.v1.PeggedLimitOrderPreview";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PeggedLimitOrderPreview {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PEGGED_LIMIT_ORDER_PREVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.PeggedLimitOrderPreview",
+    to_json: ::buffa::type_registry::any_to_json::<PeggedLimitOrderPreview>,
+    from_json: ::buffa::type_registry::any_from_json::<PeggedLimitOrderPreview>,
+    is_wkt: false,
+};
 /// StopOrderPreview is a stop-loss or take-profit: it places a market or limit
 /// order once the watched price reaches the trigger price.
 #[derive(Clone, PartialEq, Default)]
@@ -13654,6 +13992,453 @@ pub const __LADDER_PREVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     from_json: ::buffa::type_registry::any_from_json::<LadderPreview>,
     is_wkt: false,
 };
+/// OcoLegPreview is one leg of an OCO: once the watched price reaches its
+/// trigger price, it places its order for the OCO's whole remaining quantity.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OcoLegPreview {
+    /// The price that fires the leg, an exact decimal string in the quote asset.
+    ///
+    /// Field 1: `trigger_price`
+    #[serde(
+        rename = "triggerPrice",
+        alias = "trigger_price",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub trigger_price: ::buffa::alloc::string::String,
+    /// The price it watches: LAST_PRICE or INDEX_PRICE.
+    ///
+    /// Field 2: `trigger_price_source`
+    #[serde(
+        rename = "triggerPriceSource",
+        alias = "trigger_price_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub trigger_price_source: ::buffa::EnumValue<
+        super::super::orders::v1::TriggerPriceSource,
+    >,
+    /// Which way the watched price must move to reach trigger_price.
+    ///
+    /// Field 3: `direction`
+    #[serde(
+        rename = "direction",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub direction: ::buffa::EnumValue<TriggerDirection>,
+    /// The limit price of the good-till-canceled order it places, an exact
+    /// decimal string in the quote asset. Omitted when it places a market order.
+    ///
+    /// Field 4: `limit_price`
+    #[serde(
+        rename = "limitPrice",
+        alias = "limit_price",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub limit_price: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OcoLegPreview {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OcoLegPreview")
+            .field("trigger_price", &self.trigger_price)
+            .field("trigger_price_source", &self.trigger_price_source)
+            .field("direction", &self.direction)
+            .field("limit_price", &self.limit_price)
+            .finish()
+    }
+}
+impl OcoLegPreview {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.OcoLegPreview";
+}
+impl OcoLegPreview {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::limit_price`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_limit_price(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.limit_price = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(OcoLegPreview);
+impl ::buffa::MessageName for OcoLegPreview {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "OcoLegPreview";
+    const FULL_NAME: &'static str = "ai.v1.OcoLegPreview";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.OcoLegPreview";
+}
+impl ::buffa::Message for OcoLegPreview {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.trigger_price.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.trigger_price) as u32;
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.direction.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if let Some(ref v) = self.limit_price {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.trigger_price.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.trigger_price, buf);
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        {
+            let val = self.direction.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if let Some(ref v) = self.limit_price {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.trigger_price, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.direction = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .limit_price
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.trigger_price.clear();
+        self.trigger_price_source = ::buffa::EnumValue::from(0);
+        self.direction = ::buffa::EnumValue::from(0);
+        self.limit_price = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OcoLegPreview {
+    const PROTO_FQN: &'static str = "ai.v1.OcoLegPreview";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OcoLegPreview {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __OCO_LEG_PREVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.OcoLegPreview",
+    to_json: ::buffa::type_registry::any_to_json::<OcoLegPreview>,
+    from_json: ::buffa::type_registry::any_from_json::<OcoLegPreview>,
+    is_wkt: false,
+};
+/// OcoPreview is an OCO (one-cancels-the-other): a take-profit and a stop-loss
+/// that both trade the order's side for its whole quantity. A sell OCO sells
+/// base asset the account already holds: its take-profit fires when the price
+/// rises to its trigger price, its stop-loss when it falls to its own. A buy
+/// OCO buys the quantity of base asset with quote asset the account already
+/// holds, the other way round. Creating it reserves funds once, and both legs
+/// share them: a sell reserves the quantity of base asset, a buy the quote
+/// asset needed to buy the quantity, as the exchange computes it. Cancelling
+/// either leg cancels both.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OcoPreview {
+    /// The take-profit leg.
+    ///
+    /// Field 1: `take_profit`
+    #[serde(
+        rename = "takeProfit",
+        alias = "take_profit",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub take_profit: ::buffa::MessageField<OcoLegPreview>,
+    /// The stop-loss leg.
+    ///
+    /// Field 2: `stop_loss`
+    #[serde(
+        rename = "stopLoss",
+        alias = "stop_loss",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub stop_loss: ::buffa::MessageField<OcoLegPreview>,
+    /// The asset creating the OCO reserves once for both legs: the base asset for
+    /// a sell, the quote asset for a buy. OrderPreview.reserved_amount states the
+    /// amount when it is set.
+    ///
+    /// Field 3: `reserved_asset`
+    #[serde(
+        rename = "reservedAsset",
+        alias = "reserved_asset",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub reserved_asset: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OcoPreview {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OcoPreview")
+            .field("take_profit", &self.take_profit)
+            .field("stop_loss", &self.stop_loss)
+            .field("reserved_asset", &self.reserved_asset)
+            .finish()
+    }
+}
+impl OcoPreview {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.OcoPreview";
+}
+::buffa::impl_default_instance!(OcoPreview);
+impl ::buffa::MessageName for OcoPreview {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "OcoPreview";
+    const FULL_NAME: &'static str = "ai.v1.OcoPreview";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.OcoPreview";
+}
+impl ::buffa::Message for OcoPreview {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.take_profit.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.take_profit.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.stop_loss.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.stop_loss.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.reserved_asset.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.reserved_asset) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.take_profit.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.take_profit.write_to(__cache, buf);
+        }
+        if self.stop_loss.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.stop_loss.write_to(__cache, buf);
+        }
+        if !self.reserved_asset.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.reserved_asset, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.take_profit.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.stop_loss.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.reserved_asset, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.take_profit = ::buffa::MessageField::none();
+        self.stop_loss = ::buffa::MessageField::none();
+        self.reserved_asset.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OcoPreview {
+    const PROTO_FQN: &'static str = "ai.v1.OcoPreview";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OcoPreview {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __OCO_PREVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.OcoPreview",
+    to_json: ::buffa::type_registry::any_to_json::<OcoPreview>,
+    from_json: ::buffa::type_registry::any_from_json::<OcoPreview>,
+    is_wkt: false,
+};
 /// OrderPreview is the exact order an approval places, as typed values to
 /// draw it: a TWAP's slices on a timeline, a ladder's levels on a price axis,
 /// a stop's trigger price against the current price. It is computed from the
@@ -13714,7 +14499,7 @@ pub struct OrderPreview {
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
     /// Total quantity, an exact decimal string in the base asset. Omitted only
-    /// for a buy sized by quote_amount.
+    /// for a buy sized by quote_amount and a sell sized by quote_proceeds.
     ///
     /// Field 6: `quantity`
     #[serde(
@@ -13724,7 +14509,7 @@ pub struct OrderPreview {
     pub quantity: ::core::option::Option<::buffa::alloc::string::String>,
     /// A buy market order, or buy immediate-or-cancel limit order, sized by
     /// spend: the most quote asset it spends, an exact decimal string. Omitted
-    /// when quantity is set.
+    /// when quantity or quote_proceeds is set.
     ///
     /// Field 7: `quote_amount`
     #[serde(
@@ -13733,12 +14518,26 @@ pub struct OrderPreview {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub quote_amount: ::core::option::Option<::buffa::alloc::string::String>,
+    /// A sell market order, or sell immediate-or-cancel limit order, sized by
+    /// proceeds: it sells whole quantity steps until its proceeds before fees
+    /// reach this amount of quote asset, an exact decimal string, and never
+    /// receives more. The fee is charged in quote asset on those proceeds.
+    /// Omitted when quantity or quote_amount is set.
+    ///
+    /// Field 20: `quote_proceeds`
+    #[serde(
+        rename = "quoteProceeds",
+        alias = "quote_proceeds",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub quote_proceeds: ::core::option::Option<::buffa::alloc::string::String>,
     /// Estimated order value in the quote asset, a decimal string rounded to at
-    /// most 2 decimals. Valued at: quote_amount when set; a market order or TWAP
-    /// of market slices at reference_price; a limit order, ladder level or limit
+    /// most 2 decimals. Valued at: quote_amount or quote_proceeds when set; a
+    /// market order or TWAP of market slices at reference_price; a pegged limit
+    /// order at its current_price; a limit order, ladder level or limit
     /// slice at its price; a stop at its limit price, else its trigger price; a
     /// trailing stop at its limit price, else its activation price, else the last
-    /// price. Omitted when it cannot be estimated.
+    /// price. Omitted for an OCO, and when it cannot be estimated.
     ///
     /// Field 8: `estimated_value`
     #[serde(
@@ -13748,11 +14547,12 @@ pub struct OrderPreview {
     )]
     pub estimated_value: ::core::option::Option<::buffa::alloc::string::String>,
     /// What the exchange reserves on the trading account when it creates a
-    /// stop-loss, take-profit, trailing stop or ladder: an exact decimal string,
-    /// in the base asset for a sell, in the quote asset (fee reserve included)
-    /// for a buy. Omitted for market and limit orders, which reserve as they
-    /// are placed, and for a TWAP, whose slices each use what is available when
-    /// they are due.
+    /// stop-loss, take-profit, trailing stop, OCO or ladder: an exact decimal
+    /// string, in the base asset for a sell, in the quote asset (fee reserve
+    /// included) for a buy. Omitted for market and limit orders, which reserve as
+    /// they are placed, for a TWAP, whose slices each use what is available when
+    /// they are due, and for a buy OCO, whose reserve the exchange sets when it
+    /// creates it.
     ///
     /// Field 9: `reserved_amount`
     #[serde(
@@ -13762,9 +14562,10 @@ pub struct OrderPreview {
     )]
     pub reserved_amount: ::core::option::Option<::buffa::alloc::string::String>,
     /// The current market price to draw the order against: for a stop-loss,
-    /// take-profit or trailing stop the price it watches (last or index), for
-    /// the others the best ask for a buy or the best bid for a sell. Omitted
-    /// when the market has no such price.
+    /// take-profit, trailing stop or OCO the price it watches (last or index),
+    /// for a pegged limit order the book side it is pegged to, for the others
+    /// the best ask for a buy or the best bid for a sell. Omitted when the
+    /// market has no such price.
     ///
     /// Field 10: `reference_price`
     #[serde(
@@ -13801,6 +14602,7 @@ impl ::core::fmt::Debug for OrderPreview {
             .field("side", &self.side)
             .field("quantity", &self.quantity)
             .field("quote_amount", &self.quote_amount)
+            .field("quote_proceeds", &self.quote_proceeds)
             .field("estimated_value", &self.estimated_value)
             .field("reserved_amount", &self.reserved_amount)
             .field("reference_price", &self.reference_price)
@@ -13835,6 +14637,16 @@ impl OrderPreview {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.quote_amount = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::quote_proceeds`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_quote_proceeds(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.quote_proceeds = Some(value.into());
         self
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
@@ -13972,6 +14784,22 @@ impl ::buffa::Message for OrderPreview {
                         += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::order_preview::Kind::Oco(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::order_preview::Kind::PeggedLimit(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         for v in &self.relative_prices {
@@ -13981,6 +14809,9 @@ impl ::buffa::Message for OrderPreview {
             size
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
+        }
+        if let Some(ref v) = self.quote_proceeds {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -14084,11 +14915,30 @@ impl ::buffa::Message for OrderPreview {
                     );
                     x.write_to(__cache, buf);
                 }
+                __buffa::oneof::order_preview::Kind::Oco(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        19u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::order_preview::Kind::PeggedLimit(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        21u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
             }
         }
         for v in &self.relative_prices {
             ::buffa::types::put_len_delimited_header(18u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.quote_proceeds {
+            ::buffa::types::put_string_field(20u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -14337,6 +15187,46 @@ impl ::buffa::Message for OrderPreview {
                     );
                 }
             }
+            19u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::order_preview::Kind::Oco(ref mut existing),
+                ) = self.kind
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.kind = ::core::option::Option::Some(
+                        __buffa::oneof::order_preview::Kind::Oco(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::order_preview::Kind::PeggedLimit(ref mut existing),
+                ) = self.kind
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.kind = ::core::option::Option::Some(
+                        __buffa::oneof::order_preview::Kind::PeggedLimit(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
             18u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -14345,6 +15235,18 @@ impl ::buffa::Message for OrderPreview {
                 let mut elem = ::core::default::Default::default();
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.relative_prices.push(elem);
+            }
+            20u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .quote_proceeds
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -14366,6 +15268,7 @@ impl ::buffa::Message for OrderPreview {
         self.reference_price = ::buffa::MessageField::none();
         self.kind = ::core::option::Option::None;
         self.relative_prices.clear();
+        self.quote_proceeds = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -14410,6 +15313,9 @@ impl<'de> serde::Deserialize<'de> for OrderPreview {
                     ::core::option::Option<::buffa::alloc::string::String>,
                 > = None;
                 let mut __f_quote_amount: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
+                > = None;
+                let mut __f_quote_proceeds: ::core::option::Option<
                     ::core::option::Option<::buffa::alloc::string::String>,
                 > = None;
                 let mut __f_estimated_value: ::core::option::Option<
@@ -14528,6 +15434,14 @@ impl<'de> serde::Deserialize<'de> for OrderPreview {
                         }
                         "quoteAmount" | "quote_amount" => {
                             __f_quote_amount = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
+                                    >()?,
+                            );
+                        }
+                        "quoteProceeds" | "quote_proceeds" => {
+                            __f_quote_proceeds = Some(
                                 map
                                     .next_value::<
                                         ::core::option::Option<::buffa::alloc::string::String>,
@@ -14741,6 +15655,54 @@ impl<'de> serde::Deserialize<'de> for OrderPreview {
                                 );
                             }
                         }
+                        "oco" => {
+                            let v: ::core::option::Option<OcoPreview> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            OcoPreview,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_kind.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'kind'",
+                                        ),
+                                    );
+                                }
+                                __oneof_kind = Some(
+                                    __buffa::oneof::order_preview::Kind::Oco(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "peggedLimit" | "pegged_limit" => {
+                            let v: ::core::option::Option<PeggedLimitOrderPreview> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            PeggedLimitOrderPreview,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_kind.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'kind'",
+                                        ),
+                                    );
+                                }
+                                __oneof_kind = Some(
+                                    __buffa::oneof::order_preview::Kind::PeggedLimit(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
                         _ => {
                             map.next_value::<serde::de::IgnoredAny>()?;
                         }
@@ -14767,6 +15729,9 @@ impl<'de> serde::Deserialize<'de> for OrderPreview {
                 }
                 if let ::core::option::Option::Some(v) = __f_quote_amount {
                     __r.quote_amount = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_quote_proceeds {
+                    __r.quote_proceeds = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_estimated_value {
                     __r.estimated_value = v;
@@ -25305,6 +26270,17 @@ pub struct ListMessagesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub last_account: ::buffa::MessageField<ConversationAccount>,
+    /// What the conversation is about: the same as Conversation.subject, fixed
+    /// when the conversation started. Set on every page; omitted for a general
+    /// conversation. A client that opens a conversation by its ID learns from it
+    /// whether the conversation is about one of the caller's strategies.
+    ///
+    /// Field 4: `subject`
+    #[serde(
+        rename = "subject",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub subject: ::buffa::MessageField<Subject>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -25315,6 +26291,7 @@ impl ::core::fmt::Debug for ListMessagesResponse {
             .field("messages", &self.messages)
             .field("next_page_token", &self.next_page_token)
             .field("last_account", &self.last_account)
+            .field("subject", &self.subject)
             .finish()
     }
 }
@@ -25364,6 +26341,14 @@ impl ::buffa::Message for ListMessagesResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.subject.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.subject.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -25384,6 +26369,10 @@ impl ::buffa::Message for ListMessagesResponse {
         if self.last_account.is_set() {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             self.last_account.write_to(__cache, buf);
+        }
+        if self.subject.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.subject.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -25425,6 +26414,17 @@ impl ::buffa::Message for ListMessagesResponse {
                     ctx,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.subject.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -25436,6 +26436,7 @@ impl ::buffa::Message for ListMessagesResponse {
         self.messages.clear();
         self.next_page_token.clear();
         self.last_account = ::buffa::MessageField::none();
+        self.subject = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -44218,6 +45219,584 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// PeggedLimitOrderPreview is a limit order with a static peg: the exchange
+        /// takes its price once, when it accepts the order, from one side of the book
+        /// moved by a number of the pair's ticks, and never moves it with the book
+        /// after. It never carries attached exits.
+        #[derive(Clone, Debug, Default)]
+        pub struct PeggedLimitOrderPreviewView<'a> {
+            /// The book side the price is taken from: BEST_BID or BEST_ASK.
+            ///
+            /// Field 1: `reference`
+            pub reference: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::PegReference,
+            >,
+            /// Signed number of the pair's ticks added to that side's best price: 2 is
+            /// two ticks above it, -1 one tick below. Zero is the best price itself.
+            ///
+            /// Field 2: `offset_ticks`
+            pub offset_ticks: i64,
+            /// The pair's tick size, an exact decimal string in the quote asset.
+            ///
+            /// Field 3: `tick_size`
+            pub tick_size: &'a str,
+            /// The price the peg gives at reference_price, the side's best price when
+            /// the preview read it: an exact decimal string in the quote asset. The
+            /// exchange takes it again when it accepts the order, so the order's price
+            /// can differ.
+            ///
+            /// Field 4: `current_price`
+            pub current_price: &'a str,
+            /// The order's bound, an exact decimal string in the quote asset: the most
+            /// a buy pays or the least a sell takes. The exchange checks the order's
+            /// minimums, maximums and funds at it, and refuses the order when the
+            /// price the peg gives passes it. It is not the order's price.
+            ///
+            /// Field 5: `bound_price`
+            pub bound_price: &'a str,
+            /// GTC, GTD, IOC or FOK.
+            ///
+            /// Field 6: `time_in_force`
+            pub time_in_force: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TimeInForce,
+            >,
+            /// When a GTD order expires. Omitted for other times in force.
+            ///
+            /// Field 7: `expire_at`
+            pub expire_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// True when the order is refused instead of trading at once.
+            ///
+            /// Field 8: `post_only`
+            pub post_only: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PeggedLimitOrderPreviewView<'a> {
+            type Owned = super::super::PeggedLimitOrderPreview;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reference = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.offset_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.tick_size = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.current_price = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.bound_price = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.time_in_force = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expire_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expire_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PeggedLimitOrderPreview,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PeggedLimitOrderPreview,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PeggedLimitOrderPreview {
+                    reference: self.reference,
+                    offset_ticks: self.offset_ticks,
+                    tick_size: self.tick_size.to_string(),
+                    current_price: self.current_price.to_string(),
+                    bound_price: self.bound_price.to_string(),
+                    time_in_force: self.time_in_force,
+                    expire_at: match self.expire_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    post_only: self.post_only,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PeggedLimitOrderPreviewView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.reference.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.offset_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.offset_ticks)
+                                as u32;
+                }
+                if !self.tick_size.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.tick_size) as u32;
+                }
+                if !self.current_price.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.current_price)
+                                as u32;
+                }
+                if !self.bound_price.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.bound_price)
+                                as u32;
+                }
+                {
+                    let val = self.time_in_force.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.expire_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expire_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.post_only {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.reference.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.offset_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.offset_ticks, buf);
+                }
+                if !self.tick_size.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.tick_size, buf);
+                }
+                if !self.current_price.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.current_price, buf);
+                }
+                if !self.bound_price.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.bound_price, buf);
+                }
+                {
+                    let val = self.time_in_force.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(6u32, val, buf);
+                    }
+                }
+                if self.expire_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expire_at.write_to(__cache, buf);
+                }
+                if self.post_only {
+                    ::buffa::types::put_bool_field(8u32, self.post_only, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PeggedLimitOrderPreviewView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.reference,
+                ) {
+                    __map.serialize_entry("reference", &self.reference)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.offset_ticks) {
+                    __map
+                        .serialize_entry(
+                            "offsetTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.offset_ticks),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.tick_size) {
+                    __map.serialize_entry("tickSize", self.tick_size)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.current_price) {
+                    __map.serialize_entry("currentPrice", self.current_price)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.bound_price) {
+                    __map.serialize_entry("boundPrice", self.bound_price)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.time_in_force,
+                ) {
+                    __map.serialize_entry("timeInForce", &self.time_in_force)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.expire_at.as_option()
+                    {
+                        __map.serialize_entry("expireAt", __v)?;
+                    }
+                }
+                if self.post_only {
+                    __map.serialize_entry("postOnly", &self.post_only)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PeggedLimitOrderPreviewView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "PeggedLimitOrderPreview";
+            const FULL_NAME: &'static str = "ai.v1.PeggedLimitOrderPreview";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.PeggedLimitOrderPreview";
+        }
+        ::buffa::impl_default_view_instance!(PeggedLimitOrderPreviewView);
+        ::buffa::impl_view_reborrow!(PeggedLimitOrderPreviewView);
+        /** Self-contained, `'static` owned view of a `PeggedLimitOrderPreview` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PeggedLimitOrderPreviewView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PeggedLimitOrderPreviewView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PeggedLimitOrderPreviewOwnedView(
+            ::buffa::OwnedView<PeggedLimitOrderPreviewView<'static>>,
+        );
+        impl PeggedLimitOrderPreviewOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PeggedLimitOrderPreviewOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PeggedLimitOrderPreviewOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PeggedLimitOrderPreview,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PeggedLimitOrderPreviewOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PeggedLimitOrderPreviewView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PeggedLimitOrderPreviewView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PeggedLimitOrderPreview,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The book side the price is taken from: BEST_BID or BEST_ASK.
+            ///
+            /// Field 1: `reference`
+            #[must_use]
+            pub fn reference(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::PegReference,
+            > {
+                self.0.reborrow().reference
+            }
+            /// Signed number of the pair's ticks added to that side's best price: 2 is
+            /// two ticks above it, -1 one tick below. Zero is the best price itself.
+            ///
+            /// Field 2: `offset_ticks`
+            #[must_use]
+            pub fn offset_ticks(&self) -> i64 {
+                self.0.reborrow().offset_ticks
+            }
+            /// The pair's tick size, an exact decimal string in the quote asset.
+            ///
+            /// Field 3: `tick_size`
+            #[must_use]
+            pub fn tick_size(&self) -> &'_ str {
+                self.0.reborrow().tick_size
+            }
+            /// The price the peg gives at reference_price, the side's best price when
+            /// the preview read it: an exact decimal string in the quote asset. The
+            /// exchange takes it again when it accepts the order, so the order's price
+            /// can differ.
+            ///
+            /// Field 4: `current_price`
+            #[must_use]
+            pub fn current_price(&self) -> &'_ str {
+                self.0.reborrow().current_price
+            }
+            /// The order's bound, an exact decimal string in the quote asset: the most
+            /// a buy pays or the least a sell takes. The exchange checks the order's
+            /// minimums, maximums and funds at it, and refuses the order when the
+            /// price the peg gives passes it. It is not the order's price.
+            ///
+            /// Field 5: `bound_price`
+            #[must_use]
+            pub fn bound_price(&self) -> &'_ str {
+                self.0.reborrow().bound_price
+            }
+            /// GTC, GTD, IOC or FOK.
+            ///
+            /// Field 6: `time_in_force`
+            #[must_use]
+            pub fn time_in_force(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TimeInForce,
+            > {
+                self.0.reborrow().time_in_force
+            }
+            /// When a GTD order expires. Omitted for other times in force.
+            ///
+            /// Field 7: `expire_at`
+            #[must_use]
+            pub fn expire_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expire_at
+            }
+            /// True when the order is refused instead of trading at once.
+            ///
+            /// Field 8: `post_only`
+            #[must_use]
+            pub fn post_only(&self) -> bool {
+                self.0.reborrow().post_only
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PeggedLimitOrderPreviewView<'static>>,
+        > for PeggedLimitOrderPreviewOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PeggedLimitOrderPreviewView<'static>>,
+            ) -> Self {
+                PeggedLimitOrderPreviewOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PeggedLimitOrderPreviewOwnedView>
+        for ::buffa::OwnedView<PeggedLimitOrderPreviewView<'static>> {
+            fn from(wrapper: PeggedLimitOrderPreviewOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PeggedLimitOrderPreviewView<'static>>,
+        > for PeggedLimitOrderPreviewOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PeggedLimitOrderPreviewView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PeggedLimitOrderPreview {
+            type View<'a> = PeggedLimitOrderPreviewView<'a>;
+            type ViewHandle = PeggedLimitOrderPreviewOwnedView;
+        }
+        impl ::serde::Serialize for PeggedLimitOrderPreviewOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// StopOrderPreview is a stop-loss or take-profit: it places a market or limit
         /// order once the watched price reaches the trigger price.
         #[derive(Clone, Debug, Default)]
@@ -46565,6 +48144,810 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// OcoLegPreview is one leg of an OCO: once the watched price reaches its
+        /// trigger price, it places its order for the OCO's whole remaining quantity.
+        #[derive(Clone, Debug, Default)]
+        pub struct OcoLegPreviewView<'a> {
+            /// The price that fires the leg, an exact decimal string in the quote asset.
+            ///
+            /// Field 1: `trigger_price`
+            pub trigger_price: &'a str,
+            /// The price it watches: LAST_PRICE or INDEX_PRICE.
+            ///
+            /// Field 2: `trigger_price_source`
+            pub trigger_price_source: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            >,
+            /// Which way the watched price must move to reach trigger_price.
+            ///
+            /// Field 3: `direction`
+            pub direction: ::buffa::EnumValue<super::super::TriggerDirection>,
+            /// The limit price of the good-till-canceled order it places, an exact
+            /// decimal string in the quote asset. Omitted when it places a market order.
+            ///
+            /// Field 4: `limit_price`
+            pub limit_price: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OcoLegPreviewView<'a> {
+            type Owned = super::super::OcoLegPreview;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.trigger_price = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.direction = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.limit_price = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OcoLegPreview,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::OcoLegPreview,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OcoLegPreview {
+                    trigger_price: self.trigger_price.to_string(),
+                    trigger_price_source: self.trigger_price_source,
+                    direction: self.direction,
+                    limit_price: self.limit_price.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OcoLegPreviewView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.trigger_price.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.trigger_price)
+                                as u32;
+                }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.direction.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if let Some(ref v) = self.limit_price {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.trigger_price.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.trigger_price, buf);
+                }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.direction.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if let Some(ref v) = self.limit_price {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OcoLegPreviewView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.trigger_price) {
+                    __map.serialize_entry("triggerPrice", self.trigger_price)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.trigger_price_source,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceSource",
+                            &self.trigger_price_source,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.direction,
+                ) {
+                    __map.serialize_entry("direction", &self.direction)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.limit_price {
+                    __map.serialize_entry("limitPrice", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OcoLegPreviewView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "OcoLegPreview";
+            const FULL_NAME: &'static str = "ai.v1.OcoLegPreview";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.OcoLegPreview";
+        }
+        ::buffa::impl_default_view_instance!(OcoLegPreviewView);
+        ::buffa::impl_view_reborrow!(OcoLegPreviewView);
+        /** Self-contained, `'static` owned view of a `OcoLegPreview` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OcoLegPreviewView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OcoLegPreviewView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OcoLegPreviewOwnedView(
+            ::buffa::OwnedView<OcoLegPreviewView<'static>>,
+        );
+        impl OcoLegPreviewOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoLegPreviewOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoLegPreviewOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OcoLegPreview,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoLegPreviewOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OcoLegPreviewView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OcoLegPreviewView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OcoLegPreview,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The price that fires the leg, an exact decimal string in the quote asset.
+            ///
+            /// Field 1: `trigger_price`
+            #[must_use]
+            pub fn trigger_price(&self) -> &'_ str {
+                self.0.reborrow().trigger_price
+            }
+            /// The price it watches: LAST_PRICE or INDEX_PRICE.
+            ///
+            /// Field 2: `trigger_price_source`
+            #[must_use]
+            pub fn trigger_price_source(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            > {
+                self.0.reborrow().trigger_price_source
+            }
+            /// Which way the watched price must move to reach trigger_price.
+            ///
+            /// Field 3: `direction`
+            #[must_use]
+            pub fn direction(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::TriggerDirection> {
+                self.0.reborrow().direction
+            }
+            /// The limit price of the good-till-canceled order it places, an exact
+            /// decimal string in the quote asset. Omitted when it places a market order.
+            ///
+            /// Field 4: `limit_price`
+            #[must_use]
+            pub fn limit_price(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().limit_price
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OcoLegPreviewView<'static>>>
+        for OcoLegPreviewOwnedView {
+            fn from(inner: ::buffa::OwnedView<OcoLegPreviewView<'static>>) -> Self {
+                OcoLegPreviewOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OcoLegPreviewOwnedView>
+        for ::buffa::OwnedView<OcoLegPreviewView<'static>> {
+            fn from(wrapper: OcoLegPreviewOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OcoLegPreviewView<'static>>>
+        for OcoLegPreviewOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OcoLegPreviewView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OcoLegPreview {
+            type View<'a> = OcoLegPreviewView<'a>;
+            type ViewHandle = OcoLegPreviewOwnedView;
+        }
+        impl ::serde::Serialize for OcoLegPreviewOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// OcoPreview is an OCO (one-cancels-the-other): a take-profit and a stop-loss
+        /// that both trade the order's side for its whole quantity. A sell OCO sells
+        /// base asset the account already holds: its take-profit fires when the price
+        /// rises to its trigger price, its stop-loss when it falls to its own. A buy
+        /// OCO buys the quantity of base asset with quote asset the account already
+        /// holds, the other way round. Creating it reserves funds once, and both legs
+        /// share them: a sell reserves the quantity of base asset, a buy the quote
+        /// asset needed to buy the quantity, as the exchange computes it. Cancelling
+        /// either leg cancels both.
+        #[derive(Clone, Debug, Default)]
+        pub struct OcoPreviewView<'a> {
+            /// The take-profit leg.
+            ///
+            /// Field 1: `take_profit`
+            pub take_profit: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegPreviewView<'a>,
+            >,
+            /// The stop-loss leg.
+            ///
+            /// Field 2: `stop_loss`
+            pub stop_loss: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegPreviewView<'a>,
+            >,
+            /// The asset creating the OCO reserves once for both legs: the base asset for
+            /// a sell, the quote asset for a buy. OrderPreview.reserved_amount states the
+            /// amount when it is set.
+            ///
+            /// Field 3: `reserved_asset`
+            pub reserved_asset: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OcoPreviewView<'a> {
+            type Owned = super::super::OcoPreview;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.take_profit.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.take_profit = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OcoLegPreviewView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.stop_loss.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.stop_loss = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OcoLegPreviewView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.reserved_asset = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::OcoPreview, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::OcoPreview, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OcoPreview {
+                    take_profit: match self.take_profit.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OcoLegPreview,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    stop_loss: match self.stop_loss.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OcoLegPreview,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    reserved_asset: self.reserved_asset.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OcoPreviewView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.take_profit.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.take_profit.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.stop_loss.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.stop_loss.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.reserved_asset.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.reserved_asset)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.take_profit.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.take_profit.write_to(__cache, buf);
+                }
+                if self.stop_loss.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.stop_loss.write_to(__cache, buf);
+                }
+                if !self.reserved_asset.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.reserved_asset, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OcoPreviewView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .take_profit
+                        .as_option()
+                    {
+                        __map.serialize_entry("takeProfit", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.stop_loss.as_option()
+                    {
+                        __map.serialize_entry("stopLoss", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.reserved_asset) {
+                    __map.serialize_entry("reservedAsset", self.reserved_asset)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OcoPreviewView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "OcoPreview";
+            const FULL_NAME: &'static str = "ai.v1.OcoPreview";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.OcoPreview";
+        }
+        ::buffa::impl_default_view_instance!(OcoPreviewView);
+        ::buffa::impl_view_reborrow!(OcoPreviewView);
+        /** Self-contained, `'static` owned view of a `OcoPreview` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OcoPreviewView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OcoPreviewView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OcoPreviewOwnedView(::buffa::OwnedView<OcoPreviewView<'static>>);
+        impl OcoPreviewOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoPreviewOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoPreviewOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OcoPreview,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoPreviewOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OcoPreviewView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OcoPreviewView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::OcoPreview, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The take-profit leg.
+            ///
+            /// Field 1: `take_profit`
+            #[must_use]
+            pub fn take_profit(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegPreviewView<'_>,
+            > {
+                &self.0.reborrow().take_profit
+            }
+            /// The stop-loss leg.
+            ///
+            /// Field 2: `stop_loss`
+            #[must_use]
+            pub fn stop_loss(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegPreviewView<'_>,
+            > {
+                &self.0.reborrow().stop_loss
+            }
+            /// The asset creating the OCO reserves once for both legs: the base asset for
+            /// a sell, the quote asset for a buy. OrderPreview.reserved_amount states the
+            /// amount when it is set.
+            ///
+            /// Field 3: `reserved_asset`
+            #[must_use]
+            pub fn reserved_asset(&self) -> &'_ str {
+                self.0.reborrow().reserved_asset
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OcoPreviewView<'static>>>
+        for OcoPreviewOwnedView {
+            fn from(inner: ::buffa::OwnedView<OcoPreviewView<'static>>) -> Self {
+                OcoPreviewOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OcoPreviewOwnedView>
+        for ::buffa::OwnedView<OcoPreviewView<'static>> {
+            fn from(wrapper: OcoPreviewOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OcoPreviewView<'static>>>
+        for OcoPreviewOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OcoPreviewView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OcoPreview {
+            type View<'a> = OcoPreviewView<'a>;
+            type ViewHandle = OcoPreviewOwnedView;
+        }
+        impl ::serde::Serialize for OcoPreviewOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// OrderPreview is the exact order an approval places, as typed values to
         /// draw it: a TWAP's slices on a timeline, a ladder's levels on a price axis,
         /// a stop's trigger price against the current price. It is computed from the
@@ -46595,38 +48978,49 @@ pub mod __buffa {
             /// Field 5: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
             /// Total quantity, an exact decimal string in the base asset. Omitted only
-            /// for a buy sized by quote_amount.
+            /// for a buy sized by quote_amount and a sell sized by quote_proceeds.
             ///
             /// Field 6: `quantity`
             pub quantity: ::core::option::Option<&'a str>,
             /// A buy market order, or buy immediate-or-cancel limit order, sized by
             /// spend: the most quote asset it spends, an exact decimal string. Omitted
-            /// when quantity is set.
+            /// when quantity or quote_proceeds is set.
             ///
             /// Field 7: `quote_amount`
             pub quote_amount: ::core::option::Option<&'a str>,
+            /// A sell market order, or sell immediate-or-cancel limit order, sized by
+            /// proceeds: it sells whole quantity steps until its proceeds before fees
+            /// reach this amount of quote asset, an exact decimal string, and never
+            /// receives more. The fee is charged in quote asset on those proceeds.
+            /// Omitted when quantity or quote_amount is set.
+            ///
+            /// Field 20: `quote_proceeds`
+            pub quote_proceeds: ::core::option::Option<&'a str>,
             /// Estimated order value in the quote asset, a decimal string rounded to at
-            /// most 2 decimals. Valued at: quote_amount when set; a market order or TWAP
-            /// of market slices at reference_price; a limit order, ladder level or limit
+            /// most 2 decimals. Valued at: quote_amount or quote_proceeds when set; a
+            /// market order or TWAP of market slices at reference_price; a pegged limit
+            /// order at its current_price; a limit order, ladder level or limit
             /// slice at its price; a stop at its limit price, else its trigger price; a
             /// trailing stop at its limit price, else its activation price, else the last
-            /// price. Omitted when it cannot be estimated.
+            /// price. Omitted for an OCO, and when it cannot be estimated.
             ///
             /// Field 8: `estimated_value`
             pub estimated_value: ::core::option::Option<&'a str>,
             /// What the exchange reserves on the trading account when it creates a
-            /// stop-loss, take-profit, trailing stop or ladder: an exact decimal string,
-            /// in the base asset for a sell, in the quote asset (fee reserve included)
-            /// for a buy. Omitted for market and limit orders, which reserve as they
-            /// are placed, and for a TWAP, whose slices each use what is available when
-            /// they are due.
+            /// stop-loss, take-profit, trailing stop, OCO or ladder: an exact decimal
+            /// string, in the base asset for a sell, in the quote asset (fee reserve
+            /// included) for a buy. Omitted for market and limit orders, which reserve as
+            /// they are placed, for a TWAP, whose slices each use what is available when
+            /// they are due, and for a buy OCO, whose reserve the exchange sets when it
+            /// creates it.
             ///
             /// Field 9: `reserved_amount`
             pub reserved_amount: ::core::option::Option<&'a str>,
             /// The current market price to draw the order against: for a stop-loss,
-            /// take-profit or trailing stop the price it watches (last or index), for
-            /// the others the best ask for a buy or the best bid for a sell. Omitted
-            /// when the market has no such price.
+            /// take-profit, trailing stop or OCO the price it watches (last or index),
+            /// for a pegged limit order the book side it is pegged to, for the others
+            /// the best ask for a buy or the best bid for a sell. Omitted when the
+            /// market has no such price.
             ///
             /// Field 10: `reference_price`
             pub reference_price: ::buffa::MessageFieldView<
@@ -46727,6 +49121,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.quote_amount = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    20u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_proceeds = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
                     }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -47003,6 +49406,68 @@ pub mod __buffa {
                             );
                         }
                     }
+                    19u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::order_preview::Kind::Oco(
+                                ref mut existing,
+                            ),
+                        ) = view.kind
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.kind = Some(
+                                super::super::__buffa::view::oneof::order_preview::Kind::Oco(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::OcoPreviewView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::order_preview::Kind::PeggedLimit(
+                                ref mut existing,
+                            ),
+                        ) = view.kind
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.kind = Some(
+                                super::super::__buffa::view::oneof::order_preview::Kind::PeggedLimit(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::PeggedLimitOrderPreviewView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -47039,6 +49504,7 @@ pub mod __buffa {
                     side: self.side,
                     quantity: self.quantity.map(|s| s.to_string()),
                     quote_amount: self.quote_amount.map(|s| s.to_string()),
+                    quote_proceeds: self.quote_proceeds.map(|s| s.to_string()),
                     estimated_value: self.estimated_value.map(|s| s.to_string()),
                     reserved_amount: self.reserved_amount.map(|s| s.to_string()),
                     reference_price: match self.reference_price.as_option() {
@@ -47116,6 +49582,24 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::order_preview::Kind::Ladder(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::order_preview::Kind::Oco(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::order_preview::Kind::Oco(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::order_preview::Kind::PeggedLimit(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::order_preview::Kind::PeggedLimit(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -47260,6 +49744,26 @@ pub mod __buffa {
                                 += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::order_preview::Kind::Oco(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::order_preview::Kind::PeggedLimit(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 for v in &self.relative_prices {
@@ -47269,6 +49773,9 @@ pub mod __buffa {
                     size
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
+                }
+                if let Some(ref v) = self.quote_proceeds {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -47391,6 +49898,26 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::order_preview::Kind::Oco(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                19u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::order_preview::Kind::PeggedLimit(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                21u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 for v in &self.relative_prices {
@@ -47400,6 +49927,9 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.quote_proceeds {
+                    ::buffa::types::put_string_field(20u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -47446,6 +49976,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.quote_amount {
                     __map.serialize_entry("quoteAmount", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.quote_proceeds {
+                    __map.serialize_entry("quoteProceeds", __v)?;
                 }
                 if let ::core::option::Option::Some(__v) = self.estimated_value {
                     __map.serialize_entry("estimatedValue", __v)?;
@@ -47500,6 +50033,16 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("ladder", v)?;
+                        }
+                        super::super::__buffa::view::oneof::order_preview::Kind::Oco(
+                            v,
+                        ) => {
+                            __map.serialize_entry("oco", v)?;
+                        }
+                        super::super::__buffa::view::oneof::order_preview::Kind::PeggedLimit(
+                            v,
+                        ) => {
+                            __map.serialize_entry("peggedLimit", v)?;
                         }
                     }
                 }
@@ -47635,7 +50178,7 @@ pub mod __buffa {
                 self.0.reborrow().side
             }
             /// Total quantity, an exact decimal string in the base asset. Omitted only
-            /// for a buy sized by quote_amount.
+            /// for a buy sized by quote_amount and a sell sized by quote_proceeds.
             ///
             /// Field 6: `quantity`
             #[must_use]
@@ -47644,19 +50187,31 @@ pub mod __buffa {
             }
             /// A buy market order, or buy immediate-or-cancel limit order, sized by
             /// spend: the most quote asset it spends, an exact decimal string. Omitted
-            /// when quantity is set.
+            /// when quantity or quote_proceeds is set.
             ///
             /// Field 7: `quote_amount`
             #[must_use]
             pub fn quote_amount(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().quote_amount
             }
+            /// A sell market order, or sell immediate-or-cancel limit order, sized by
+            /// proceeds: it sells whole quantity steps until its proceeds before fees
+            /// reach this amount of quote asset, an exact decimal string, and never
+            /// receives more. The fee is charged in quote asset on those proceeds.
+            /// Omitted when quantity or quote_amount is set.
+            ///
+            /// Field 20: `quote_proceeds`
+            #[must_use]
+            pub fn quote_proceeds(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().quote_proceeds
+            }
             /// Estimated order value in the quote asset, a decimal string rounded to at
-            /// most 2 decimals. Valued at: quote_amount when set; a market order or TWAP
-            /// of market slices at reference_price; a limit order, ladder level or limit
+            /// most 2 decimals. Valued at: quote_amount or quote_proceeds when set; a
+            /// market order or TWAP of market slices at reference_price; a pegged limit
+            /// order at its current_price; a limit order, ladder level or limit
             /// slice at its price; a stop at its limit price, else its trigger price; a
             /// trailing stop at its limit price, else its activation price, else the last
-            /// price. Omitted when it cannot be estimated.
+            /// price. Omitted for an OCO, and when it cannot be estimated.
             ///
             /// Field 8: `estimated_value`
             #[must_use]
@@ -47664,11 +50219,12 @@ pub mod __buffa {
                 self.0.reborrow().estimated_value
             }
             /// What the exchange reserves on the trading account when it creates a
-            /// stop-loss, take-profit, trailing stop or ladder: an exact decimal string,
-            /// in the base asset for a sell, in the quote asset (fee reserve included)
-            /// for a buy. Omitted for market and limit orders, which reserve as they
-            /// are placed, and for a TWAP, whose slices each use what is available when
-            /// they are due.
+            /// stop-loss, take-profit, trailing stop, OCO or ladder: an exact decimal
+            /// string, in the base asset for a sell, in the quote asset (fee reserve
+            /// included) for a buy. Omitted for market and limit orders, which reserve as
+            /// they are placed, for a TWAP, whose slices each use what is available when
+            /// they are due, and for a buy OCO, whose reserve the exchange sets when it
+            /// creates it.
             ///
             /// Field 9: `reserved_amount`
             #[must_use]
@@ -47676,9 +50232,10 @@ pub mod __buffa {
                 self.0.reborrow().reserved_amount
             }
             /// The current market price to draw the order against: for a stop-loss,
-            /// take-profit or trailing stop the price it watches (last or index), for
-            /// the others the best ask for a buy or the best bid for a sell. Omitted
-            /// when the market has no such price.
+            /// take-profit, trailing stop or OCO the price it watches (last or index),
+            /// for a pegged limit order the book side it is pegged to, for the others
+            /// the best ask for a buy or the best bid for a sell. Omitted when the
+            /// market has no such price.
             ///
             /// Field 10: `reference_price`
             #[must_use]
@@ -64027,6 +66584,15 @@ pub mod __buffa {
             pub last_account: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ConversationAccountView<'a>,
             >,
+            /// What the conversation is about: the same as Conversation.subject, fixed
+            /// when the conversation started. Set on every page; omitted for a general
+            /// conversation. A client that opens a conversation by its ID learns from it
+            /// whether the conversation is about one of the caller's strategies.
+            ///
+            /// Field 4: `subject`
+            pub subject: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SubjectView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListMessagesResponseView<'a> {
@@ -64092,6 +66658,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.subject.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.subject = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SubjectView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -64150,6 +66741,14 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    subject: match self.subject.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Subject,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -64186,6 +66785,14 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.subject.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.subject.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -64215,6 +66822,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.last_account.write_to(__cache, buf);
+                }
+                if self.subject.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.subject.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -64249,6 +66864,11 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("lastAccount", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.subject.as_option() {
+                        __map.serialize_entry("subject", __v)?;
                     }
                 }
                 __map.end()
@@ -64379,6 +66999,20 @@ pub mod __buffa {
                 super::super::__buffa::view::ConversationAccountView<'_>,
             > {
                 &self.0.reborrow().last_account
+            }
+            /// What the conversation is about: the same as Conversation.subject, fixed
+            /// when the conversation started. Set on every page; omitted for a general
+            /// conversation. A client that opens a conversation by its ID learns from it
+            /// whether the conversation is about one of the caller's strategies.
+            ///
+            /// Field 4: `subject`
+            #[must_use]
+            pub fn subject(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::SubjectView<'_>,
+            > {
+                &self.0.reborrow().subject
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ListMessagesResponseView<'static>>>
@@ -72526,6 +75160,18 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    Oco(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::OcoPreviewView<'a>,
+                        >,
+                    ),
+                    PeggedLimit(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::PeggedLimitOrderPreviewView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod trigger_settings {
@@ -73064,6 +75710,12 @@ pub mod __buffa {
                 ),
                 Twap(::buffa::alloc::boxed::Box<super::super::super::TwapPreview>),
                 Ladder(::buffa::alloc::boxed::Box<super::super::super::LadderPreview>),
+                Oco(::buffa::alloc::boxed::Box<super::super::super::OcoPreview>),
+                PeggedLimit(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::PeggedLimitOrderPreview,
+                    >,
+                ),
             }
             impl ::buffa::Oneof for Kind {}
             impl From<super::super::super::MarketOrderPreview> for Kind {
@@ -73121,6 +75773,27 @@ pub mod __buffa {
                     Self::Some(Kind::from(v))
                 }
             }
+            impl From<super::super::super::OcoPreview> for Kind {
+                fn from(v: super::super::super::OcoPreview) -> Self {
+                    Self::Oco(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::OcoPreview> for ::core::option::Option<Kind> {
+                fn from(v: super::super::super::OcoPreview) -> Self {
+                    Self::Some(Kind::from(v))
+                }
+            }
+            impl From<super::super::super::PeggedLimitOrderPreview> for Kind {
+                fn from(v: super::super::super::PeggedLimitOrderPreview) -> Self {
+                    Self::PeggedLimit(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::PeggedLimitOrderPreview>
+            for ::core::option::Option<Kind> {
+                fn from(v: super::super::super::PeggedLimitOrderPreview) -> Self {
+                    Self::Some(Kind::from(v))
+                }
+            }
             impl serde::Serialize for Kind {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -73149,6 +75822,12 @@ pub mod __buffa {
                         }
                         Self::Ladder(v) => {
                             map.serialize_entry("ladder", v)?;
+                        }
+                        Self::Oco(v) => {
+                            map.serialize_entry("oco", v)?;
+                        }
+                        Self::PeggedLimit(v) => {
+                            map.serialize_entry("peggedLimit", v)?;
                         }
                     }
                     map.end()
@@ -73759,11 +76438,14 @@ pub mod __buffa {
         reg.register_json_any(super::__ATTACHED_EXITS_JSON_ANY);
         reg.register_json_any(super::__MARKET_ORDER_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__LIMIT_ORDER_PREVIEW_JSON_ANY);
+        reg.register_json_any(super::__PEGGED_LIMIT_ORDER_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__STOP_ORDER_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__TRAILING_STOP_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__TWAP_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__LADDER_LEVEL_JSON_ANY);
         reg.register_json_any(super::__LADDER_PREVIEW_JSON_ANY);
+        reg.register_json_any(super::__OCO_LEG_PREVIEW_JSON_ANY);
+        reg.register_json_any(super::__OCO_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__ORDER_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__QUOTE_VALUE_JSON_ANY);
         reg.register_json_any(super::__PLACE_ORDERS_PREVIEW_JSON_ANY);
@@ -73987,6 +76669,10 @@ pub use self::__buffa::view::LimitOrderPreviewView;
 #[doc(inline)]
 pub use self::__buffa::view::LimitOrderPreviewOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::PeggedLimitOrderPreviewView;
+#[doc(inline)]
+pub use self::__buffa::view::PeggedLimitOrderPreviewOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::StopOrderPreviewView;
 #[doc(inline)]
 pub use self::__buffa::view::StopOrderPreviewOwnedView;
@@ -74006,6 +76692,14 @@ pub use self::__buffa::view::LadderLevelOwnedView;
 pub use self::__buffa::view::LadderPreviewView;
 #[doc(inline)]
 pub use self::__buffa::view::LadderPreviewOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OcoLegPreviewView;
+#[doc(inline)]
+pub use self::__buffa::view::OcoLegPreviewOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OcoPreviewView;
+#[doc(inline)]
+pub use self::__buffa::view::OcoPreviewOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::OrderPreviewView;
 #[doc(inline)]

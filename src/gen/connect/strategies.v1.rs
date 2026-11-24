@@ -238,6 +238,48 @@ pub type OwnedStopBotRequestView = ::buffa::view::OwnedView<
 pub type OwnedStopBotResponseView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::StopBotResponseView<'static>,
 >;
+///Shorthand for `OwnedView<PublishStrategyVersionRequestView<'static>>`.
+pub type OwnedPublishStrategyVersionRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PublishStrategyVersionResponseView<'static>>`.
+pub type OwnedPublishStrategyVersionResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UnpublishStrategyRequestView<'static>>`.
+pub type OwnedUnpublishStrategyRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::UnpublishStrategyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UnpublishStrategyResponseView<'static>>`.
+pub type OwnedUnpublishStrategyResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::UnpublishStrategyResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListCommunityStrategiesRequestView<'static>>`.
+pub type OwnedListCommunityStrategiesRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListCommunityStrategiesResponseView<'static>>`.
+pub type OwnedListCommunityStrategiesResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetCommunityStrategyRequestView<'static>>`.
+pub type OwnedGetCommunityStrategyRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetCommunityStrategyResponseView<'static>>`.
+pub type OwnedGetCommunityStrategyResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::strategies::v1::GetStrategyReferenceResponse>
 for crate::proto::strategies::v1::__buffa::view::GetStrategyReferenceResponseView<'_> {
     fn encode(
@@ -812,6 +854,102 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::PublishStrategyVersionResponse,
+>
+for crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::PublishStrategyVersionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::UnpublishStrategyResponse>
+for crate::proto::strategies::v1::__buffa::view::UnpublishStrategyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::UnpublishStrategyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::UnpublishStrategyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::ListCommunityStrategiesResponse,
+>
+for crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::ListCommunityStrategiesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::GetCommunityStrategyResponse>
+for crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::GetCommunityStrategyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const STRATEGIES_SERVICE_SERVICE_NAME: &str = "strategies.v1.StrategiesService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetStrategyReference` RPC.
@@ -1066,6 +1204,42 @@ pub const STRATEGIES_SERVICE_STOP_BOT_SPEC: ::connectrpc::Spec = ::connectrpc::S
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `PublishStrategyVersion` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_PUBLISH_STRATEGY_VERSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/PublishStrategyVersion",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `UnpublishStrategy` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_UNPUBLISH_STRATEGY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/UnpublishStrategy",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListCommunityStrategies` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_LIST_COMMUNITY_STRATEGIES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/ListCommunityStrategies",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetCommunityStrategy` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_GET_COMMUNITY_STRATEGY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/GetCommunityStrategy",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// StrategiesService writes, tests and proposes the caller's trading bots and
 /// reads them. Bots belong to the caller's main account, and each runs on its
 /// own subaccount, created when the user deploys it. No call moves money,
@@ -1080,8 +1254,11 @@ pub const STRATEGIES_SERVICE_STOP_BOT_SPEC: ::connectrpc::Spec = ::connectrpc::S
 /// save, rename and delete strategies and test versions, PROPOSE_STRATEGY_DEPLOY to
 /// propose deploys, STOP_STRATEGIES to stop bots. An API key scoped to a subaccount is refused
 /// (PERMISSION_DENIED, AUTH_API_KEY_ACCESS_DENIED) even when its policy grants
-/// the permission. GetStrategyReference and ListStrategyTemplates need no
-/// credentials. A session a connected app holds on the user's behalf makes
+/// the permission. GetStrategyReference, ListStrategyTemplates,
+/// ListCommunityStrategies and GetCommunityStrategy need no credentials.
+/// PublishStrategyVersion and UnpublishStrategy take the user's own session:
+/// publishing makes a strategy's code public, so only the user does it, on
+/// the website. A session a connected app holds on the user's behalf makes
 /// the reads with the account:read scope, and creates, saves, renames and
 /// deletes strategies, tests versions, proposes deploys and stops bots with
 /// strategies:manage; a call outside the session's scopes refuses it
@@ -1406,10 +1583,12 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// DeleteStrategy deletes one strategy of the caller and its revisions. It
     /// is refused while the strategy is in use: while a bot deployed from it
     /// hasn't stopped, whether deployed from one of its proposals or running
-    /// one of its revisions' versions, and while a deploy proposal of it has
-    /// neither expired, failed nor been deployed. Deleting never stops a bot. Proposals
-    /// of the strategy stay, and show no strategy once it is deleted. A version
-    /// only the strategy's revisions kept then expires like any other.
+    /// one of its revisions' versions, while a deploy proposal of it has
+    /// neither expired, failed nor been deployed, and while its community
+    /// listing is public. Deleting never stops a bot. Proposals of the strategy
+    /// stay, and show no strategy once it is deleted. Its unpublished listing
+    /// stays unpublished, with the versions it published. A version only the
+    /// strategy's revisions kept then expires like any other.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request.
     /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
@@ -1817,6 +1996,9 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// is, and answers its status; it never starts a second bot. A step that
     /// fails ends the deploy as FAILED, answered as a status, not an error:
     /// failure says why and what to do.
+    /// Once the bot's limits are set, the call waits up to about 20 seconds for
+    /// the exchange to apply the bot's limits, then answers SETTING_ACCESS:
+    /// call again.
     /// A deploy that creates a subaccount needs the user's signed
     /// authorization: request a challenge with CreateSubaccountChallenge, have
     /// the user sign it, and pass it as subaccount_authorization.
@@ -2133,6 +2315,146 @@ pub trait StrategiesService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::strategies::v1::StopBotResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// PublishStrategyVersion publishes one version of one of the caller's
+    /// strategies as the strategy's community listing, with its title,
+    /// description and types: its code, manifest and settings form become
+    /// readable by everyone, its settings shown at their defaults. A strategy
+    /// has one listing; publishing again shows the new version and makes an
+    /// unpublished listing public again. The version must be one of the
+    /// strategy's revisions' versions, valid, with every behaviour example
+    /// passing. Each publish starts the platform backtest of the version
+    /// (CommunityBacktest), whose results the listing shows once it finishes;
+    /// a bot that can't be backtested on candles is published without
+    /// results. An account has at most 20 public listings and publishes at
+    /// most 20 times per UTC day. Publishing shows the author by username.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
+    /// an unknown one; VERSION_NOT_FOUND when no revision of the strategy
+    /// saved the version.
+    /// - FAILED_PRECONDITION: VERSION_INVALID; SCENARIOS_FAILING;
+    /// WINDOW_HAS_NO_DATA when the default window holds no market data;
+    /// USERNAME_REQUIRED; LISTING_CAP_REACHED, listing_cap gives the cap;
+    /// PUBLISH_LIMIT_REACHED, retry_after says when the day resets.
+    /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original publish stands.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
+    /// - PERMISSION_DENIED: AUTH_SESSION_KIND_NOT_ALLOWED for an API key or a
+    /// session a connected app holds on the user's behalf.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn publish_strategy_version<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::PublishStrategyVersionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::PublishStrategyVersionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// UnpublishStrategy unpublishes one of the caller's community listings: it
+    /// leaves the list, and GetCommunityStrategy answers LISTING_NOT_FOUND. The
+    /// author's next publish makes it public again. Copies other users already
+    /// made stay theirs. Unpublishing an unpublished listing changes nothing.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: LISTING_NOT_FOUND, for another account's listing as for an
+    /// unknown one.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
+    /// - PERMISSION_DENIED: AUTH_SESSION_KIND_NOT_ALLOWED for an API key or a
+    /// session a connected app holds on the user's behalf.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn unpublish_strategy<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::UnpublishStrategyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::UnpublishStrategyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListCommunityStrategies lists the public community listings, most
+    /// recently published first, optionally only those of some types or
+    /// trading some markets.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request or page token.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_community_strategies<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::ListCommunityStrategiesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::ListCommunityStrategiesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetCommunityStrategy reads one public community listing: its title,
+    /// description, types, markets and author, and its published version's
+    /// code, manifest, settings form, money rules, flow and platform backtest.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: LISTING_NOT_FOUND, for an unpublished listing as for an
+    /// unknown one.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_community_strategy<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::GetCommunityStrategyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::GetCommunityStrategyResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2980,6 +3302,122 @@ impl<S: StrategiesService> StrategiesServiceExt for S {
                 },
             )
             .with_spec(STRATEGIES_SERVICE_STOP_BOT_SPEC)
+            .route_view(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "PublishStrategyVersion",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::PublishStrategyVersionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.publish_strategy_version(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::PublishStrategyVersionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_PUBLISH_STRATEGY_VERSION_SPEC)
+            .route_view(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "UnpublishStrategy",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::UnpublishStrategyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::UnpublishStrategyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.unpublish_strategy(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::UnpublishStrategyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_UNPUBLISH_STRATEGY_SPEC)
+            .route_view_idempotent(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListCommunityStrategies",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::ListCommunityStrategiesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_community_strategies(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::ListCommunityStrategiesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_LIST_COMMUNITY_STRATEGIES_SPEC)
+            .route_view_idempotent(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "GetCommunityStrategy",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::GetCommunityStrategyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_community_strategy(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::GetCommunityStrategyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_GET_COMMUNITY_STRATEGY_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -3200,6 +3638,30 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(STRATEGIES_SERVICE_STOP_BOT_SPEC),
+                )
+            }
+            "PublishStrategyVersion" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STRATEGIES_SERVICE_PUBLISH_STRATEGY_VERSION_SPEC),
+                )
+            }
+            "UnpublishStrategy" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STRATEGIES_SERVICE_UNPUBLISH_STRATEGY_SPEC),
+                )
+            }
+            "ListCommunityStrategies" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(STRATEGIES_SERVICE_LIST_COMMUNITY_STRATEGIES_SPEC),
+                )
+            }
+            "GetCommunityStrategy" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(STRATEGIES_SERVICE_GET_COMMUNITY_STRATEGY_SPEC),
                 )
             }
             _ => None,
@@ -3797,6 +4259,90 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                     svc.stop_bot(ctx, req)
                         .await?
                         .encode::<crate::proto::strategies::v1::StopBotResponse>(format)
+                })
+            }
+            "PublishStrategyVersion" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::PublishStrategyVersionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::PublishStrategyVersionRequest,
+                    >::from_parts(&req, &body);
+                    svc.publish_strategy_version(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::PublishStrategyVersionResponse,
+                        >(format)
+                })
+            }
+            "UnpublishStrategy" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::UnpublishStrategyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::UnpublishStrategyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::UnpublishStrategyRequest,
+                    >::from_parts(&req, &body);
+                    svc.unpublish_strategy(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::UnpublishStrategyResponse,
+                        >(format)
+                })
+            }
+            "ListCommunityStrategies" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::ListCommunityStrategiesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::ListCommunityStrategiesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_community_strategies(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::ListCommunityStrategiesResponse,
+                        >(format)
+                })
+            }
+            "GetCommunityStrategy" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::GetCommunityStrategyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::GetCommunityStrategyRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_community_strategy(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::GetCommunityStrategyResponse,
+                        >(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -5142,6 +5688,186 @@ where
                 &self.config,
                 STRATEGIES_SERVICE_SERVICE_NAME,
                 "StopBot",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the PublishStrategyVersion RPC. Sends a request to /strategies.v1.StrategiesService/PublishStrategyVersion.
+    pub async fn publish_strategy_version(
+        &self,
+        request: crate::proto::strategies::v1::PublishStrategyVersionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.publish_strategy_version_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PublishStrategyVersion RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn publish_strategy_version_with_options(
+        &self,
+        request: crate::proto::strategies::v1::PublishStrategyVersionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::PublishStrategyVersionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "PublishStrategyVersion",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UnpublishStrategy RPC. Sends a request to /strategies.v1.StrategiesService/UnpublishStrategy.
+    pub async fn unpublish_strategy(
+        &self,
+        request: crate::proto::strategies::v1::UnpublishStrategyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::UnpublishStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.unpublish_strategy_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UnpublishStrategy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn unpublish_strategy_with_options(
+        &self,
+        request: crate::proto::strategies::v1::UnpublishStrategyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::UnpublishStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "UnpublishStrategy",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListCommunityStrategies RPC. Sends a request to /strategies.v1.StrategiesService/ListCommunityStrategies.
+    pub async fn list_community_strategies(
+        &self,
+        request: crate::proto::strategies::v1::ListCommunityStrategiesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_community_strategies_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListCommunityStrategies RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_community_strategies_with_options(
+        &self,
+        request: crate::proto::strategies::v1::ListCommunityStrategiesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ListCommunityStrategies",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetCommunityStrategy RPC. Sends a request to /strategies.v1.StrategiesService/GetCommunityStrategy.
+    pub async fn get_community_strategy(
+        &self,
+        request: crate::proto::strategies::v1::GetCommunityStrategyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_community_strategy_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetCommunityStrategy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_community_strategy_with_options(
+        &self,
+        request: crate::proto::strategies::v1::GetCommunityStrategyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::GetCommunityStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "GetCommunityStrategy",
                 request,
                 options,
             )

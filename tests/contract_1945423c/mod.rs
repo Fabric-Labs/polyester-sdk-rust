@@ -1430,6 +1430,59 @@ async fn route_suspended_withdrawal_is_final() {
     }
 }
 
+/// `DESTINATION_SWAP_DEPOSIT_ADDRESS` is a final refusal over ConnectRPC and
+/// REST: not retryable and not an unknown outcome.
+#[tokio::test]
+async fn swap_deposit_address_destination_is_final() {
+    use polyester::proto::chain::withdraw::v1::{ErrorCode, ErrorDetail};
+    let connect = connect_error(
+        "invalid_argument",
+        "chain.withdraw.v1.ErrorDetail",
+        ErrorDetail {
+            code: ErrorCode::ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS.into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    );
+    let rest = || {
+        let body = json!({"code": "DESTINATION_SWAP_DEPOSIT_ADDRESS", "status": 400, "detail": "swap deposit address"})
+            .to_string();
+        HttpScript::Raw {
+            status: 400,
+            headers: vec![
+                ("Content-Type".into(), "application/problem+json".into()),
+                ("Content-Length".into(), body.len().to_string()),
+            ],
+            body: body.into_bytes(),
+        }
+    };
+    let connect = Arc::new(Mutex::new(Some(connect)));
+    for shape in ["connect", "rest"] {
+        let script = if shape == "connect" {
+            connect.lock().unwrap().take().unwrap()
+        } else {
+            rest()
+        };
+        let script = Arc::new(Mutex::new(Some(script)));
+        let (client, _) = server(move |_| {
+            script
+                .lock()
+                .unwrap()
+                .take()
+                .unwrap_or(HttpScript::NotFound)
+        })
+        .await;
+        let err = client.auth.me().await.unwrap_err();
+        assert!(
+            err.is_withdraw_destination_swap_deposit_address(),
+            "{shape}: {err:?}"
+        );
+        assert!(!err.is_retryable(), "{shape}: {err:?}");
+        assert!(!err.mutation_outcome_unknown(), "{shape}: {err:?}");
+        assert!(!err.is_withdraw_route_suspended());
+    }
+}
+
 /// Dust and statement export refusals are classified by their retry rule:
 /// only `DUST_BUSY` is retried; the window, daily and export limits are
 /// final although they are `resource_exhausted`.

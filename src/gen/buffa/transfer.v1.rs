@@ -3535,7 +3535,8 @@ pub const __BATCH_CREATE_INTERNAL_TRANSFERS_RESPONSE_JSON_ANY: ::buffa::type_reg
     is_wkt: false,
 };
 /// GetInternalTransferBatchRequest selects a batch by the request ID
-/// BatchCreateInternalTransfers returned.
+/// BatchCreateInternalTransfers returned, or by the idempotency key the caller
+/// sent it.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3550,6 +3551,19 @@ pub struct GetInternalTransferBatchRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
+    /// Idempotency key the caller sent to BatchCreateInternalTransfers, scoped
+    /// to the authenticated caller as that request scoped it: the session's
+    /// account, or the API key. Reads the batch's stored outcome when its answer
+    /// was lost.
+    ///
+    /// Field 2: `idempotency_key`
+    #[serde(
+        rename = "idempotencyKey",
+        alias = "idempotency_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub idempotency_key: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3558,6 +3572,7 @@ impl ::core::fmt::Debug for GetInternalTransferBatchRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetInternalTransferBatchRequest")
             .field("request_id", &self.request_id)
+            .field("idempotency_key", &self.idempotency_key)
             .finish()
     }
 }
@@ -3589,6 +3604,11 @@ impl ::buffa::Message for GetInternalTransferBatchRequest {
         if !self.request_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
         }
+        if !self.idempotency_key.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3601,6 +3621,9 @@ impl ::buffa::Message for GetInternalTransferBatchRequest {
         use ::buffa::Enumeration as _;
         if !self.request_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        if !self.idempotency_key.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3622,6 +3645,13 @@ impl ::buffa::Message for GetInternalTransferBatchRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.request_id, buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3631,6 +3661,7 @@ impl ::buffa::Message for GetInternalTransferBatchRequest {
     }
     fn clear(&mut self) {
         self.request_id.clear();
+        self.idempotency_key.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -11713,13 +11744,21 @@ pub mod __buffa {
             }
         }
         /// GetInternalTransferBatchRequest selects a batch by the request ID
-        /// BatchCreateInternalTransfers returned.
+        /// BatchCreateInternalTransfers returned, or by the idempotency key the caller
+        /// sent it.
         #[derive(Clone, Debug, Default)]
         pub struct GetInternalTransferBatchRequestView<'a> {
             /// Batch request ID returned by BatchCreateInternalTransfers.
             ///
             /// Field 1: `request_id`
             pub request_id: &'a str,
+            /// Idempotency key the caller sent to BatchCreateInternalTransfers, scoped
+            /// to the authenticated caller as that request scoped it: the session's
+            /// account, or the API key. Reads the batch's stored outcome when its answer
+            /// was lost.
+            ///
+            /// Field 2: `idempotency_key`
+            pub idempotency_key: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetInternalTransferBatchRequestView<'a> {
@@ -11760,6 +11799,13 @@ pub mod __buffa {
                         )?;
                         view.request_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -11790,6 +11836,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetInternalTransferBatchRequest {
                     request_id: self.request_id.to_string(),
+                    idempotency_key: self.idempotency_key.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -11810,6 +11857,12 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.request_id)
                                 as u32;
                 }
+                if !self.idempotency_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.idempotency_key)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -11823,6 +11876,9 @@ pub mod __buffa {
                 use ::buffa::Enumeration as _;
                 if !self.request_id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                if !self.idempotency_key.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -11847,6 +11903,9 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
                     __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
+                    __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
                 }
                 __map.end()
             }
@@ -11954,6 +12013,16 @@ pub mod __buffa {
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
+            }
+            /// Idempotency key the caller sent to BatchCreateInternalTransfers, scoped
+            /// to the authenticated caller as that request scoped it: the session's
+            /// account, or the API key. Reads the batch's stored outcome when its answer
+            /// was lost.
+            ///
+            /// Field 2: `idempotency_key`
+            #[must_use]
+            pub fn idempotency_key(&self) -> &'_ str {
+                self.0.reborrow().idempotency_key
             }
         }
         impl ::core::convert::From<
