@@ -10513,6 +10513,138 @@ pub const __GET_PRICE_BAND_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<GetPriceBandResponse>,
     is_wkt: false,
 };
+/// ErrorDetail is attached to a ConnectRPC error the caller can correct:
+/// BAD_REQUEST, INVALID_ARGUMENT, UNKNOWN_SYMBOL, NOT_FOUND and
+/// PAGE_TOKEN_INVALID. The error message is the stable error code; branch on
+/// it. Other errors carry no ErrorDetail.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ErrorDetail {
+    /// Why the request was refused, for display, for example "timeframe SEC_1
+    /// has no index price candles". For PAGE_TOKEN_INVALID it tells a malformed
+    /// page_token ("bad page_token") from one issued for another request
+    /// ("page_token does not match request"); either way, request the first
+    /// page again. The wording can change: never branch on it.
+    ///
+    /// Field 1: `reason`
+    #[serde(
+        rename = "reason",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub reason: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ErrorDetail {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ErrorDetail").field("reason", &self.reason).finish()
+    }
+}
+impl ErrorDetail {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.ErrorDetail";
+}
+::buffa::impl_default_instance!(ErrorDetail);
+impl ::buffa::MessageName for ErrorDetail {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "ErrorDetail";
+    const FULL_NAME: &'static str = "marketdata.v1.ErrorDetail";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.ErrorDetail";
+}
+impl ::buffa::Message for ErrorDetail {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.reason.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.reason) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.reason.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.reason, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.reason, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.reason.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ErrorDetail {
+    const PROTO_FQN: &'static str = "marketdata.v1.ErrorDetail";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ErrorDetail {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ERROR_DETAIL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.ErrorDetail",
+    to_json: ::buffa::type_registry::any_to_json::<ErrorDetail>,
+    from_json: ::buffa::type_registry::any_from_json::<ErrorDetail>,
+    is_wkt: false,
+};
 /// HeatmapInterval controls bucket resolution for historical orderbook heatmap.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -29056,6 +29188,283 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// ErrorDetail is attached to a ConnectRPC error the caller can correct:
+        /// BAD_REQUEST, INVALID_ARGUMENT, UNKNOWN_SYMBOL, NOT_FOUND and
+        /// PAGE_TOKEN_INVALID. The error message is the stable error code; branch on
+        /// it. Other errors carry no ErrorDetail.
+        #[derive(Clone, Debug, Default)]
+        pub struct ErrorDetailView<'a> {
+            /// Why the request was refused, for display, for example "timeframe SEC_1
+            /// has no index price candles". For PAGE_TOKEN_INVALID it tells a malformed
+            /// page_token ("bad page_token") from one issued for another request
+            /// ("page_token does not match request"); either way, request the first
+            /// page again. The wording can change: never branch on it.
+            ///
+            /// Field 1: `reason`
+            pub reason: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
+            type Owned = super::super::ErrorDetail;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.reason = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ErrorDetail,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ErrorDetail,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ErrorDetail {
+                    reason: self.reason.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ErrorDetailView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.reason.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.reason) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.reason.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.reason, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ErrorDetailView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.reason) {
+                    __map.serialize_entry("reason", self.reason)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ErrorDetailView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "ErrorDetail";
+            const FULL_NAME: &'static str = "marketdata.v1.ErrorDetail";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.ErrorDetail";
+        }
+        ::buffa::impl_default_view_instance!(ErrorDetailView);
+        ::buffa::impl_view_reborrow!(ErrorDetailView);
+        /** Self-contained, `'static` owned view of a `ErrorDetail` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ErrorDetailView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ErrorDetailView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ErrorDetailOwnedView(::buffa::OwnedView<ErrorDetailView<'static>>);
+        impl ErrorDetailOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ErrorDetailOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ErrorDetailOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ErrorDetail,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ErrorDetailOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ErrorDetailView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ErrorDetailView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ErrorDetail,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Why the request was refused, for display, for example "timeframe SEC_1
+            /// has no index price candles". For PAGE_TOKEN_INVALID it tells a malformed
+            /// page_token ("bad page_token") from one issued for another request
+            /// ("page_token does not match request"); either way, request the first
+            /// page again. The wording can change: never branch on it.
+            ///
+            /// Field 1: `reason`
+            #[must_use]
+            pub fn reason(&self) -> &'_ str {
+                self.0.reborrow().reason
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
+        for ErrorDetailOwnedView {
+            fn from(inner: ::buffa::OwnedView<ErrorDetailView<'static>>) -> Self {
+                ErrorDetailOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ErrorDetailOwnedView>
+        for ::buffa::OwnedView<ErrorDetailView<'static>> {
+            fn from(wrapper: ErrorDetailOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ErrorDetailView<'static>>>
+        for ErrorDetailOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ErrorDetailView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ErrorDetail {
+            type View<'a> = ErrorDetailView<'a>;
+            type ViewHandle = ErrorDetailOwnedView;
+        }
+        impl ::serde::Serialize for ErrorDetailOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// HeatmapTimeRange selects historical buckets by \[start_time, end_time\] (UTC).
         /// At least one bound is required.
         #[derive(Clone, Debug, Default)]
@@ -33706,6 +34115,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIVE_PRICE_BAND_JSON_ANY);
         reg.register_json_any(super::__GET_PRICE_BAND_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_PRICE_BAND_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__HEATMAP_TIME_RANGE_JSON_ANY);
         reg.register_json_any(super::__GET_ORDERBOOK_HEATMAP_REQUEST_JSON_ANY);
         reg.register_json_any(super::__HEATMAP_LEVELS_JSON_ANY);
@@ -33837,6 +34247,10 @@ pub use self::__buffa::view::GetPriceBandRequestOwnedView;
 pub use self::__buffa::view::GetPriceBandResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetPriceBandResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ErrorDetailView;
+#[doc(inline)]
+pub use self::__buffa::view::ErrorDetailOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::HeatmapTimeRangeView;
 #[doc(inline)]

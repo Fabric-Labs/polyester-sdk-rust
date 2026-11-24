@@ -590,9 +590,17 @@ pub trait TriggersService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// List triggers for a sub-account with optional filters. Costs one unit of
-    /// the account's trading read limit per 100 rows the limit asks for,
-    /// rounded up.
+    /// List triggers for a sub-account with optional filters. A list shows every
+    /// trigger request acknowledged before it, including a trigger that ended
+    /// right after its create. While one of them is temporarily unreadable, the
+    /// call fails with a retryable UNAVAILABLE rather than omitting the trigger
+    /// or returning a stale state; retry the same request. An ended trigger
+    /// stays listable for at least 24 hours after it ends. A list whose status
+    /// filter names live statuses only (CREATED, ARMED, RUNNING, PAUSED) never
+    /// reads ended-trigger history and is the cheapest to serve. To track
+    /// triggers, follow realtime trigger updates and use ListTriggers to
+    /// recover and reconcile, not to poll. Costs one unit of the account's
+    /// trading read limit per 100 rows the limit asks for, rounded up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
