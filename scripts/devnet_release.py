@@ -350,10 +350,25 @@ def stamp_python(root: Path, version: str) -> list[Path]:
     if count != 1:
         raise ReleaseError(f"expected one __version__ in {package}, found {count}")
     package.write_text(stamped, encoding="utf-8")
+    stamped_paths = [pyproject, package]
+    # The single-file request builders (pure.py) carry the version too, as an
+    # indented _VERSION inside their factory function; keep that indent.
+    pure = package.with_name("pure.py")
+    if pure.exists():
+        stamped, count = re.subn(
+            r'^([ \t]*)_VERSION\s*=\s*"[^"]*"[ \t]*$',
+            lambda match: f'{match.group(1)}_VERSION = "{version}"',
+            pure.read_text(encoding="utf-8"),
+            flags=re.MULTILINE,
+        )
+        if count != 1:
+            raise ReleaseError(f"expected one _VERSION in {pure}, found {count}")
+        pure.write_text(stamped, encoding="utf-8")
+        stamped_paths.append(pure)
     with pyproject.open("rb") as handle:
         if tomllib.load(handle)["project"]["version"] != version:
             raise ReleaseError("pyproject.toml does not read back the stamped version")
-    return [pyproject, package]
+    return stamped_paths
 
 
 def stamp_rust(root: Path, version: str) -> list[Path]:
@@ -524,7 +539,33 @@ def go_query(home: Path, env: dict[str, str], query: str) -> str:
     probe = home / "probe"
     probe.mkdir(exist_ok=True)
     result = run(["go", "list", "-m", "-json", query], cwd=probe, env=env)
-    return str(json.loads(result.stdout)["Version"])
+    return go_module_version(result.stdout, query)
+
+
+def go_module_version(stdout: str, query: str) -> str:
+    """The Version in the module document `go list -m -json <query>` printed.
+
+    -json output is a stream of JSON values, one per listed module. The go on
+    PATH can be a launcher (a version-manager shim) that writes its own JSON
+    log lines to the same stdout before it runs the toolchain, so this decodes
+    the whole stream and keeps the one document for the queried module path.
+    Output that is not a JSON stream still fails. Errors here are ValueError,
+    not ReleaseError, which published() reads as "this version is not there".
+    """
+    decoder = json.JSONDecoder()
+    values: list[object] = []
+    rest = stdout.lstrip()
+    while rest:
+        value, end = decoder.raw_decode(rest)
+        values.append(value)
+        rest = rest[end:].lstrip()
+    path = query.partition("@")[0]
+    modules = [value for value in values if isinstance(value, dict) and value.get("Path") == path]
+    if len(modules) != 1:
+        raise ValueError(
+            f"go list -m -json {query} printed {len(modules)} documents for {path}:\n{stdout}"
+        )
+    return str(modules[0]["Version"])
 
 
 def verify_go(root: Path, version: str, sha: str) -> list[str]:

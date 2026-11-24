@@ -326,6 +326,99 @@ class VerifyGoTest(unittest.TestCase):
         with self.assertRaisesRegex(dr.ReleaseError, "already exists"):
             dr.verify_go(self.repo, self.version, self.sha)
 
+    def test_a_launcher_logging_to_stdout_does_not_break_resolution(self) -> None:
+        run_git(self.repo, "tag", f"v{self.version}", self.sha)
+        real_go = shutil.which("go")
+        assert real_go
+        launcher = Path(self.tmp.name) / "launcher"
+        launcher.mkdir()
+        write_executable(
+            launcher / "go", f"#!/bin/sh\necho '{LAUNCHER_LINE}'\nexec '{real_go}' \"$@\"\n"
+        )
+        with mock.patch.dict(os.environ, {"PATH": f"{launcher}{os.pathsep}{os.environ['PATH']}"}):
+            lines = dr.verify_go(self.repo, self.version, self.sha)
+        self.assertTrue(lines[0].endswith(f"-> v{self.version}"))
+        self.assertTrue(lines[1].endswith("@latest -> v0.34.0"))
+
+
+# What a version-manager shim in front of go printed to stdout, verbatim,
+# before the toolchain's own -json document.
+LAUNCHER_LINE = (
+    '{"type":"message","message":"Detected an AI agent environment, printing as NDJSON. '
+    'Trace logs are written to stderr, while user-facing logs are written to stdout."}'
+)
+
+
+def go_document(path: str, version: str) -> str:
+    # The go command indents -json output with tabs.
+    return json.dumps({"Path": path, "Version": version, "GoVersion": "1.22"}, indent="\t") + "\n"
+
+
+def write_executable(path: Path, text: str) -> None:
+    path.write_text(text)
+    path.chmod(0o755)
+
+
+class GoQueryTest(unittest.TestCase):
+    """go_query reads the module document out of go list -m -json stdout."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name)
+        self.bin = self.home / "bin"
+        self.bin.mkdir()
+        write_executable(self.bin / "go", '#!/bin/sh\ncat "$(dirname "$0")/stdout"\n')
+        path = mock.patch.dict(os.environ, {"PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"})
+        path.start()
+        self.addCleanup(path.stop)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def query(self, stdout: str, query: str) -> str:
+        (self.bin / "stdout").write_text(stdout)
+        return dr.go_query(self.home, dr.go_env(self.home, {}), query)
+
+    def test_launcher_log_line_before_the_document(self) -> None:
+        stdout = LAUNCHER_LINE + "\n" + go_document("github.com/example/sdk", "v0.34.0")
+        with self.assertRaisesRegex(json.JSONDecodeError, "Extra data"):
+            json.loads(stdout)
+        self.assertEqual(self.query(stdout, "github.com/example/sdk@latest"), "v0.34.0")
+
+    def test_plain_document(self) -> None:
+        stdout = go_document("github.com/example/sdk", "v0.34.1-devnet.20261117093000")
+        self.assertEqual(
+            self.query(stdout, "github.com/example/sdk@v0.34.1-devnet.20261117093000"),
+            "v0.34.1-devnet.20261117093000",
+        )
+
+    def test_picks_the_queried_module_from_a_stream(self) -> None:
+        stdout = go_document("github.com/example/other", "v9.0.0") + go_document(
+            "github.com/example/sdk", "v0.34.0"
+        )
+        self.assertEqual(self.query(stdout, "github.com/example/sdk@latest"), "v0.34.0")
+
+    def test_text_that_is_not_json_fails(self) -> None:
+        notice = "go: downloading go1.27.4 (linux/amd64)\n"
+        stdout = notice + go_document("github.com/example/sdk", "v0.34.0")
+        with self.assertRaises(json.JSONDecodeError):
+            self.query(stdout, "github.com/example/sdk@latest")
+
+    def test_no_or_several_module_documents_fail(self) -> None:
+        with self.assertRaisesRegex(ValueError, "printed 0 documents"):
+            self.query(LAUNCHER_LINE + "\n", "github.com/example/sdk@latest")
+        document = go_document("github.com/example/sdk", "v0.34.0")
+        with self.assertRaisesRegex(ValueError, "printed 2 documents"):
+            self.query(document + document, "github.com/example/sdk@latest")
+
+    def test_unreadable_output_is_not_read_as_unpublished(self) -> None:
+        root = self.home / "repo"
+        root.mkdir()
+        (root / "go.mod").write_text("module github.com/example/sdk\n\ngo 1.22\n")
+        (self.bin / "stdout").write_text(LAUNCHER_LINE + "\n")
+        with self.assertRaisesRegex(ValueError, "printed 0 documents"):
+            dr.published(root, "go", "0.34.0")
+
 
 class StampTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -353,6 +446,62 @@ class StampTest(unittest.TestCase):
         self.assertIn(
             '__version__ = "0.35.0.dev20261117093000"', (package / "_version.py").read_text()
         )
+
+    @unittest.skipUnless(ECOSYSTEM == "python", "Python package manifest")
+    def test_stamp_python_stamps_the_single_file_builders_when_present(self) -> None:
+        shutil.copy(ROOT / "pyproject.toml", self.dir)
+        package = self.dir / dr.python_package_dir(ROOT)
+        package.mkdir(parents=True)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "_version.py", package)
+        self.assertEqual(len(dr.stamp_python(self.dir, "0.35.0.dev1")), 2)
+        (package / "pure.py").write_text('"""Doc."""\n\n_VERSION = "0.1.0"\n_OTHER = "0.1.0"\n')
+        stamped = dr.stamp_python(self.dir, "0.35.0.dev20261117093000")
+        self.assertEqual(stamped[-1], package / "pure.py")
+        self.assertEqual(
+            (package / "pure.py").read_text(),
+            '"""Doc."""\n\n_VERSION = "0.35.0.dev20261117093000"\n_OTHER = "0.1.0"\n',
+        )
+        (package / "pure.py").write_text("_OTHER = 1\n")
+        with self.assertRaisesRegex(dr.ReleaseError, "expected one _VERSION"):
+            dr.stamp_python(self.dir, "0.35.0.dev1")
+
+    @unittest.skipUnless(ECOSYSTEM == "python", "Python package manifest")
+    def test_stamp_python_keeps_the_indent_of_a_nested_version(self) -> None:
+        shutil.copy(ROOT / "pyproject.toml", self.dir)
+        package = self.dir / dr.python_package_dir(ROOT)
+        package.mkdir(parents=True)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "_version.py", package)
+        (package / "pure.py").write_text(
+            'def polyester():\n  import re\n\n  _VERSION = "0.1.0"\n  _OTHER = "0.1.0"\n'
+        )
+        dr.stamp_python(self.dir, "0.35.0.dev20261117093000")
+        self.assertEqual(
+            (package / "pure.py").read_text(),
+            'def polyester():\n  import re\n\n  _VERSION = "0.35.0.dev20261117093000"\n'
+            '  _OTHER = "0.1.0"\n',
+        )
+        (package / "pure.py").write_text('_VERSION = "0.1.0"\n\ndef f():\n  _VERSION = "0.1.0"\n')
+        with self.assertRaisesRegex(dr.ReleaseError, "expected one _VERSION .*found 2"):
+            dr.stamp_python(self.dir, "0.35.0.dev1")
+
+    @unittest.skipUnless(ECOSYSTEM == "python", "Python package manifest")
+    def test_stamp_python_stamps_the_real_single_file_builders(self) -> None:
+        shutil.copy(ROOT / "pyproject.toml", self.dir)
+        package = self.dir / dr.python_package_dir(ROOT)
+        package.mkdir(parents=True)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "_version.py", package)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "pure.py", package)
+        before = (package / "pure.py").read_text().splitlines()
+        version = "0.35.0.dev20261117093000"
+        self.assertEqual(dr.stamp_python(self.dir, version)[-1], package / "pure.py")
+        after = (package / "pure.py").read_text().splitlines()
+        [(old, new)] = [(a, b) for a, b in zip(before, after, strict=True) if a != b]
+        self.assertEqual(new, f'{old.split("_VERSION")[0]}_VERSION = "{version}"')
+        spec = importlib.util.spec_from_file_location("stamped_pure", package / "pure.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.polyester.VERSION, version)
 
     @unittest.skipUnless(ECOSYSTEM == "rust", "Rust package manifest")
     def test_stamp_rust_changes_manifest_and_own_lock_entry(self) -> None:
