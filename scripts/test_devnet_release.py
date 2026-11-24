@@ -326,6 +326,99 @@ class VerifyGoTest(unittest.TestCase):
         with self.assertRaisesRegex(dr.ReleaseError, "already exists"):
             dr.verify_go(self.repo, self.version, self.sha)
 
+    def test_a_launcher_logging_to_stdout_does_not_break_resolution(self) -> None:
+        run_git(self.repo, "tag", f"v{self.version}", self.sha)
+        real_go = shutil.which("go")
+        assert real_go
+        launcher = Path(self.tmp.name) / "launcher"
+        launcher.mkdir()
+        write_executable(
+            launcher / "go", f"#!/bin/sh\necho '{LAUNCHER_LINE}'\nexec '{real_go}' \"$@\"\n"
+        )
+        with mock.patch.dict(os.environ, {"PATH": f"{launcher}{os.pathsep}{os.environ['PATH']}"}):
+            lines = dr.verify_go(self.repo, self.version, self.sha)
+        self.assertTrue(lines[0].endswith(f"-> v{self.version}"))
+        self.assertTrue(lines[1].endswith("@latest -> v0.34.0"))
+
+
+# What a version-manager shim in front of go printed to stdout, verbatim,
+# before the toolchain's own -json document.
+LAUNCHER_LINE = (
+    '{"type":"message","message":"Detected an AI agent environment, printing as NDJSON. '
+    'Trace logs are written to stderr, while user-facing logs are written to stdout."}'
+)
+
+
+def go_document(path: str, version: str) -> str:
+    # The go command indents -json output with tabs.
+    return json.dumps({"Path": path, "Version": version, "GoVersion": "1.22"}, indent="\t") + "\n"
+
+
+def write_executable(path: Path, text: str) -> None:
+    path.write_text(text)
+    path.chmod(0o755)
+
+
+class GoQueryTest(unittest.TestCase):
+    """go_query reads the module document out of go list -m -json stdout."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name)
+        self.bin = self.home / "bin"
+        self.bin.mkdir()
+        write_executable(self.bin / "go", '#!/bin/sh\ncat "$(dirname "$0")/stdout"\n')
+        path = mock.patch.dict(os.environ, {"PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"})
+        path.start()
+        self.addCleanup(path.stop)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def query(self, stdout: str, query: str) -> str:
+        (self.bin / "stdout").write_text(stdout)
+        return dr.go_query(self.home, dr.go_env(self.home, {}), query)
+
+    def test_launcher_log_line_before_the_document(self) -> None:
+        stdout = LAUNCHER_LINE + "\n" + go_document("github.com/example/sdk", "v0.34.0")
+        with self.assertRaisesRegex(json.JSONDecodeError, "Extra data"):
+            json.loads(stdout)
+        self.assertEqual(self.query(stdout, "github.com/example/sdk@latest"), "v0.34.0")
+
+    def test_plain_document(self) -> None:
+        stdout = go_document("github.com/example/sdk", "v0.34.1-devnet.20261117093000")
+        self.assertEqual(
+            self.query(stdout, "github.com/example/sdk@v0.34.1-devnet.20261117093000"),
+            "v0.34.1-devnet.20261117093000",
+        )
+
+    def test_picks_the_queried_module_from_a_stream(self) -> None:
+        stdout = go_document("github.com/example/other", "v9.0.0") + go_document(
+            "github.com/example/sdk", "v0.34.0"
+        )
+        self.assertEqual(self.query(stdout, "github.com/example/sdk@latest"), "v0.34.0")
+
+    def test_text_that_is_not_json_fails(self) -> None:
+        notice = "go: downloading go1.27.4 (linux/amd64)\n"
+        stdout = notice + go_document("github.com/example/sdk", "v0.34.0")
+        with self.assertRaises(json.JSONDecodeError):
+            self.query(stdout, "github.com/example/sdk@latest")
+
+    def test_no_or_several_module_documents_fail(self) -> None:
+        with self.assertRaisesRegex(ValueError, "printed 0 documents"):
+            self.query(LAUNCHER_LINE + "\n", "github.com/example/sdk@latest")
+        document = go_document("github.com/example/sdk", "v0.34.0")
+        with self.assertRaisesRegex(ValueError, "printed 2 documents"):
+            self.query(document + document, "github.com/example/sdk@latest")
+
+    def test_unreadable_output_is_not_read_as_unpublished(self) -> None:
+        root = self.home / "repo"
+        root.mkdir()
+        (root / "go.mod").write_text("module github.com/example/sdk\n\ngo 1.22\n")
+        (self.bin / "stdout").write_text(LAUNCHER_LINE + "\n")
+        with self.assertRaisesRegex(ValueError, "printed 0 documents"):
+            dr.published(root, "go", "0.34.0")
+
 
 class StampTest(unittest.TestCase):
     def setUp(self) -> None:
