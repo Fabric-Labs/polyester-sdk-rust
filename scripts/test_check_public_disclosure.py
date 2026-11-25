@@ -88,38 +88,76 @@ class TicketReferenceTest(unittest.TestCase):
             "/// " + "zip" + "-9: keep the memo",
         )
 
-    def test_refuses_a_merge_request_in_prose(self) -> None:
-        self.assert_refused(
-            "# fixed by " + MR,
-            "// fixed by " + MR + ".",
-            "/// See " + MR + " for the history.",
-            "//! " + MR + ": keep the order",
-            "# " + MR,
+    def test_refuses_a_merge_request_in_markdown_prose(self) -> None:
+        for line in (
+            "Fixed by " + MR + ".",
+            "Fixed by " + MR,
+            "Fixed (" + MR + ").",
+            "Fixed: " + MR,
             MR + " moved this check here.",
-            "  * landed in " + MR,
+            "- " + MR + ": keep the order",
             "Reverted " + MR + " and " + "!" + "4538.",
+            "| " + MR + " | merged |",
+        ):
+            with self.subTest(line=line):
+                failures = self.check({"docs/guide.md": f"# Guide\n\n{line}\n".encode()})
+                self.assertEqual(
+                    failures, ["docs/guide.md:3: contains an internal tracker reference"]
+                )
+
+    def test_accepts_a_merge_request_number_in_markdown_code(self) -> None:
+        guide = "\n".join(
+            (
+                "# Guide",
+                "Use `!" + "4537` or ``a ` !" + "4537`` inline.",
+                "```rust",
+                "const COMPLEMENT: i64 = !" + "1024;",
+                "Fixed (" + MR + ").",
+                "```",
+                "~~~~",
+                "Fixed: " + MR,
+                "```",
+                "still code: " + MR,
+                "~~~~",
+                "   ```",
+                "    !" + "1024, // clear this bit",
+                "   ```",
+                "Back in prose.",
+            )
+        )
+        self.assertEqual(self.check({"docs/guide.md": (guide + "\n").encode()}), [])
+        # Prose after a closed fence is checked again.
+        after = guide + "\nFixed: " + MR + "\n"
+        self.assertEqual(
+            self.check({"docs/guide.md": after.encode()}),
+            ["docs/guide.md:16: contains an internal tracker reference"],
         )
 
-    def test_accepts_a_unary_operator_on_a_number(self) -> None:
-        self.assert_accepted(
+    def test_never_checks_source_for_a_merge_request_number(self) -> None:
+        # "!" and digits are code in source files, comments included: only
+        # Markdown prose is checked for a merge request number.
+        lines = (
+            "const MASKS: [i64; 2] = [",
+            "    !" + "1024, // clear this bit",
+            "    !" + "2048, // clear this bit",
+            "];",
             "const COMPLEMENT: i64 = !" + "1024;",
             "let mask = !" + "1024 & bits;",
             "let mask = bits & !" + "1024;",
             "    | !" + "1024,",
             "call(a, !" + "1024)",
-            "call( !" + "1024)",
-            "let pair = [ !" + "1024, !" + "2048];",
             "Foo { mask: !" + "1024 }",
             "match x { _ => !" + "1024 }",
             "    return !" + "1024;",
-            "    break !" + "1024;",
             "if !" + "1024 == x {}",
-            "match !" + "1024 { _ => () }",
             "let r = &mut !" + "1024;",
-            "0.. !" + "1024",
             "/// let mask = !" + "1024;",
-            "x !" + "= 1024",
+            "// " + MR + " moved this check here.",
         )
+        for name in ("src/bits.rs", "src/bits.py", "bits.go", "Cargo.toml"):
+            with self.subTest(name=name):
+                content = ("\n".join(lines) + "\n").encode()
+                self.assertEqual(self.check({name: content}), [])
 
     def test_ignores_generated_code_and_binary_files(self) -> None:
         generated = cpd.GENERATED_PREFIXES[0] + "orders/v1/orders.txt"
@@ -156,6 +194,8 @@ class TicketReferenceTest(unittest.TestCase):
             "if a != 100 and not b: pass",
             "![diagram](img.png) Hello!100 times? a!=123",
         )
+        prose = "![diagram](img.png) Hello!100 times? a!=123, HTTP 404, GHSA-4v7x-pqxf-cx7m.\n"
+        self.assertEqual(self.check({"README.md": prose.encode()}), [])
 
     def test_markdown_refuses_a_finding_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -4,7 +4,9 @@
 README.md and CHANGELOG.md are checked for every internal/QA disclosure
 pattern in FORBIDDEN. Every other tracked file outside the generated tree
 (GENERATED_PREFIXES) is checked for internal tracker references, in its path
-and, unless it is binary, in its text, so they cannot come back.
+and, unless it is binary, in its text, so they cannot come back. Markdown
+prose, outside code blocks and code spans, is also checked for internal merge
+request numbers; source files are not, as "!" and digits are code there.
 """
 
 from __future__ import annotations
@@ -41,15 +43,15 @@ TICKET_REFERENCE = re.compile(r"poly(?!1305(?!\d))[-_]?\d+|ticket[-_]?\d+", re.I
 # any case. A key joined to the word or hyphen before it, as in a fixture
 # name such as depth-chain-00, is not a reference.
 PROJECT_REFERENCE = re.compile(r"(?<![\w-])(?:admin|chain|huly|ody|zip)-\d+\b", re.IGNORECASE)
-# A candidate internal merge request number: "!" and at least three digits,
-# at the start of a line or after whitespace. It is a reference only in
-# prose; see is_merge_request.
-MERGE_REQUEST = re.compile(r"(?<!\S)!\d{3,}\b")
-# Before a merge request number, nothing but a comment marker reads as prose.
-COMMENT_PREFIX = re.compile(r"\s*(?:#+|//[/!]?)?")
-# Rust keywords that take an expression, so a "!" after one is the unary
-# operator, not a merge request.
-EXPRESSION_KEYWORDS = frozenset({"break", "if", "match", "mut", "return", "while", "yield"})
+# An internal merge request number: "!" and at least three digits, not
+# joined to a word before it. Only Markdown prose is checked for one.
+MERGE_REQUEST = re.compile(r"(?<!\w)!\d{3,}\b")
+PROSE_SUFFIXES = (".md",)
+# A fenced code block opens and closes with three or more backticks or
+# tildes; the closing fence is at least as long as the opening one.
+CODE_FENCE = re.compile(r"\s*(`{3,}|~{3,})")
+# An inline code span: a run of backticks, then text, then a run as long.
+CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)")
 # Generated code, copied from the published contract, is not checked.
 GENERATED_PREFIXES = ("src/gen/",)
 # Git reads a file as binary when its first 8000 bytes hold a NUL byte.
@@ -78,26 +80,28 @@ def is_binary(content: bytes) -> bool:
     return False
 
 
-def is_merge_request(text: str) -> bool:
-    """Reports whether text holds a merge request number in prose: one that
-    starts the line or a comment, or follows a word. After an operator, a
-    bracket, punctuation or an expression keyword, "!" and digits are the
-    unary operator of code such as Rust's, and are not a reference."""
-    for match in MERGE_REQUEST.finditer(text):
-        before = text[: match.start()].rstrip()
-        if COMMENT_PREFIX.fullmatch(before):
-            return True
-        word = re.search(r"\w+$", before)
-        if word and word.group() not in EXPRESSION_KEYWORDS:
-            return True
-    return False
-
-
 def is_reference(text: str) -> bool:
-    """Reports whether text holds an internal tracker reference."""
-    return bool(
-        TICKET_REFERENCE.search(text) or PROJECT_REFERENCE.search(text) or is_merge_request(text)
-    )
+    """Reports whether text holds an internal ticket or project reference."""
+    return bool(TICKET_REFERENCE.search(text) or PROJECT_REFERENCE.search(text))
+
+
+def markdown_prose(text: str) -> dict[int, str]:
+    """Returns Markdown text's prose by line number: every line outside a
+    fenced code block, without its inline code spans."""
+    prose: dict[int, str] = {}
+    fence = ""
+    for number, line in enumerate(text.splitlines(), start=1):
+        if fence:
+            closing = CODE_FENCE.match(line)
+            if closing and closing.group(1).startswith(fence) and not line[closing.end() :].strip():
+                fence = ""
+            continue
+        opening = CODE_FENCE.match(line)
+        if opening:
+            fence = opening.group(1)
+            continue
+        prose[number] = CODE_SPAN.sub("", line)
+    return prose
 
 
 def ticket_references(root: Path, names: Iterable[str]) -> list[str]:
@@ -117,8 +121,10 @@ def ticket_references(root: Path, names: Iterable[str]) -> list[str]:
         content = path.read_bytes()
         if is_binary(content):
             continue
-        for number, line in enumerate(content.decode("utf-8").splitlines(), start=1):
-            if is_reference(line):
+        text = content.decode("utf-8")
+        prose = markdown_prose(text) if name.endswith(PROSE_SUFFIXES) else {}
+        for number, line in enumerate(text.splitlines(), start=1):
+            if is_reference(line) or MERGE_REQUEST.search(prose.get(number, "")):
                 failures.append(f"{name}:{number}: contains an internal tracker reference")
                 break
     return failures
