@@ -169,6 +169,14 @@ class TicketReferenceTest(unittest.TestCase):
         failures = self.check_guide("> ```", "> !" + "1024", "", "Fixed: " + MR)
         self.assertEqual(failures, ["docs/guide.md:4: contains an internal tracker reference"])
 
+    def test_only_a_closing_fence_at_the_fence_quote_depth_closes_it(self) -> None:
+        # A quoted fence marker inside a fence's code is content: the real
+        # closer still closes the fence, and the prose after it is checked.
+        failures = self.check_guide("```markdown", "> ```", "```", "Fixed: " + MR)
+        self.assertEqual(failures, ["docs/guide.md:4: contains an internal tracker reference"])
+        failures = self.check_guide("> ```markdown", "> > ```", "> ```", "> Fixed: " + MR)
+        self.assertEqual(failures, ["docs/guide.md:4: contains an internal tracker reference"])
+
     def test_a_code_span_across_lines_is_checked_as_prose(self) -> None:
         # Only a code span within one line is code; one that spans lines is
         # read as prose, so its merge request number fails closed.

@@ -95,8 +95,9 @@ def markdown_prose(text: str) -> dict[int, str]:
     """Returns Markdown text's prose by line number, without its code.
 
     Code is a subset of CommonMark's: a fenced code block, whose fences are
-    indented at most 3 spaces, inside blockquotes too (a fence opened in a
-    blockquote ends with it); an indented code line, outside a fence; and an
+    indented at most 3 spaces, inside blockquotes too (only a closing fence
+    at the same quote depth closes it, and a fence opened in a blockquote
+    ends with it); an indented code line, outside a fence; and an
     inline code span within one line. Everything else is prose, so a code
     span that spans lines is checked as prose, which fails closed."""
     prose: dict[int, str] = {}
@@ -109,7 +110,10 @@ def markdown_prose(text: str) -> dict[int, str]:
         body = line[quote.end() :]
         marker = CODE_FENCE.match(body)
         if fence and depth >= fence_depth:
-            if marker and marker.group(1).startswith(fence) and not body[marker.end() :].strip():
+            # Only a closing fence at the fence's own quote depth closes it;
+            # a deeper quoted one is code content.
+            closes = marker and marker.group(1).startswith(fence)
+            if depth == fence_depth and closes and not body[marker.end() :].strip():
                 fence = ""
             continue
         fence = ""
