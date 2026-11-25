@@ -441,9 +441,10 @@ impl InternalTransfersService {
     ///
     /// `request_id` is sent as given; one that is empty, over 39 characters,
     /// or not decimal digits without a leading zero is refused before
-    /// sending. A reply that breaks the contract, or names no batch, is an
+    /// sending. A reply that breaks the contract, or names no batch or
+    /// another batch than `request_id`, is an
     /// [`crate::errors::Error::ResponseContract`]: it reads by request ID only,
-    /// so the reply must carry one. An abandoned key has no request ID and
+    /// so the reply must echo it. An abandoned key has no request ID and
     /// never answers this read; [`Self::abandon_batch`] with the key reads it
     /// (`abandoned`, with no `request_id` and no legs).
     pub async fn get_batch(
@@ -480,7 +481,18 @@ impl InternalTransfersService {
         )
         .await?
         .into_owned();
-        internal_transfer_batch_from_get_response(&resp)
+        let batch = internal_transfer_batch_from_get_response(&resp)?;
+        // A read by request ID must answer the batch it asked for.
+        if batch.request_id != request_id {
+            return Err(Error::response_contract(
+                "GetInternalTransferBatch",
+                format!(
+                    "reply names batch {:?}, not {request_id:?}",
+                    batch.request_id
+                ),
+            ));
+        }
+        Ok(batch)
     }
 
     /// Make the absence of a batch under an idempotency key final

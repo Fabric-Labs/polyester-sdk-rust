@@ -360,3 +360,34 @@ async fn batch_under_an_abandoned_key_is_final() {
     assert!(!err.is_idempotency_key_abandoned(), "{err:?}");
     assert!(err.mutation_outcome_unknown(), "{err:?}");
 }
+
+/// A read by request ID must answer the batch it asked for: a reply naming
+/// another batch breaks the contract, however well formed it is.
+#[tokio::test]
+async fn get_batch_refuses_a_reply_for_another_batch() {
+    let reply = |request_id: &str| GetInternalTransferBatchResponse {
+        request_id: request_id.into(),
+        status: InternalTransferBatchStatus::BATCH_PROCESSING.into(),
+        legs: vec![InternalTransferBatchLegResult {
+            leg_index: 0,
+            status: InternalTransferBatchLegStatus::LEG_PROCESSING.into(),
+            transfer_id: "t0".into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let (client, _) = server(vec![connect_proto_ok(&reply("456"))]).await;
+    let err = client
+        .internal_transfers
+        .get_batch("123")
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
+
+    let (client, _) = server(vec![connect_proto_ok(&reply("123"))]).await;
+    let read = client.internal_transfers.get_batch("123").await.unwrap();
+    assert_eq!(
+        (read.request_id.as_str(), read.status.as_str()),
+        ("123", "processing")
+    );
+}
