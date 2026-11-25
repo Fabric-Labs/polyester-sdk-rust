@@ -3,6 +3,7 @@
 use super::money::{
     decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled_allow_zero,
 };
+use crate::errors::Result;
 use crate::models::{
     CurrencyConversionConfig, CurrencyConversionRates, CurrencyMetadata, FiatConversionRate,
     FiatConversionSnapshot, LivePriceBand, MarketOverviewEntry, MarketOverviewList,
@@ -17,12 +18,24 @@ use crate::proto::marketoverview::v1::{
 };
 use crate::types::money::{Price, Quantity};
 
-pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOverviewEntry {
-    let (best_bid, best_bid_qty) =
-        book_side(msg.best_bid_ticks, msg.best_bid_qty_scaled, msg.symbol_id);
-    let (best_ask, best_ask_qty) =
-        book_side(msg.best_ask_ticks, msg.best_ask_qty_scaled, msg.symbol_id);
-    MarketOverviewEntry {
+/// # Errors
+///
+/// [`crate::Error::ResponseContract`] when a best bid or ask size is
+/// negative.
+pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> Result<MarketOverviewEntry> {
+    let (best_bid, best_bid_qty) = book_side(
+        msg.best_bid_ticks,
+        msg.best_bid_qty_scaled,
+        msg.symbol_id,
+        "MarketOverview.best_bid_qty_scaled",
+    )?;
+    let (best_ask, best_ask_qty) = book_side(
+        msg.best_ask_ticks,
+        msg.best_ask_qty_scaled,
+        msg.symbol_id,
+        "MarketOverview.best_ask_qty_scaled",
+    )?;
+    Ok(MarketOverviewEntry {
         symbol_id: msg.symbol_id,
         symbol: String::new(),
         last_price: decode_price_ticks(msg.last_price_ticks, None),
@@ -46,7 +59,7 @@ pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOver
         last_trade_ts_ns: ts_ns_or_empty(msg.last_trade_ts_ns),
         listed_ts_ns: ts_ns_or_empty(msg.listed_ts_ns),
         price_band: msg.price_band.as_option().map(live_price_band_from_proto),
-    }
+    })
 }
 
 /// Decode a live price band, as the market overview row carries it.
@@ -98,14 +111,18 @@ pub fn live_price_band_from_proto(
 
 /// The best price of one side of the book and the base quantity at it; both
 /// `None` when that side is empty.
-fn book_side(ticks: i64, qty_scaled: i64, symbol_id: u32) -> (Option<Price>, Option<Quantity>) {
-    match decode_price_ticks(ticks, None) {
-        Some(price) => (
-            Some(price),
-            decode_qty_scaled_allow_zero(qty_scaled, None, None, Some(symbol_id)),
-        ),
+fn book_side(
+    ticks: i64,
+    qty_scaled: i64,
+    symbol_id: u32,
+    field: &str,
+) -> Result<(Option<Price>, Option<Quantity>)> {
+    // A negative size is refused whether or not the side has a price.
+    let qty = decode_qty_scaled_allow_zero(qty_scaled, None, None, Some(symbol_id), field)?;
+    Ok(match decode_price_ticks(ticks, None) {
+        Some(price) => (Some(price), Some(qty)),
         None => (None, None),
-    }
+    })
 }
 
 fn ts_ns_or_empty(ts_ns: u64) -> String {
@@ -152,15 +169,17 @@ pub fn spot_volume_history_from_proto(msg: &GetSpotVolumeHistoryResponse) -> Spo
     }
 }
 
-pub fn market_overview_list_from_proto(msg: &ListMarketOverviewResponse) -> MarketOverviewList {
-    MarketOverviewList {
+pub fn market_overview_list_from_proto(
+    msg: &ListMarketOverviewResponse,
+) -> Result<MarketOverviewList> {
+    Ok(MarketOverviewList {
         markets: msg
             .markets
             .iter()
             .map(market_overview_entry_from_proto)
-            .collect(),
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 pub fn currency_metadata_from_proto(msg: &ProtoCurrencyMetadata) -> CurrencyMetadata {
@@ -224,20 +243,81 @@ pub fn currency_conversion_rates_from_proto(
     }
 }
 
-pub fn market_overview_batch_from_proto(msg: &MarketOverviewBatch) -> MarketOverviewList {
-    MarketOverviewList {
+pub fn market_overview_batch_from_proto(msg: &MarketOverviewBatch) -> Result<MarketOverviewList> {
+    Ok(MarketOverviewList {
         markets: msg
             .markets
             .iter()
             .map(market_overview_entry_from_proto)
-            .collect(),
+            .collect::<Result<_>>()?,
         next_page_token: String::new(),
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A negative best size is refused whether or not that side has a
+    /// price; an empty side with no size still reads as no side.
+    #[test]
+    fn market_overview_entry_refuses_a_negative_book_size_without_a_price() {
+        let row = ProtoMarketOverview {
+            symbol_id: 1,
+            best_bid_ticks: 74_800_000_000_000,
+            best_bid_qty_scaled: 12,
+            ..Default::default()
+        };
+        let entry = market_overview_entry_from_proto(&row).unwrap();
+        assert_eq!(
+            (entry.best_ask.as_ref(), entry.best_ask_qty.as_ref()),
+            (None, None)
+        );
+        for (field, msg) in [
+            (
+                "MarketOverview.best_ask_qty_scaled",
+                ProtoMarketOverview {
+                    best_ask_qty_scaled: -2,
+                    ..row.clone()
+                },
+            ),
+            (
+                "MarketOverview.best_bid_qty_scaled",
+                ProtoMarketOverview {
+                    best_bid_ticks: 0,
+                    best_bid_qty_scaled: -1,
+                    ..row.clone()
+                },
+            ),
+        ] {
+            match market_overview_entry_from_proto(&msg) {
+                Err(crate::Error::ResponseContract { context, .. }) => assert_eq!(context, field),
+                other => panic!("{field}: want Error::ResponseContract, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn market_overview_entry_refuses_a_negative_book_size() {
+        let msg = ProtoMarketOverview {
+            symbol_id: 1,
+            best_ask_ticks: 75_000_000_000_000,
+            best_ask_qty_scaled: -3,
+            ..Default::default()
+        };
+        match market_overview_entry_from_proto(&msg) {
+            Err(crate::Error::ResponseContract { context, message }) => assert_eq!(
+                (context.as_str(), message.as_str()),
+                ("MarketOverview.best_ask_qty_scaled", "negative quantity -3")
+            ),
+            other => panic!("want Error::ResponseContract, got {other:?}"),
+        }
+        let list = ListMarketOverviewResponse {
+            markets: vec![msg],
+            ..Default::default()
+        };
+        assert!(market_overview_list_from_proto(&list).is_err());
+    }
 
     /// The Devnet BTC-USDT row from POLY-9019.
     fn devnet_row() -> ProtoMarketOverview {
@@ -271,11 +351,13 @@ mod tests {
         let list = market_overview_list_from_proto(&ListMarketOverviewResponse {
             markets: vec![devnet_row()],
             ..Default::default()
-        });
+        })
+        .unwrap();
         let batch = market_overview_batch_from_proto(&MarketOverviewBatch {
             markets: vec![devnet_row()],
             ..Default::default()
-        });
+        })
+        .unwrap();
         for row in [&list.markets[0], &batch.markets[0]] {
             assert_eq!(ticks(&row.high_24h), Some(76_167_500_000_000));
             assert_eq!(ticks(&row.low_24h), Some(73_621_960_000_000));
@@ -305,7 +387,7 @@ mod tests {
                 msg.best_ask_ticks = 0;
                 msg.best_ask_qty_scaled = 0;
             }
-            let row = market_overview_entry_from_proto(&msg);
+            let row = market_overview_entry_from_proto(&msg).unwrap();
             assert!(row.high_24h.is_none() && row.low_24h.is_none());
             assert!(row.last_trade_ts_ns.is_empty() && row.listed_ts_ns.is_empty());
             let (empty, other) = if bid {
@@ -336,7 +418,7 @@ mod tests {
             next_page_token: "tok".into(),
             ..Default::default()
         };
-        let list = market_overview_list_from_proto(&msg);
+        let list = market_overview_list_from_proto(&msg).unwrap();
         assert_eq!(list.markets.len(), 1);
         assert_eq!(list.markets[0].symbol_id, 2);
         assert_eq!(list.markets[0].symbol, "");
@@ -359,7 +441,8 @@ mod tests {
             volume_24h_quote_scaled: Some(20),
             volume_24h_usd_scaled: Some(30),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(present.volume_24h_base_scaled.as_deref(), Some("10"));
         assert_eq!(present.volume_24h_quote_scaled.as_deref(), Some("20"));
         assert_eq!(present.volume_24h_usd_scaled.as_deref(), Some("30"));
@@ -367,7 +450,8 @@ mod tests {
         let absent = market_overview_entry_from_proto(&ProtoMarketOverview {
             symbol_id: 2,
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert!(absent.volume_24h_base_scaled.is_none());
         assert!(absent.volume_24h_quote_scaled.is_none());
         assert!(absent.volume_24h_usd_scaled.is_none());
@@ -493,6 +577,7 @@ mod tests {
             ..Default::default()
         };
         let band = market_overview_entry_from_proto(&msg)
+            .unwrap()
             .price_band
             .expect("band");
         assert_eq!(band.state, "active");
@@ -519,7 +604,7 @@ mod tests {
         lapsed.state = "unknown".into();
         assert!(!lapsed.is_fresh_at(UNIX_EPOCH));
 
-        let none = market_overview_entry_from_proto(&ProtoMarketOverview::default());
+        let none = market_overview_entry_from_proto(&ProtoMarketOverview::default()).unwrap();
         assert_eq!(none.price_band, None);
     }
 }

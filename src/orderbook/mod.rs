@@ -221,8 +221,14 @@ fn side_to_levels(
         };
         let price = decode_price(price, symbol.clone())
             .ok_or_else(|| Error::validation("orderbook level has invalid or missing price"))?;
-        let qty = decode_qty_scaled(qty, Some(quantity_scale), symbol.clone(), None)
-            .ok_or_else(|| Error::validation("orderbook level has invalid or missing quantity"))?;
+        let qty = decode_qty_scaled(
+            qty,
+            Some(quantity_scale),
+            symbol.clone(),
+            None,
+            "orderbook level qty",
+        )?
+        .ok_or_else(|| Error::validation("orderbook level has invalid or missing quantity"))?;
         levels.push(OrderbookLevel {
             price: Some(price),
             qty: Some(qty),

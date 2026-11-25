@@ -18,12 +18,12 @@ use rust_decimal::Decimal;
 /// admission, no `terminal_ts_ns`, and its own `lineage` at generation 1.
 /// Its `symbol_id`, `side`, `order_type`, `tif`, `self_trade_prevention_mode`
 /// and `fee_asset` are `None`. On the wire its quantities and prices are 0
-/// placeholders (`"0"` in JSON); decoded, `orig_qty`, `price` and `avg_px` are
-/// `None`, as for any order whose wire value is 0, while `cum_qty`,
-/// `leaves_qty`, `inherited_cum_qty`, `display_qty` and `hidden_qty` are
-/// zero quantities that name no pair and carry no scale, `avg_price_e18` and
-/// `cum_notional` are `"0"` and `fee_total` is `None`. Take its terms from
-/// the batch you sent. After the 60 seconds it is not found. Open
+/// placeholders (`"0"` in JSON, or omitted); decoded, `price` and `avg_px`
+/// are `None`, as for any order whose wire value is 0, while `orig_qty`,
+/// `cum_qty`, `leaves_qty`, `inherited_cum_qty`, `display_qty` and
+/// `hidden_qty` are zero quantities that name no pair and carry no scale,
+/// `avg_price_e18` and `cum_notional` are `"0"` and `fee_total` is `None`.
+/// Take its terms from the batch you sent. After the 60 seconds it is not found. Open
 /// orders, order history and the order streams always carry the terms.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
@@ -48,6 +48,14 @@ pub struct Order {
     /// needed. `cum_qty` and `avg_px` are cumulative execution values across
     /// the lineage through the returned generation, not values limited to one
     /// physical order. `leaves_qty` is remaining working quantity.
+    ///
+    /// Above zero on a working order. Zero on a base-quantity order canceled
+    /// with `cancel_reason` `stp_decrement` or `qty_at_or_below_filled`
+    /// before any fill: the server sets the total to the filled quantity.
+    /// Zero, too, on a refused batch replacement (see [`Order`]). A decoded
+    /// order always has `orig_qty`, `cum_qty`, `leaves_qty`, `display_qty`,
+    /// `hidden_qty` and `inherited_cum_qty`; a negative wire value fails the
+    /// read with [`crate::Error::ResponseContract`].
     pub orig_qty: Option<Quantity>,
     pub cum_qty: Option<Quantity>,
     pub leaves_qty: Option<Quantity>,
@@ -1882,9 +1890,9 @@ mod tests {
             fee_total: Some(super::OrderFeeTotal {
                 amount_e18: "1000000000000".into(),
                 is_rebate: false,
-                qty: decode_qty_scaled_allow_zero(1500, None, None, None),
+                qty: Some(decode_qty_scaled_allow_zero(1500, None, None, None, "test").unwrap()),
             }),
-            cum_qty: decode_qty_scaled_allow_zero(1500, None, None, None),
+            cum_qty: Some(decode_qty_scaled_allow_zero(1500, None, None, None, "test").unwrap()),
             ..order_from_proto(&ProtoOrder {
                 order_id: 1,
                 ..Default::default()

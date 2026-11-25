@@ -141,16 +141,12 @@ async fn get_order_decodes_a_refused_batch_replacement_without_terms() {
             (None, None, None, None, None, None),
             "{wire:?}: the six order terms"
         );
-        // The wire's "0" placeholders, as the model reads them: an original
-        // quantity and prices of 0 are absent, and the cumulative, remaining,
-        // inherited, display and hidden quantities are zero quantities that
-        // name no pair.
-        assert!(
-            order.orig_qty.is_none(),
-            "{wire:?}: orig_qty {:?}",
-            order.orig_qty
-        );
+        // The wire's "0" placeholders, as the model reads them: prices of 0
+        // are absent, and the original, cumulative, remaining, inherited,
+        // display and hidden quantities are zero quantities that name no
+        // pair.
         for (name, qty) in [
+            ("orig_qty", &order.orig_qty),
             ("cum_qty", &order.cum_qty),
             ("leaves_qty", &order.leaves_qty),
             ("inherited_cum_qty", &order.inherited_cum_qty),

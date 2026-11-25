@@ -1023,7 +1023,14 @@ impl Actor {
         let decoded = match decode(&msg) {
             Ok(decoded) => decoded,
             Err(err) => {
-                self.report_all(&err);
+                // A snapshot page or unit that breaks the contract, such as an
+                // order with a negative quantity, belongs to one subscription:
+                // only its account sees the error. Nothing of the frame is
+                // applied, and the account subscribes again from its cursor.
+                if let Some(&account) = self.by_sub.get(&msg.sub) {
+                    self.report(account, &err);
+                    self.resubscribe(account);
+                }
                 return;
             }
         };

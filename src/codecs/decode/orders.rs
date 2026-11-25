@@ -46,6 +46,10 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
     // Quantities name the order's pair, so the catalogs can scale them; an
     // order without one leaves them unnamed rather than naming pair 0.
     let symbol_id_opt = (msg.symbol_id != 0).then_some(msg.symbol_id);
+    // Every order quantity is a plain proto3 scalar: an omitted value is 0,
+    // and 0 is a quantity, not an absent one.
+    let order_qty =
+        |scaled, field| decode_qty_scaled_allow_zero(scaled, None, None, symbol_id_opt, field);
     Ok(Order {
         order_id: format_uint64_id(msg.order_id),
         symbol_id: symbol_id_opt,
@@ -54,31 +58,33 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         status: enum_value_order_status(msg.status).to_owned(),
         order_type: reported_term(enum_value_order_type(msg.order_type)),
         tif: reported_term(enum_value_time_in_force(msg.time_in_force)),
-        orig_qty: decode_qty_scaled(msg.orig_qty_scaled, None, None, symbol_id_opt),
-        cum_qty: decode_qty_scaled_allow_zero(msg.cum_qty_scaled, None, None, symbol_id_opt),
-        leaves_qty: decode_qty_scaled_allow_zero(msg.leaves_qty_scaled, None, None, symbol_id_opt),
-        display_qty: decode_qty_scaled_allow_zero(
+        orig_qty: Some(order_qty(msg.orig_qty_scaled, "Order.orig_qty_scaled")?),
+        cum_qty: Some(order_qty(msg.cum_qty_scaled, "Order.cum_qty_scaled")?),
+        leaves_qty: Some(order_qty(msg.leaves_qty_scaled, "Order.leaves_qty_scaled")?),
+        display_qty: Some(order_qty(
             msg.display_qty_scaled,
-            None,
-            None,
-            symbol_id_opt,
-        ),
-        hidden_qty: decode_qty_scaled_allow_zero(msg.hidden_qty_scaled, None, None, symbol_id_opt),
-        inherited_cum_qty: decode_qty_scaled_allow_zero(
+            "Order.display_qty_scaled",
+        )?),
+        hidden_qty: Some(order_qty(msg.hidden_qty_scaled, "Order.hidden_qty_scaled")?),
+        inherited_cum_qty: Some(order_qty(
             msg.inherited_cum_qty_scaled,
-            None,
-            None,
-            symbol_id_opt,
-        ),
+            "Order.inherited_cum_qty_scaled",
+        )?),
         price: decode_price_ticks(msg.price_ticks, None),
         avg_px: decode_price_ticks(msg.avg_price_ticks, None),
         avg_price_e18: u128_field(msg.avg_price_e18.as_option()),
         cum_notional: u128_field(msg.cum_notional.as_option()),
-        fee_total: msg.fee_total.as_option().map(|fee| OrderFeeTotal {
-            amount_e18: u128_field(fee.amount_e18.as_option()),
-            is_rebate: fee.is_rebate,
-            qty: decode_qty_scaled_allow_zero(fee.qty_scaled, None, None, symbol_id_opt),
-        }),
+        fee_total: msg
+            .fee_total
+            .as_option()
+            .map(|fee| {
+                Ok::<_, Error>(OrderFeeTotal {
+                    amount_e18: u128_field(fee.amount_e18.as_option()),
+                    is_rebate: fee.is_rebate,
+                    qty: Some(order_qty(fee.qty_scaled, "OrderFeeTotal.qty_scaled")?),
+                })
+            })
+            .transpose()?,
         created_ts_ns: TsNs::from_wire(msg.created_ts_ns, "Order.created_ts_ns")?.optional_string(),
         terminal_ts_ns: TsNs::from_wire(msg.terminal_ts_ns, "Order.terminal_ts_ns")?
             .optional_string(),
@@ -482,7 +488,13 @@ pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> Result<UserTrade> {
         side: enum_value_side(msg.side).to_owned(),
         is_maker: msg.is_maker,
         price: decode_price_ticks(msg.price_ticks, None),
-        qty: decode_qty_scaled(msg.qty_scaled, None, None, symbol_id_opt),
+        qty: decode_qty_scaled(
+            msg.qty_scaled,
+            None,
+            None,
+            symbol_id_opt,
+            "UserTrade.qty_scaled",
+        )?,
         fee_amount_e18: u128_field(msg.fee_amount_e18.as_option()),
         fee_asset: enum_value_fee_asset(msg.fee_asset),
         referral_share_amount_e18: u128_field(msg.referral_share_amount_e18.as_option()),
@@ -552,7 +564,13 @@ pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMuta
     }
     let mut result = order_mutation("accepted", msg.order_id, &msg.client_order_id);
     result.accepted_ts_ns = paired_ts_ns(msg.accepted_at_ts_ns, msg.accepted_at.as_option());
-    result.resolved_base_qty = decode_qty_scaled(msg.resolved_base_qty_scaled, None, None, None);
+    result.resolved_base_qty = decode_qty_scaled(
+        msg.resolved_base_qty_scaled,
+        None,
+        None,
+        None,
+        "CreateOrderResponse.resolved_base_qty_scaled",
+    )?;
     result.submitted_max_quote_debit_scaled = msg.submitted_max_quote_debit_scaled;
     result.submitted_quote_proceeds_scaled = msg.submitted_quote_proceeds_scaled;
     result.take_profit_trigger_id = leg_trigger_id(msg.take_profit_trigger_id);
@@ -667,9 +685,18 @@ pub fn preview_order_from_proto(
             .rejection
             .as_option()
             .map(|detail| order_error_detail_from_proto(detail, symbol.clone())),
-        resolved_base_qty: msg.resolved_base_qty_scaled.and_then(|scaled| {
-            decode_qty_scaled_allow_zero(scaled, Some(base_scale), symbol.clone(), symbol_id)
-        }),
+        resolved_base_qty: msg
+            .resolved_base_qty_scaled
+            .map(|scaled| {
+                decode_qty_scaled_allow_zero(
+                    scaled,
+                    Some(base_scale),
+                    symbol.clone(),
+                    symbol_id,
+                    "PreviewOrderResponse.resolved_base_qty_scaled",
+                )
+            })
+            .transpose()?,
         protected_price_bound: msg
             .protected_price_bound_ticks
             .and_then(|ticks| decode_price_ticks_allow_zero(ticks, symbol.clone())),
@@ -823,8 +850,13 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                     out.status = "accepted".to_owned();
                     out.order_id = format_uint64_id(value.order_id);
                     // Unscaled: the service attaches the item's pair scale.
-                    out.resolved_base_qty =
-                        decode_qty_scaled(value.resolved_base_qty_scaled, None, None, None);
+                    out.resolved_base_qty = decode_qty_scaled(
+                        value.resolved_base_qty_scaled,
+                        None,
+                        None,
+                        None,
+                        "BatchCreateResultItem.accepted.resolved_base_qty_scaled",
+                    )?;
                     out.submitted_max_quote_debit_scaled = value.submitted_max_quote_debit_scaled;
                     out.submitted_quote_proceeds_scaled = value.submitted_quote_proceeds_scaled;
                     out.take_profit_trigger_id = leg_trigger_id(value.take_profit_trigger_id);
@@ -1233,6 +1265,288 @@ mod tests {
         assert_eq!(order2.version, 7);
     }
 
+    /// A base-quantity order canceled with no fill, whose total the server
+    /// took down to its filled quantity, 0. A self-trade prevention
+    /// decrement and a modify to at or below the filled quantity reduce
+    /// only an order sized in base quantity.
+    fn canceled_unfilled(reason: crate::proto::orders::v1::CancelReason) -> ProtoOrder {
+        ProtoOrder {
+            order_id: 51,
+            symbol_id: 3,
+            side: Side::Buy.into(),
+            status: OrderStatus::Canceled.into(),
+            order_type: OrderType::Limit.into(),
+            time_in_force: TimeInForce::Gtc.into(),
+            orig_qty_scaled: 0,
+            cum_qty_scaled: 0,
+            leaves_qty_scaled: 0,
+            price_ticks: 5000,
+            created_ts_ns: 1_700_000_000_000_000_000,
+            terminal_ts_ns: 1_700_000_000_000_000_500,
+            version: 2,
+            cancel_reason: reason.into(),
+            ..Default::default()
+        }
+    }
+
+    fn assert_zero_qty(qty: Option<&crate::Quantity>, symbol_id: Option<u32>) {
+        let qty = qty.expect("a wire 0 decodes as a zero quantity, not as absent");
+        assert_eq!(qty.as_scaled(), 0);
+        assert_eq!(qty.symbol_id(), symbol_id);
+    }
+
+    #[test]
+    fn order_from_proto_reads_zero_orig_qty_after_stp_decrement() {
+        use crate::proto::orders::v1::CancelReason;
+
+        let msg = canceled_unfilled(CancelReason::StpDecrement);
+        assert_eq!(
+            msg.submitted_max_quote_debit_scaled, None,
+            "base-quantity order"
+        );
+        let order = order_from_proto(&msg).unwrap();
+        assert_eq!(order.status, "canceled");
+        assert_eq!(order.cancel_reason.as_deref(), Some("stp_decrement"));
+        assert_zero_qty(order.orig_qty.as_ref(), Some(3));
+        assert_zero_qty(order.cum_qty.as_ref(), Some(3));
+        assert_zero_qty(order.leaves_qty.as_ref(), Some(3));
+    }
+
+    #[test]
+    fn order_from_proto_keeps_positive_orig_qty_of_quote_sized_buy_after_stp_decrement() {
+        use crate::proto::orders::v1::CancelReason;
+
+        // Self-trade prevention does not reduce a BUY sized in quote: its
+        // original quantity stays above 0 with no fill.
+        let order = order_from_proto(&ProtoOrder {
+            order_type: OrderType::Market.into(),
+            time_in_force: TimeInForce::Ioc.into(),
+            orig_qty_scaled: 2940,
+            submitted_max_quote_debit_scaled: Some(6_000_000_000),
+            ..canceled_unfilled(CancelReason::StpDecrement)
+        })
+        .unwrap();
+        assert_eq!(order.cancel_reason.as_deref(), Some("stp_decrement"));
+        assert_eq!(
+            order.orig_qty.as_ref().map(crate::Quantity::as_scaled),
+            Some(2940)
+        );
+        assert_zero_qty(order.cum_qty.as_ref(), Some(3));
+    }
+
+    #[test]
+    fn order_from_proto_reads_zero_orig_qty_after_modify_to_filled() {
+        use crate::proto::orders::v1::CancelReason;
+
+        let order = order_from_proto(&canceled_unfilled(CancelReason::QtyAtOrBelowFilled)).unwrap();
+        assert_eq!(order.status, "canceled");
+        assert_eq!(
+            order.cancel_reason.as_deref(),
+            Some("qty_at_or_below_filled")
+        );
+        assert_zero_qty(order.orig_qty.as_ref(), Some(3));
+        assert_zero_qty(order.cum_qty.as_ref(), Some(3));
+    }
+
+    /// ConnectRPC JSON omits a quantity of 0, which proto3 reads as 0: an
+    /// omitted `origQtyScaled` decodes as a zero quantity, as the binary
+    /// encoding does.
+    #[test]
+    fn order_from_proto_reads_omitted_json_orig_qty_as_zero() {
+        let json = r#"{
+            "orderId": "51",
+            "symbolId": 3,
+            "side": "BUY",
+            "status": "CANCELED",
+            "orderType": "LIMIT",
+            "timeInForce": "GTC",
+            "priceTicks": "5000",
+            "createdTsNs": "1700000000000000000",
+            "terminalTsNs": "1700000000000000500",
+            "version": "2",
+            "cancelReason": "CANCEL_REASON_STP_DECREMENT"
+        }"#;
+        let msg: ProtoOrder = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            msg,
+            canceled_unfilled(crate::proto::orders::v1::CancelReason::StpDecrement)
+        );
+        let order = order_from_proto(&msg).unwrap();
+        assert_zero_qty(order.orig_qty.as_ref(), Some(3));
+        assert_zero_qty(order.cum_qty.as_ref(), Some(3));
+        assert_zero_qty(order.leaves_qty.as_ref(), Some(3));
+        let from_bytes = order_from_proto(
+            &<ProtoOrder as buffa::Message>::decode_from_slice(&buffa::Message::encode_to_vec(
+                &msg,
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(from_bytes, order);
+    }
+
+    #[test]
+    fn order_from_proto_refuses_a_negative_quantity() {
+        for (field, msg) in [
+            (
+                "Order.orig_qty_scaled",
+                ProtoOrder {
+                    orig_qty_scaled: -1,
+                    ..order_with_id()
+                },
+            ),
+            (
+                "Order.cum_qty_scaled",
+                ProtoOrder {
+                    cum_qty_scaled: -1,
+                    ..order_with_id()
+                },
+            ),
+            (
+                "Order.leaves_qty_scaled",
+                ProtoOrder {
+                    leaves_qty_scaled: -1,
+                    ..order_with_id()
+                },
+            ),
+        ] {
+            match order_from_proto(&msg) {
+                Err(Error::ResponseContract { context, message }) => {
+                    assert_eq!(
+                        (context.as_str(), message.as_str()),
+                        (field, "negative quantity -1")
+                    );
+                }
+                other => panic!("{field}: want Error::ResponseContract, got {other:?}"),
+            }
+        }
+    }
+
+    /// Each reply's own negative quantity path, inside an otherwise valid
+    /// reply: a user trade, a create, a preview and a batch create item.
+    #[test]
+    fn replies_refuse_a_negative_quantity_naming_the_field() {
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateResultItem as ProtoItem, CreateOrderResponse,
+            batch_create_result_item,
+        };
+        use buffa_types::google::protobuf::Timestamp;
+
+        fn contract<T: std::fmt::Debug>(result: Result<T>) -> (String, String) {
+            match result {
+                Err(Error::ResponseContract { context, message }) => (context, message),
+                other => panic!("want Error::ResponseContract, got {other:?}"),
+            }
+        }
+        let want =
+            |field: &str, scaled: i64| (field.to_owned(), format!("negative quantity {scaled}"));
+
+        let trade = ProtoUserTrade {
+            order_id: 1,
+            match_id: 2,
+            symbol_id: 3,
+            price_ticks: 5000,
+            qty_scaled: 4,
+            ..Default::default()
+        };
+        user_trade_from_proto(&trade).unwrap();
+        assert_eq!(
+            contract(user_trade_from_proto(&ProtoUserTrade {
+                qty_scaled: -5,
+                ..trade
+            })),
+            want("UserTrade.qty_scaled", -5)
+        );
+
+        let create = |qty| CreateOrderResponse {
+            order_id: 42,
+            resolved_base_qty_scaled: qty,
+            ..Default::default()
+        };
+        order_mutation_from_create(&create(6)).unwrap();
+        assert_eq!(
+            contract(order_mutation_from_create(&create(-6))),
+            want("CreateOrderResponse.resolved_base_qty_scaled", -6)
+        );
+
+        let preview = |qty| PreviewOrderResponse {
+            admissible: Some(true),
+            resolved_base_qty_scaled: Some(qty),
+            evaluated_at: Timestamp {
+                seconds: 1,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let zero = preview_order_from_proto(&preview(0), 8, "BTC-USDT", Some(3)).unwrap();
+        assert_eq!(zero.resolved_base_qty.map(|q| q.as_scaled()), Some(0));
+        assert_eq!(
+            contract(preview_order_from_proto(
+                &preview(-8),
+                8,
+                "BTC-USDT",
+                Some(3)
+            )),
+            want("PreviewOrderResponse.resolved_base_qty_scaled", -8)
+        );
+
+        let batch = |qty| BatchCreateOrdersResponse {
+            results: vec![ProtoItem {
+                client_order_id: "a".into(),
+                outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                    BatchCreateAccepted {
+                        order_id: 9,
+                        resolved_base_qty_scaled: qty,
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            }],
+            accepted_count: 1,
+            ..Default::default()
+        };
+        batch_create_from_proto(&batch(5)).unwrap();
+        assert_eq!(
+            contract(batch_create_from_proto(&batch(-9))),
+            want(
+                "BatchCreateResultItem.accepted.resolved_base_qty_scaled",
+                -9
+            )
+        );
+    }
+
+    fn order_with_id() -> ProtoOrder {
+        ProtoOrder {
+            order_id: 1,
+            symbol_id: 3,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn order_from_proto_reads_zero_orig_qty_of_refused_batch_replacement() {
+        use crate::proto::orders::v1::ErrorCode;
+
+        // `GetOrder` of a batch replacement refused as it applied: no order
+        // terms, 0 placeholders for its quantities and prices.
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 52,
+            status: OrderStatus::Rejected.into(),
+            reject_reason: ErrorCode::ModifyApplyExpired.into(),
+            batch_request_id: 77,
+            version: 1,
+            created_ts_ns: 1_700_000_000_000_000_000,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(order.status, "rejected");
+        assert_eq!(order.symbol_id, None);
+        assert_zero_qty(order.orig_qty.as_ref(), None);
+        assert_zero_qty(order.cum_qty.as_ref(), None);
+        assert_eq!(order.price, None);
+    }
+
     #[test]
     fn order_from_proto_reads_exact_execution_totals() {
         use crate::proto::orders::v1::{FeeAsset as ProtoFeeAsset, OrderFeeTotal as ProtoFeeTotal};
@@ -1346,9 +1660,9 @@ mod tests {
             fee_total: Some(OrderFeeTotal {
                 amount_e18: fee_e18.into(),
                 is_rebate: false,
-                qty: decode_qty_scaled_allow_zero(5, None, None, None),
+                qty: Some(decode_qty_scaled_allow_zero(5, None, None, None, "test").unwrap()),
             }),
-            cum_qty: decode_qty_scaled_allow_zero(5, None, None, None),
+            cum_qty: Some(decode_qty_scaled_allow_zero(5, None, None, None, "test").unwrap()),
             ..order_from_proto(&ProtoOrder {
                 order_id: 1,
                 ..Default::default()

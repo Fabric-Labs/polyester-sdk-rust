@@ -157,7 +157,13 @@ pub fn market_trade_from_proto(msg: &ProtoMarketTrade, quantity_scale: u32) -> R
             msg.match_id.to_string()
         },
         price: decode_price_ticks(msg.price_ticks, None),
-        qty: decode_qty_scaled(msg.qty_scaled, Some(quantity_scale), None, symbol_id_opt),
+        qty: decode_qty_scaled(
+            msg.qty_scaled,
+            Some(quantity_scale),
+            None,
+            symbol_id_opt,
+            "MarketTrade.qty_scaled",
+        )?,
         ts_ns: TsNs::from_wire(msg.ts_ns, "MarketTrade.ts_ns")?.optional_string(),
         side: if msg.is_buy {
             "buy".to_owned()
@@ -481,6 +487,31 @@ fn reference_candles_from_columns(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn market_trade_refuses_a_negative_quantity_naming_the_field() {
+        let trade = ProtoMarketTrade {
+            symbol_id: 1,
+            match_id: 7,
+            price_ticks: 5,
+            qty_scaled: 3,
+            ..Default::default()
+        };
+        market_trade_from_proto(&trade, 8).unwrap();
+        match market_trade_from_proto(
+            &ProtoMarketTrade {
+                qty_scaled: -1,
+                ..trade
+            },
+            8,
+        ) {
+            Err(Error::ResponseContract { context, message }) => assert_eq!(
+                (context.as_str(), message.as_str()),
+                ("MarketTrade.qty_scaled", "negative quantity -1")
+            ),
+            other => panic!("want Error::ResponseContract, got {other:?}"),
+        }
+    }
 
     /// Index price candles keep the server's newest-first order, read their
     /// prices at the given scale and their source as a label, and refuse

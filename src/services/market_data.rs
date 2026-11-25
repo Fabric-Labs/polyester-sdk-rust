@@ -704,7 +704,7 @@ impl MarketOverviewService {
         let resp = unary::await_public(client.list_market_overview(req))
             .await?
             .into_owned();
-        let mut list = market_overview_list_from_proto(&resp);
+        let mut list = market_overview_list_from_proto(&resp)?;
         enrich_market_overview_rows(&self.ctx.catalogs, &mut list.markets)?;
         Ok(list)
     }

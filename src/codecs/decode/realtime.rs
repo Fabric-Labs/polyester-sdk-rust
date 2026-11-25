@@ -81,7 +81,7 @@ pub fn ledger_transfer_batch_from_bytes(payload: &[u8]) -> Result<Vec<Result<Led
 
 pub fn trigger_from_bytes(payload: &[u8]) -> Result<Trigger> {
     let msg = decode_proto::<ProtoTrigger>(payload)?;
-    Ok(trigger_from_proto(&msg))
+    trigger_from_proto(&msg)
 }
 
 /// Decode a `TriggerEventBatch` publication: every event in order. An event
@@ -172,7 +172,7 @@ pub fn heatmap_live_bucket_from_bytes(payload: &[u8]) -> Result<ApiData> {
 
 pub fn market_overview_batch_from_bytes(payload: &[u8]) -> Result<MarketOverviewList> {
     let msg = decode_proto::<MarketOverviewBatch>(payload)?;
-    Ok(market_overview_batch_from_proto(&msg))
+    market_overview_batch_from_proto(&msg)
 }
 
 pub fn zipped_asset_supply_batch_from_bytes(
@@ -227,7 +227,7 @@ pub fn orders_unit_from_proto(msg: &ProtoUnit) -> Result<OrdersUnit> {
             .iter()
             .filter_map(|event| event.kind.as_ref())
             .map(order_unit_event_from_proto)
-            .collect(),
+            .collect::<Result<Vec<_>>>()?,
     })
 }
 
@@ -247,8 +247,8 @@ pub fn orders_stale_from_proto(msg: &ProtoUnavailable) -> OrdersStale {
     }
 }
 
-fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
-    match kind {
+fn order_unit_event_from_proto(kind: &unit_event::Kind) -> Result<OrderUnitEvent> {
+    Ok(match kind {
         unit_event::Kind::Order(event) => OrderUnitEvent::Order(OrderStreamEvent {
             order_id: format_uint64_id(event.order_id),
             version: event.version,
@@ -256,17 +256,29 @@ fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
             reject_reason: order_reject_reason(event.reject_reason),
             cancel_reason: order_cancel_reason(event.cancel_reason),
             replacement_order_id: optional_public_id(event.replacement_order_id),
-            fill: event.fill.as_option().map(|fill| OrderFill {
-                match_id: if fill.match_id == 0 {
-                    String::new()
-                } else {
-                    fill.match_id.to_string()
-                },
-                ordinal: fill.ordinal,
-                role: lowercase_enum_label(fill.role),
-                qty: decode_qty_scaled(fill.qty_scaled, None, None, None),
-                price: decode_price_ticks(fill.price_ticks, None),
-            }),
+            fill: event
+                .fill
+                .as_option()
+                .map(|fill| {
+                    Ok::<_, crate::errors::Error>(OrderFill {
+                        match_id: if fill.match_id == 0 {
+                            String::new()
+                        } else {
+                            fill.match_id.to_string()
+                        },
+                        ordinal: fill.ordinal,
+                        role: lowercase_enum_label(fill.role),
+                        qty: decode_qty_scaled(
+                            fill.qty_scaled,
+                            None,
+                            None,
+                            None,
+                            "OrderEvent.fill.qty_scaled",
+                        )?,
+                        price: decode_price_ticks(fill.price_ticks, None),
+                    })
+                })
+                .transpose()?,
         }),
         unit_event::Kind::Outcome(outcome) => OrderUnitEvent::Outcome(OrderCommandOutcome {
             kind: lowercase_enum_label(outcome.kind),
@@ -279,7 +291,7 @@ fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
                 None => format!("UNKNOWN({})", outcome.reason.to_i32()),
             },
         }),
-    }
+    })
 }
 
 fn optional_public_id(id: u64) -> Option<String> {
@@ -296,6 +308,39 @@ fn lowercase_enum_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn orders_unit_refuses_a_negative_fill_quantity() {
+        use crate::proto::privatews::v1::{Fill, OrderEvent, UnitEvent, order_event};
+
+        let unit = ProtoUnit {
+            events: vec![UnitEvent {
+                kind: Some(
+                    OrderEvent {
+                        order_id: 42,
+                        kind: order_event::Kind::FILLED.into(),
+                        fill: buffa::MessageField::some(Fill {
+                            match_id: 900,
+                            qty_scaled: -5,
+                            price_ticks: 2_420_000_000_000,
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }
+                    .into(),
+                ),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        match orders_unit_from_proto(&unit) {
+            Err(crate::Error::ResponseContract { context, message }) => assert_eq!(
+                (context.as_str(), message.as_str()),
+                ("OrderEvent.fill.qty_scaled", "negative quantity -5")
+            ),
+            other => panic!("want Error::ResponseContract, got {other:?}"),
+        }
+    }
 
     /// An update's timestamp is kept to the precision `SystemTime` holds when
     /// sent, and is `None` when the server sends none.
@@ -452,7 +497,7 @@ mod tests {
                         match_id: "900".into(),
                         ordinal: 1,
                         role: "maker".into(),
-                        qty: decode_qty_scaled(231_500, None, None, None),
+                        qty: decode_qty_scaled(231_500, None, None, None, "test").unwrap(),
                         price: decode_price_ticks(2_420_000_000_000, None),
                     }),
                 }),

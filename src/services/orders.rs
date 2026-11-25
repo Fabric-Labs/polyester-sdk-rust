@@ -1305,7 +1305,8 @@ impl OrdersService {
             Some(market.base_quantity_scale),
             Some(market.symbol),
             Some(market.symbol_id),
-        );
+            "CreateOrderResponse.resolved_base_qty_scaled",
+        )?;
         Ok(result)
     }
 
@@ -1446,7 +1447,8 @@ impl OrdersService {
                         Some(market.base_quantity_scale),
                         Some(market.symbol),
                         Some(market.symbol_id),
-                    );
+                        "BatchCreateResultItem.accepted.resolved_base_qty_scaled",
+                    )?;
                 }
             }
         }
