@@ -1233,6 +1233,83 @@ mod tests {
         assert_eq!(order2.version, 7);
     }
 
+    /// A canceled order with no fill whose total was taken down to its filled
+    /// quantity, 0.
+    fn canceled_unfilled(reason: crate::proto::orders::v1::CancelReason) -> ProtoOrder {
+        ProtoOrder {
+            order_id: 51,
+            symbol_id: 3,
+            side: Side::Sell.into(),
+            status: OrderStatus::Canceled.into(),
+            order_type: OrderType::Limit.into(),
+            time_in_force: TimeInForce::Gtc.into(),
+            orig_qty_scaled: 0,
+            cum_qty_scaled: 0,
+            leaves_qty_scaled: 0,
+            price_ticks: 5000,
+            created_ts_ns: 1_700_000_000_000_000_000,
+            terminal_ts_ns: 1_700_000_000_000_000_500,
+            version: 2,
+            cancel_reason: reason.into(),
+            ..Default::default()
+        }
+    }
+
+    fn assert_zero_qty(qty: Option<&crate::Quantity>, symbol_id: Option<u32>) {
+        let qty = qty.expect("a wire 0 decodes as a zero quantity, not as absent");
+        assert_eq!(qty.as_scaled(), 0);
+        assert_eq!(qty.symbol_id(), symbol_id);
+    }
+
+    #[test]
+    fn order_from_proto_reads_zero_orig_qty_after_stp_decrement() {
+        use crate::proto::orders::v1::CancelReason;
+
+        let order = order_from_proto(&canceled_unfilled(CancelReason::StpDecrement)).unwrap();
+        assert_eq!(order.status, "canceled");
+        assert_eq!(order.cancel_reason.as_deref(), Some("stp_decrement"));
+        assert_zero_qty(order.orig_qty.as_ref(), Some(3));
+        assert_zero_qty(order.cum_qty.as_ref(), Some(3));
+        assert_zero_qty(order.leaves_qty.as_ref(), Some(3));
+    }
+
+    #[test]
+    fn order_from_proto_reads_zero_orig_qty_after_modify_to_filled() {
+        use crate::proto::orders::v1::CancelReason;
+
+        let order = order_from_proto(&canceled_unfilled(CancelReason::QtyAtOrBelowFilled)).unwrap();
+        assert_eq!(order.status, "canceled");
+        assert_eq!(
+            order.cancel_reason.as_deref(),
+            Some("qty_at_or_below_filled")
+        );
+        assert_zero_qty(order.orig_qty.as_ref(), Some(3));
+        assert_zero_qty(order.cum_qty.as_ref(), Some(3));
+    }
+
+    #[test]
+    fn order_from_proto_reads_zero_orig_qty_of_refused_batch_replacement() {
+        use crate::proto::orders::v1::ErrorCode;
+
+        // `GetOrder` of a batch replacement refused as it applied: no order
+        // terms, 0 placeholders for its quantities and prices.
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 52,
+            status: OrderStatus::Rejected.into(),
+            reject_reason: ErrorCode::ModifyApplyExpired.into(),
+            batch_request_id: 77,
+            version: 1,
+            created_ts_ns: 1_700_000_000_000_000_000,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(order.status, "rejected");
+        assert_eq!(order.symbol_id, None);
+        assert_zero_qty(order.orig_qty.as_ref(), None);
+        assert_zero_qty(order.cum_qty.as_ref(), None);
+        assert_eq!(order.price, None);
+    }
+
     #[test]
     fn order_from_proto_reads_exact_execution_totals() {
         use crate::proto::orders::v1::{FeeAsset as ProtoFeeAsset, OrderFeeTotal as ProtoFeeTotal};
