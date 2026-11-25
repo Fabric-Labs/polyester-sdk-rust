@@ -2087,7 +2087,8 @@ mod tests {
                 ..Default::default()
             }))),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let Some(TriggerDetails::Stop(stop)) = stop_read.details else {
             panic!("expected stop details");
         };
@@ -2102,7 +2103,8 @@ mod tests {
                 },
             ))),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let Some(TriggerDetails::Trailing(trailing_details)) = trailing_read.details else {
             panic!("expected trailing details");
         };
@@ -2463,7 +2465,8 @@ mod tests {
                     },
                 ))),
                 ..Default::default()
-            });
+            })
+            .unwrap();
             let Some(TriggerDetails::Trailing(details)) = read.details else {
                 panic!("expected trailing details, got {:?}", read.details);
             };

@@ -157,7 +157,13 @@ pub fn market_trade_from_proto(msg: &ProtoMarketTrade, quantity_scale: u32) -> R
             msg.match_id.to_string()
         },
         price: decode_price_ticks(msg.price_ticks, None),
-        qty: decode_qty_scaled(msg.qty_scaled, Some(quantity_scale), None, symbol_id_opt),
+        qty: decode_qty_scaled(
+            msg.qty_scaled,
+            Some(quantity_scale),
+            None,
+            symbol_id_opt,
+            "MarketTrade.qty_scaled",
+        )?,
         ts_ns: TsNs::from_wire(msg.ts_ns, "MarketTrade.ts_ns")?.optional_string(),
         side: if msg.is_buy {
             "buy".to_owned()

@@ -173,8 +173,8 @@ fn trigger_details_from_proto(
     msg: &ProtoTrigger,
     symbol: Option<String>,
     symbol_id_opt: Option<u32>,
-) -> Option<TriggerDetails> {
-    match msg.runtime_details.as_ref() {
+) -> crate::errors::Result<Option<TriggerDetails>> {
+    Ok(match msg.runtime_details.as_ref() {
         Some(trigger::RuntimeDetails::Stop(stop)) => {
             Some(TriggerDetails::Stop(TriggerStopDetails {
                 trigger_price: decode_price_ticks(stop.trigger_price_ticks, symbol.clone()),
@@ -230,7 +230,8 @@ fn trigger_details_from_proto(
                     None,
                     symbol.clone(),
                     symbol_id_opt,
-                ),
+                    "Trigger.twap_state.executed_qty_scaled",
+                )?,
             }))
         }
         Some(trigger::RuntimeDetails::LadderState(ladder)) => {
@@ -253,7 +254,8 @@ fn trigger_details_from_proto(
                     None,
                     symbol.clone(),
                     symbol_id_opt,
-                ),
+                    "Trigger.ladder_state.executed_qty_scaled",
+                )?,
                 requested_levels: ladder.requested_levels,
                 placed_levels: ladder.placed_levels,
                 rejected_levels: ladder.rejected_levels,
@@ -262,7 +264,7 @@ fn trigger_details_from_proto(
             }))
         }
         None => None,
-    }
+    })
 }
 
 fn trigger_price_from_details(details: &Option<TriggerDetails>) -> Option<Price> {
@@ -457,14 +459,17 @@ fn trailing_details_cap(
     }
 }
 
-pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
+/// # Errors
+///
+/// [`crate::Error::ResponseContract`] when a quantity is negative.
+pub fn trigger_from_proto(msg: &ProtoTrigger) -> crate::errors::Result<Trigger> {
     let symbol_id = msg.symbol_id;
     let symbol_id_opt = if symbol_id == 0 {
         None
     } else {
         Some(symbol_id)
     };
-    let details = trigger_details_from_proto(msg, None, symbol_id_opt);
+    let details = trigger_details_from_proto(msg, None, symbol_id_opt)?;
     let proj = trigger_config_projection(msg, None);
     // Fall back to stop runtime details for the trigger-price convenience field.
     let trigger_price = proj
@@ -472,7 +477,7 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         .clone()
         .or_else(|| trigger_price_from_details(&details));
     let (cancel_reason, failure_reason) = trigger_terminal_reasons(msg.terminal_reason.as_ref());
-    Trigger {
+    Ok(Trigger {
         trigger_id: format_uint64_id(msg.trigger_id),
         subaccount_id: format_uint64_id(msg.subaccount_id),
         symbol_id,
@@ -489,7 +494,13 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         side: proj.side,
         order_type: proj.order_type,
         time_in_force: proj.time_in_force,
-        qty: decode_qty_scaled(msg.qty_scaled, None, None, symbol_id_opt),
+        qty: decode_qty_scaled(
+            msg.qty_scaled,
+            None,
+            None,
+            symbol_id_opt,
+            "Trigger.qty_scaled",
+        )?,
         limit_price: proj.limit_price,
         fee_asset: fee_asset_label(msg.fee_asset),
         self_trade_prevention_mode: enum_value_self_trade_prevention_mode(
@@ -509,7 +520,7 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         failure_reason,
         details,
         version: (msg.version != 0).then_some(msg.version),
-    }
+    })
 }
 
 /// Gives a read trigger's quantities (`qty` and a TWAP's or ladder's
@@ -529,7 +540,7 @@ pub(crate) fn attach_trigger_scale(trigger: &mut Trigger, base_scale: Option<u32
 /// A read trigger, refused with `Error::ResponseContract` without its ID.
 fn required_trigger(operation: &str, msg: &ProtoTrigger) -> crate::errors::Result<Trigger> {
     require_id(operation, "trigger_id", msg.trigger_id)?;
-    Ok(trigger_from_proto(msg))
+    trigger_from_proto(msg)
 }
 
 pub fn triggers_list_from_proto(msg: &ListTriggersResponse) -> crate::errors::Result<TriggersList> {
@@ -853,6 +864,44 @@ mod tests {
     };
 
     #[test]
+    fn trigger_from_proto_refuses_a_negative_quantity() {
+        use crate::proto::triggers::v1::TwapDetails;
+
+        let contract = |msg: &ProtoTrigger| match trigger_from_proto(msg) {
+            Err(crate::Error::ResponseContract { context, message }) => (context, message),
+            other => panic!("want Error::ResponseContract, got {other:?}"),
+        };
+        let negative_qty = ProtoTrigger {
+            trigger_id: 1,
+            symbol_id: 3,
+            qty_scaled: -1,
+            ..Default::default()
+        };
+        assert_eq!(
+            contract(&negative_qty),
+            (
+                "Trigger.qty_scaled".to_owned(),
+                "negative quantity -1".to_owned()
+            )
+        );
+        let negative_executed = ProtoTrigger {
+            qty_scaled: 100,
+            runtime_details: Some(trigger::RuntimeDetails::TwapState(Box::new(TwapDetails {
+                executed_qty_scaled: -2,
+                ..Default::default()
+            }))),
+            ..negative_qty
+        };
+        assert_eq!(
+            contract(&negative_executed),
+            (
+                "Trigger.twap_state.executed_qty_scaled".to_owned(),
+                "negative quantity -2".to_owned()
+            )
+        );
+    }
+
+    #[test]
     fn trigger_from_proto_projects_attached_trailing_stop_side_and_parent() {
         use crate::proto::triggers::v1::TrailingStopTrigger;
 
@@ -877,7 +926,7 @@ mod tests {
             ))),
             ..Default::default()
         };
-        let t = trigger_from_proto(&msg);
+        let t = trigger_from_proto(&msg).unwrap();
         assert_eq!(t.trigger_type, "trailing_stop");
         assert_eq!(t.side, "buy");
         assert_eq!(t.order_type, "market");
@@ -893,6 +942,7 @@ mod tests {
                 version,
                 ..Default::default()
             })
+            .unwrap()
             .version
         };
         assert_eq!(versioned(1), Some(1));
@@ -944,7 +994,7 @@ mod tests {
             }))),
             ..Default::default()
         };
-        let t = trigger_from_proto(&msg);
+        let t = trigger_from_proto(&msg).unwrap();
         assert_eq!(t.trigger_id, format_uint64_id(42));
         assert_eq!(t.subaccount_id, format_uint64_id(9));
         assert_eq!(t.symbol, "");
@@ -989,20 +1039,26 @@ mod tests {
         };
         let t = trigger_from_proto(&market(Some(
             trigger_market_ioc::MaxSlippage::MaxSlippageTicks(25_000_000_000),
-        )));
+        )))
+        .unwrap();
         assert_eq!(t.side, "buy");
         assert_eq!(t.order_type, "market");
         assert_eq!(t.trigger_price.as_ref().unwrap().format(), "85000");
         assert_eq!(t.max_slippage, Some(MaxSlippage::Ticks(25_000_000_000)));
-        assert_eq!(trigger_from_proto(&market(None)).max_slippage, None);
+        assert_eq!(
+            trigger_from_proto(&market(None)).unwrap().max_slippage,
+            None
+        );
 
         // Two triggers that differ only in their cap must not decode alike.
         let ten = trigger_from_proto(&market(Some(
             trigger_market_ioc::MaxSlippage::MaxSlippageBps(10),
-        )));
+        )))
+        .unwrap();
         let fifty = trigger_from_proto(&market(Some(
             trigger_market_ioc::MaxSlippage::MaxSlippageBps(50),
-        )));
+        )))
+        .unwrap();
         assert_eq!(ten.max_slippage, Some(MaxSlippage::Bps(10)));
         assert_eq!(fifty.max_slippage, Some(MaxSlippage::Bps(50)));
         assert_ne!(ten, fifty);
@@ -1083,8 +1139,8 @@ mod tests {
             let from_json: ProtoTrigger = serde_json::from_slice(&json).unwrap();
             assert_eq!(from_json, msg, "proto JSON round trip");
             let reads = [
-                ("from_proto", trigger_from_proto(&msg)),
-                ("from_json", trigger_from_proto(&from_json)),
+                ("from_proto", trigger_from_proto(&msg).unwrap()),
+                ("from_json", trigger_from_proto(&from_json).unwrap()),
                 (
                     "from_bytes",
                     crate::codecs::decode::trigger_from_bytes(&bytes).unwrap(),
@@ -1150,7 +1206,8 @@ mod tests {
         };
         let t = trigger_from_proto(&configured(Some(
             trailing_stop_trigger::MaxSlippage::MaxSlippageBps(100),
-        )));
+        )))
+        .unwrap();
         assert_eq!(t.max_slippage, Some(MaxSlippage::Bps(100)));
         let Some(TriggerDetails::Trailing(details)) = t.details.as_ref() else {
             panic!("expected trailing details");
@@ -1158,7 +1215,8 @@ mod tests {
         assert_eq!(details.max_slippage_bps, 100);
         let t = trigger_from_proto(&configured(Some(
             trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(7_000_000_000),
-        )));
+        )))
+        .unwrap();
         assert_eq!(t.max_slippage, Some(MaxSlippage::Ticks(7_000_000_000)));
 
         for (details, want) in [
@@ -1184,7 +1242,7 @@ mod tests {
                 runtime_details: Some(trigger::RuntimeDetails::Trailing(Box::new(details))),
                 ..Default::default()
             };
-            assert_eq!(trigger_from_proto(&msg).max_slippage, want);
+            assert_eq!(trigger_from_proto(&msg).unwrap().max_slippage, want);
         }
     }
 
@@ -1224,7 +1282,7 @@ mod tests {
             ))),
             ..Default::default()
         };
-        let t = trigger_from_proto(&msg);
+        let t = trigger_from_proto(&msg).unwrap();
         assert_eq!(t.trigger_type, "trailing_stop");
         assert_eq!(t.side, "buy");
         // A BUY trailing child is an IOC limit order at the maximum price.
@@ -1251,7 +1309,9 @@ mod tests {
         if let Some(trigger::RuntimeDetails::Trailing(details)) = unarmed.runtime_details.as_mut() {
             details.trigger_price_ticks = None;
         }
-        let Some(TriggerDetails::Trailing(trailing)) = trigger_from_proto(&unarmed).details else {
+        let Some(TriggerDetails::Trailing(trailing)) =
+            trigger_from_proto(&unarmed).unwrap().details
+        else {
             panic!("expected trailing details");
         };
         assert!(trailing.trigger_price.is_none());
@@ -1262,7 +1322,7 @@ mod tests {
             config.side = Side::Sell.into();
             config.limit_price_ticks = 0;
         }
-        let t = trigger_from_proto(&sell);
+        let t = trigger_from_proto(&sell).unwrap();
         assert_eq!(t.side, "sell");
         // A SELL trailing child is a market IOC order; its cap stays in max_slippage.
         assert_eq!(t.order_type, "market");
@@ -1298,7 +1358,7 @@ mod tests {
             }))),
             ..Default::default()
         };
-        let t = trigger_from_proto(&msg);
+        let t = trigger_from_proto(&msg).unwrap();
         assert_eq!(t.trigger_type, "twap");
         assert_eq!(t.side, "buy");
         assert_eq!(t.order_type, "market");
@@ -1343,7 +1403,7 @@ mod tests {
             ))),
             ..Default::default()
         };
-        let t = trigger_from_proto(&msg);
+        let t = trigger_from_proto(&msg).unwrap();
         let Some(TriggerDetails::Ladder(ladder)) = t.details.as_ref() else {
             panic!("expected ladder details");
         };
@@ -1387,7 +1447,8 @@ mod tests {
                 qty_scaled: 60_000,
                 runtime_details: Some(details),
                 ..Default::default()
-            });
+            })
+            .unwrap();
             attach_trigger_scale(&mut t, Some(8));
             let executed = match t.details.as_ref() {
                 Some(TriggerDetails::Twap(twap)) => twap.executed_qty.clone(),
@@ -1442,7 +1503,8 @@ mod tests {
             trigger_id: 5,
             status: TriggerStatus::StatusCanceled.into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let canceled = trigger_mutation_from_cancel(&CancelTriggerResponse {
             trigger_id: 5,
             status: TriggerStatus::StatusCanceled.into(),
@@ -1494,7 +1556,7 @@ mod tests {
             ..Default::default()
         };
         for read in [
-            trigger_from_proto(&leg),
+            trigger_from_proto(&leg).unwrap(),
             crate::codecs::decode::trigger_from_bytes(&buffa::Message::encode_to_vec(&leg))
                 .unwrap(),
         ] {
@@ -1508,7 +1570,8 @@ mod tests {
                 trigger_id: 73,
                 order_list_id,
                 ..Default::default()
-            });
+            })
+            .unwrap();
             assert_eq!(read.order_list_id, None, "{order_list_id:?}");
             assert_eq!(read.client_list_id, "", "{order_list_id:?}");
         }
@@ -1812,7 +1875,8 @@ mod tests {
                 trigger_id: 1,
                 terminal_reason: Some(trigger::TerminalReason::CancelReason(reason.into())),
                 ..Default::default()
-            });
+            })
+            .unwrap();
             assert_eq!(trigger.cancel_reason, want);
             let event = trigger_event_from_proto(&ProtoTriggerEvent {
                 trigger_id: 1,
@@ -1864,7 +1928,8 @@ mod tests {
                 trigger_id: 1,
                 terminal_reason: Some(trigger::TerminalReason::FailureReason(reason.into())),
                 ..Default::default()
-            });
+            })
+            .unwrap();
             assert_eq!(trigger.failure_reason, want);
             let event = trigger_event_from_proto(&ProtoTriggerEvent {
                 trigger_id: 1,
@@ -1884,7 +1949,8 @@ mod tests {
                 TriggerCancelReason::TRIGGER_CANCEL_REASON_CANCEL_ALL.into(),
             )),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(canceled.cancel_reason, "cancel_all");
         // A fire refused while the trigger was being stopped placed nothing;
         // the trigger then ends canceled `cancel_all`.
@@ -1910,7 +1976,8 @@ mod tests {
                 TriggerCancelReason::TRIGGER_CANCEL_REASON_OCO.into(),
             )),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(canceled.cancel_reason, "oco");
         assert!(canceled.failure_reason.is_empty());
 
@@ -1946,7 +2013,8 @@ mod tests {
                 buffa::EnumValue::Unknown(321),
             )),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(
             unknown.failure_reason,
             "UNKNOWN_TRIGGER_FAILURE_REASON(321)"
