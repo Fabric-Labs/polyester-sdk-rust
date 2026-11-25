@@ -154,3 +154,39 @@ async fn the_call_gets_only_the_time_left_after_signing() {
     let options = signing.await.unwrap().expect("signed in time");
     assert_eq!(options.timeout(), Some(Duration::from_millis(750)));
 }
+
+#[tokio::test]
+async fn a_call_dropped_as_its_turn_comes_is_not_sent() {
+    let key_id = "ak_signing_deadline_dropped";
+    let (addr, requests) = silent_server(ME).await;
+    let client = Arc::new(keyed_client(format!("http://{addr}"), key_id, GUARD));
+    let creds = Credentials::new(key_id, SEED_HEX).unwrap();
+    let before = creds.last_signing_timestamp();
+
+    // The call waits in the signing queue. Its turn comes (the queue is let
+    // go) and it is dropped before it runs again, on the same turn.
+    let queue = creds.hold_signing_queue().await;
+    let call = tokio::spawn({
+        let client = client.clone();
+        async move { client.auth.me().await }
+    });
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    drop(queue);
+    call.abort();
+    assert!(call.await.unwrap_err().is_cancelled());
+
+    // Whatever the dropped call left behind has had time to run.
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(
+        requests.load(Ordering::SeqCst),
+        0,
+        "the dropped call was sent"
+    );
+    assert_eq!(
+        creds.last_signing_timestamp(),
+        before,
+        "the dropped call took a timestamp"
+    );
+}
