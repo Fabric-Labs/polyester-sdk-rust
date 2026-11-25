@@ -8,7 +8,7 @@ on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Conne
 **Status:** `0.32.0` (git tag `v0.32.0`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
 change breaks only one SDK's API: Rust 0.32.0 is the release of Go 0.34.0 and Python 0.33.0.
-Proprietary license (not open source). API-key only; no browser login or JWT flows.
+Licensed under the [Apache License 2.0](LICENSE). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
 
@@ -3423,4 +3423,5 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Proprietary. See [LICENSE](LICENSE).
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE)
+for the attribution notice that redistributions keep.
