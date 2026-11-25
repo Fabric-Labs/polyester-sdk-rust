@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub const API_KEY_ID_ENV: &str = "POLYESTER_API_KEY_ID";
 pub const API_PRIVATE_KEY_ENV: &str = "POLYESTER_API_PRIVATE_KEY";
@@ -53,12 +53,65 @@ struct SigningTimestampAllocator {
     async_gate: tokio::sync::Mutex<()>,
 }
 
-/// One allocation attempt: a timestamp, or a full window and how long until
-/// the clock gives it room again.
+/// One allocation attempt: a timestamp, a full window and how long until the
+/// clock gives it room again, or a waiter whose time ran out.
 #[derive(Debug, PartialEq, Eq)]
 enum Allocation {
     Granted(u64),
     Full { wait_ms: u64 },
+    OutOfTime(Expiry),
+}
+
+/// What ended a wait for signing capacity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Expiry {
+    /// The deadline of the request being signed.
+    Deadline,
+    /// [`MAX_SIGNING_BACKPRESSURE`].
+    Cap,
+}
+
+/// How long an async signer may wait for capacity: until its request's
+/// deadline, when it has one, and at most [`MAX_SIGNING_BACKPRESSURE`].
+#[derive(Debug, Clone, Copy)]
+struct WaitLimits {
+    deadline: Option<tokio::time::Instant>,
+    cap: tokio::time::Instant,
+}
+
+impl WaitLimits {
+    fn starting_now(deadline: Option<tokio::time::Instant>) -> Self {
+        Self {
+            deadline,
+            cap: tokio::time::Instant::now() + MAX_SIGNING_BACKPRESSURE,
+        }
+    }
+
+    /// What has run out, if anything; the request's deadline first.
+    fn expired(&self) -> Option<Expiry> {
+        let now = tokio::time::Instant::now();
+        if self.deadline.is_some_and(|deadline| now >= deadline) {
+            Some(Expiry::Deadline)
+        } else if now >= self.cap {
+            Some(Expiry::Cap)
+        } else {
+            None
+        }
+    }
+
+    /// When the wait ends at the latest.
+    fn end(&self) -> tokio::time::Instant {
+        self.deadline
+            .map_or(self.cap, |deadline| deadline.min(self.cap))
+    }
+
+    /// What ended a wait that reached [`Self::end`].
+    fn ended(&self) -> Expiry {
+        self.expired().unwrap_or(match self.deadline {
+            Some(deadline) if deadline <= self.cap => Expiry::Deadline,
+            _ => Expiry::Cap,
+        })
+    }
 }
 
 impl SigningTimestampAllocator {
@@ -69,15 +122,19 @@ impl SigningTimestampAllocator {
     /// The synchronous path: a full window is refused with a retryable
     /// capacity error at once. Only [`Self::next_async`] waits for room.
     fn next_at(&self, now_ms: u64) -> Result<u64> {
-        match self.allocate_at(now_ms)? {
+        match self.allocate_at(now_ms, None)? {
             Allocation::Granted(timestamp) => Ok(timestamp),
             Allocation::Full { wait_ms } => Err(signing_capacity_error(wait_ms)),
+            // Without limits nothing runs out.
+            Allocation::OutOfTime(_) => Err(signing_capacity_error(1)),
         }
     }
 
     /// Allocate against `now_ms` without waiting. A full window consumes
-    /// nothing.
-    fn allocate_at(&self, now_ms: u64) -> Result<Allocation> {
+    /// nothing, and neither does a waiter whose `limits` ran out: they are
+    /// checked right before the timestamp is taken, so a waiter that comes
+    /// back to the allocator after its time ran out takes nothing.
+    fn allocate_at(&self, now_ms: u64, limits: Option<&WaitLimits>) -> Result<Allocation> {
         let ceiling = now_ms
             .checked_add(MAX_SIGNING_FUTURE_SKEW_MS)
             .ok_or_else(|| Error::transport("signing timestamp ceiling overflow"))?;
@@ -95,6 +152,9 @@ impl SigningTimestampAllocator {
                     wait_ms: candidate - ceiling,
                 });
             }
+            if let Some(expiry) = limits.and_then(WaitLimits::expired) {
+                return Ok(Allocation::OutOfTime(expiry));
+            }
             if self
                 .last_timestamp_ms
                 .compare_exchange_weak(observed, candidate, Ordering::AcqRel, Ordering::Acquire)
@@ -106,21 +166,45 @@ impl SigningTimestampAllocator {
     }
 
     async fn next_async(&self) -> Result<u64> {
+        self.next_async_until(None)
+            .await?
+            .ok_or_else(|| signing_capacity_error(1))
+    }
+
+    /// Allocate with bounded, cooperative backpressure, for a request whose
+    /// deadline is `deadline`: `Ok(None)` when it passes before a timestamp
+    /// is free. However long the request has, the wait ends after
+    /// [`MAX_SIGNING_BACKPRESSURE`] with a retryable capacity error. A waiter
+    /// that leaves, out of time or dropped, takes no timestamp.
+    async fn next_async_until(
+        &self,
+        deadline: Option<tokio::time::Instant>,
+    ) -> Result<Option<u64>> {
+        let limits = WaitLimits::starting_now(deadline);
+        let out_of_time = |expiry: Expiry, wait_ms: u64| -> Result<Option<u64>> {
+            match expiry {
+                Expiry::Deadline => Ok(None),
+                Expiry::Cap => Err(signing_capacity_error(wait_ms)),
+            }
+        };
+        if let Some(expiry) = limits.expired() {
+            return out_of_time(expiry, 1);
+        }
         // Serialize only timestamp allocation, not hashing, signing, or I/O.
         // Tokio's mutex queues waiters without blocking an executor thread.
-        let started = Instant::now();
-        let _gate = tokio::time::timeout(MAX_SIGNING_BACKPRESSURE, self.async_gate.lock())
-            .await
-            .map_err(|_| signing_capacity_error(1))?;
+        let Ok(_gate) = tokio::time::timeout_at(limits.end(), self.async_gate.lock()).await else {
+            return out_of_time(limits.ended(), 1);
+        };
         loop {
-            match self.allocate_at(timestamp_ms_from(SystemTime::now())?)? {
-                Allocation::Granted(timestamp) => return Ok(timestamp),
+            match self.allocate_at(timestamp_ms_from(SystemTime::now())?, Some(&limits))? {
+                Allocation::Granted(timestamp) => return Ok(Some(timestamp)),
+                Allocation::OutOfTime(expiry) => return out_of_time(expiry, 1),
                 Allocation::Full { wait_ms } => {
-                    let remaining = MAX_SIGNING_BACKPRESSURE.saturating_sub(started.elapsed());
-                    if remaining.is_zero() {
-                        return Err(signing_capacity_error(wait_ms));
+                    if let Some(expiry) = limits.expired() {
+                        return out_of_time(expiry, wait_ms);
                     }
-                    tokio::time::sleep(Duration::from_millis(wait_ms).min(remaining)).await;
+                    let retry = tokio::time::Instant::now() + Duration::from_millis(wait_ms);
+                    tokio::time::sleep_until(retry.min(limits.end())).await;
                 }
             }
         }
@@ -330,6 +414,26 @@ impl Credentials {
         };
         self.signed_headers(ts, method, raw_url, body, recv_window_ms)
     }
+
+    /// [`Self::sign_request_with_recv_window_async`] for a request whose
+    /// deadline is `deadline`, with an automatic timestamp: `Ok(None)` when
+    /// the deadline passes before a timestamp is free, with nothing signed
+    /// and no timestamp taken.
+    pub(crate) async fn sign_request_with_recv_window_before(
+        &self,
+        method: &str,
+        raw_url: &str,
+        body: &[u8],
+        recv_window_ms: Option<u32>,
+        deadline: Option<tokio::time::Instant>,
+    ) -> Result<Option<BTreeMap<String, String>>> {
+        validate_recv_window_ms(recv_window_ms)?;
+        let Some(ts) = self.timestamp_allocator.next_async_until(deadline).await? else {
+            return Ok(None);
+        };
+        self.signed_headers(ts.to_string(), method, raw_url, body, recv_window_ms)
+            .map(Some)
+    }
 }
 
 impl Credentials {
@@ -338,11 +442,28 @@ impl Credentials {
     /// `ws-nonce:<nonce>`: the nonce is 16 fresh random bytes in lower-case
     /// hex, sent in [`HEADER_NONCE`], and the server accepts each nonce once.
     pub async fn sign_websocket_upgrade(&self, raw_url: &str) -> Result<BTreeMap<String, String>> {
-        let ts = self.timestamp_allocator.next_async().await?.to_string();
+        self.sign_websocket_upgrade_before(raw_url, None)
+            .await?
+            .ok_or_else(|| signing_capacity_error(1))
+    }
+
+    /// [`Self::sign_websocket_upgrade`] for an upgrade whose deadline is
+    /// `deadline`: `Ok(None)` when it passes before a signing timestamp is
+    /// free, with nothing signed and no timestamp taken.
+    pub(crate) async fn sign_websocket_upgrade_before(
+        &self,
+        raw_url: &str,
+        deadline: Option<tokio::time::Instant>,
+    ) -> Result<Option<BTreeMap<String, String>>> {
+        let Some(ts) = self.timestamp_allocator.next_async_until(deadline).await? else {
+            return Ok(None);
+        };
+        let ts = ts.to_string();
         let mut nonce = [0u8; 16];
         getrandom::fill(&mut nonce)
             .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
         self.signed_upgrade_headers(ts, raw_url, &hex::encode(nonce))
+            .map(Some)
     }
 
     fn signed_upgrade_headers(
@@ -528,6 +649,32 @@ pub fn generate_ed25519_keypair() -> (String, String) {
     let seed = signing.to_bytes();
     let public = signing.verifying_key().to_bytes();
     (hex::encode(seed), hex::encode(public))
+}
+
+#[cfg(test)]
+impl Credentials {
+    /// Takes this key's signing capacity for the next hour, as a burst of
+    /// requests would, and returns the last timestamp taken.
+    pub(crate) fn hold_signing_capacity(&self) -> u64 {
+        let now_ms = timestamp_ms_from(SystemTime::now()).unwrap();
+        let held = now_ms + MAX_SIGNING_FUTURE_SKEW_MS + 3_600_000;
+        self.timestamp_allocator
+            .last_timestamp_ms
+            .fetch_max(held, Ordering::AcqRel);
+        self.last_signing_timestamp()
+    }
+
+    /// The last signing timestamp this key's allocator took.
+    pub(crate) fn last_signing_timestamp(&self) -> u64 {
+        self.timestamp_allocator
+            .last_timestamp_ms
+            .load(Ordering::Acquire)
+    }
+
+    /// Holds the queue async signers of this key wait in.
+    pub(crate) async fn hold_signing_queue(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.timestamp_allocator.async_gate.lock().await
+    }
 }
 
 #[cfg(test)]
@@ -870,7 +1017,7 @@ mod tests {
             allocator.last_timestamp_ms.store(seed, Ordering::Release);
             // The decision: the window is full and has room in `wait_ms`.
             assert_eq!(
-                allocator.allocate_at(NOW_MS).unwrap(),
+                allocator.allocate_at(NOW_MS, None).unwrap(),
                 Allocation::Full { wait_ms }
             );
             assert_eq!(allocator.last_timestamp_ms.load(Ordering::Acquire), seed);
@@ -1028,5 +1175,133 @@ mod tests {
             timestamp_ms_from(before_epoch),
             Err(Error::Transport { .. })
         ));
+    }
+
+    // A request's deadline bounds the async wait for capacity. The tests run
+    // on Tokio's paused clock: a wait ends at an exact instant, and a test
+    // moves the clock past a deadline on the turn a waiter comes back.
+
+    /// Capacity held for an hour: only a deadline or the cap ends a wait.
+    const HELD_MS: u64 = MAX_SIGNING_FUTURE_SKEW_MS + 3_600_000;
+    /// Room for the next timestamps: the next is the last plus one.
+    const ROOM_MS: u64 = 100;
+
+    fn allocator_ahead_by(ms: u64) -> (Arc<SigningTimestampAllocator>, u64) {
+        let allocator = Arc::new(SigningTimestampAllocator::default());
+        let last = timestamp_ms_from(SystemTime::now()).unwrap() + ms;
+        allocator.last_timestamp_ms.store(last, Ordering::Release);
+        (allocator, last)
+    }
+
+    fn last_taken(allocator: &SigningTimestampAllocator) -> u64 {
+        allocator.last_timestamp_ms.load(Ordering::Acquire)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_request_deadline_ends_the_capacity_wait_without_a_timestamp() {
+        let (allocator, last) = allocator_ahead_by(HELD_MS);
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(100);
+        assert_eq!(
+            allocator.next_async_until(Some(deadline)).await.unwrap(),
+            None
+        );
+        assert_eq!(tokio::time::Instant::now(), deadline);
+        assert_eq!(last_taken(&allocator), last);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_expired_deadline_takes_no_timestamp() {
+        let (allocator, last) = allocator_ahead_by(ROOM_MS);
+        let now = tokio::time::Instant::now();
+        assert_eq!(allocator.next_async_until(Some(now)).await.unwrap(), None);
+        assert_eq!(last_taken(&allocator), last);
+        assert_eq!(
+            allocator.next_async_until(None).await.unwrap(),
+            Some(last + 1)
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_cap_still_ends_a_wait_with_no_or_a_later_deadline() {
+        for later in [None, Some(Duration::from_secs(60))] {
+            let (allocator, last) = allocator_ahead_by(HELD_MS);
+            let started = tokio::time::Instant::now();
+            let deadline = later.map(|after| started + after);
+            let err = allocator.next_async_until(deadline).await.unwrap_err();
+            assert!(matches!(err, Error::RateLimit { .. }), "{err:?}");
+            assert_eq!(started.elapsed(), MAX_SIGNING_BACKPRESSURE);
+            assert_eq!(last_taken(&allocator), last);
+        }
+    }
+
+    /// A waiter with `deadline_in` left queues behind a held queue, which is
+    /// let go on the turn the clock reaches `resumed_after`, so the waiter's
+    /// turn and the end of its wait come together. Capacity is free.
+    async fn resumed_late(
+        deadline_in: Duration,
+        resumed_after: Duration,
+    ) -> (Result<Option<u64>>, Arc<SigningTimestampAllocator>, u64) {
+        let (allocator, last) = allocator_ahead_by(ROOM_MS);
+        let queue = allocator.async_gate.lock().await;
+        let deadline = tokio::time::Instant::now() + deadline_in;
+        let waiter = tokio::spawn({
+            let allocator = allocator.clone();
+            async move { allocator.next_async_until(Some(deadline)).await }
+        });
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        drop(queue);
+        tokio::time::advance(resumed_after).await;
+        (waiter.await.unwrap(), allocator, last)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_waiter_resumed_past_its_deadline_takes_no_timestamp() {
+        let (outcome, allocator, last) =
+            resumed_late(Duration::from_millis(100), Duration::from_millis(200)).await;
+        assert_eq!(outcome.unwrap(), None);
+        assert_eq!(last_taken(&allocator), last);
+        assert_eq!(
+            allocator.next_async_until(None).await.unwrap(),
+            Some(last + 1)
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_waiter_resumed_past_its_deadline_and_the_cap_takes_no_timestamp() {
+        let (outcome, allocator, last) =
+            resumed_late(Duration::from_millis(10_100), Duration::from_millis(10_200)).await;
+        assert_eq!(outcome.unwrap(), None);
+        assert_eq!(last_taken(&allocator), last);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_waiter_resumed_past_the_cap_with_time_left_takes_no_timestamp() {
+        let (outcome, allocator, last) =
+            resumed_late(Duration::from_secs(60), Duration::from_millis(10_200)).await;
+        let err = outcome.unwrap_err();
+        assert!(matches!(err, Error::RateLimit { .. }), "{err:?}");
+        assert_eq!(last_taken(&allocator), last);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_dropped_waiter_leaves_the_queue_without_a_timestamp() {
+        let (allocator, last) = allocator_ahead_by(ROOM_MS);
+        let queue = allocator.async_gate.lock().await;
+        let spawn_waiter = || {
+            let allocator = allocator.clone();
+            tokio::spawn(async move { allocator.next_async_until(None).await })
+        };
+        let dropped = spawn_waiter();
+        let next = spawn_waiter();
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        dropped.abort();
+        assert!(dropped.await.unwrap_err().is_cancelled());
+        drop(queue);
+        assert_eq!(next.await.unwrap().unwrap(), Some(last + 1));
+        assert_eq!(last_taken(&allocator), last + 1);
     }
 }

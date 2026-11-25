@@ -65,6 +65,8 @@ mod reply_id_inventory_tests;
 #[cfg(test)]
 mod rpc_auth_routing_tests;
 pub mod services;
+#[cfg(test)]
+mod signing_deadline_tests;
 mod tls;
 pub mod tradews;
 pub mod transport;

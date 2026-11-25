@@ -1223,32 +1223,58 @@ impl Factory {
 
     /// Async variant used by SDK network calls so timestamp-capacity
     /// backpressure never blocks a Tokio worker thread.
+    ///
+    /// The call's deadline, [`Config::timeout`], starts here, before signing:
+    /// a wait for signing capacity spends it and ends at it with the error the
+    /// call's own deadline gives, sending nothing, and the options give the
+    /// call only the time left.
     pub async fn sign_options_async<M: Message + Serialize>(
         &self,
         procedure: &str,
         request: &M,
     ) -> Result<CallOptions> {
+        let deadline = tokio::time::Instant::now().checked_add(self.config.timeout);
         let creds = self.require_credentials()?;
         let body = match self.config.wire_format {
             WireFormat::Binary => request.encode_to_bytes(),
             WireFormat::Json => connectrpc::JsonCodec::encode(request).map_err(Self::map_error)?,
         };
         let sign_url = auth::request_url(&self.config.api_url, procedure);
-        let headers = creds
-            .sign_request_with_recv_window_async(
+        let Some(headers) = creds
+            .sign_request_with_recv_window_before(
                 "POST",
                 &sign_url,
                 &body,
-                None,
                 self.config.recv_window_ms,
+                deadline,
             )
-            .await?;
+            .await?
+        else {
+            return Err(call_deadline_exceeded(procedure));
+        };
         let mut opts = CallOptions::default().with_header(USER_AGENT, user_agent());
+        if let Some(deadline) = deadline {
+            let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if left.is_zero() {
+                return Err(call_deadline_exceeded(procedure));
+            }
+            opts = opts.with_timeout(left);
+        }
         for (k, v) in headers {
             opts = opts.with_header(k, v);
         }
         Ok(opts)
     }
+}
+
+/// The error a call's own deadline gives when it passes in flight
+/// (connectrpc's client-side deadline), for a call whose deadline passed
+/// before it was sent.
+fn call_deadline_exceeded(procedure: &str) -> Error {
+    Factory::map_error(ConnectError::deadline_exceeded(
+        "client-side deadline exceeded",
+    ))
+    .for_procedure(procedure)
 }
 
 fn build_http_client(api_url: &str) -> Result<GatewayTransport> {

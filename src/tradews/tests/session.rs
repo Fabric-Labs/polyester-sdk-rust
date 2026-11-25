@@ -2960,3 +2960,42 @@ async fn a_tagged_value_on_a_pair_without_a_known_symbol_is_refused_not_sent() {
     let seen = record.lock().unwrap()[0].clone();
     assert_eq!(sent_sizes(&seen), vec![(2, 1_500_000, 2_000_000_000)]);
 }
+
+#[tokio::test]
+async fn the_connect_timeout_bounds_the_upgrade_s_wait_for_signing_capacity() {
+    use crate::signing_deadline_tests::{GUARD, MARGIN, TIMEOUT, silent_server};
+    use std::sync::atomic::Ordering;
+
+    let (addr, requests) = silent_server(crate::tradews::PATH).await;
+    let creds = Credentials::new("ak_signing_deadline_tradews", SEED_HEX).unwrap();
+    let held = creds.hold_signing_capacity();
+    let mut config = crate::tradews::Config::new(
+        format!("ws://{addr}{}", crate::tradews::PATH),
+        creds.clone(),
+        super::pairs(),
+    );
+    config.connect_timeout = TIMEOUT;
+    let started = std::time::Instant::now();
+    let Err(err) = tokio::time::timeout(GUARD, crate::tradews::connect(config))
+        .await
+        .expect("the connect timeout ends it, not the ten-second cap")
+    else {
+        panic!("connected while signing capacity is held");
+    };
+    let elapsed = started.elapsed();
+
+    assert!(
+        elapsed < TIMEOUT + MARGIN,
+        "took {elapsed:?} with a {TIMEOUT:?} connect timeout"
+    );
+    assert_eq!(
+        err.to_string(),
+        Error::realtime("tradews connect timed out").to_string()
+    );
+    assert_eq!(requests.load(Ordering::SeqCst), 0, "the upgrade was sent");
+    assert_eq!(
+        creds.last_signing_timestamp(),
+        held,
+        "a timestamp was taken"
+    );
+}
