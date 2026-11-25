@@ -382,12 +382,18 @@ impl InternalTransfersService {
     /// retry it with the same key and legs.
     ///
     /// A `refused` batch is final for its key: fix the cause and submit under
-    /// a new key. Every failure of the call, whatever the server answered, is
-    /// an [`crate::errors::Error::Server`] with an unknown outcome
-    /// ([`crate::errors::Error::mutation_outcome_unknown`]) that this SDK does
-    /// not retry, keeping the answer's status, Retry-After and code: send the
-    /// batch again under the same idempotency key and legs, which is safe
-    /// whether or not it was admitted.
+    /// a new key. Every other failure of the call, whatever the server
+    /// answered, is an [`crate::errors::Error::Server`] with an unknown
+    /// outcome ([`crate::errors::Error::mutation_outcome_unknown`]) that this
+    /// SDK does not retry, keeping the answer's status, Retry-After and code:
+    /// send the batch again under the same idempotency key and legs, which is
+    /// safe whether or not it was admitted, or give it up with
+    /// [`Self::abandon_batch`]. The one exception is a key that was abandoned:
+    /// that refusal is an [`crate::errors::Error::Api`] for which
+    /// [`crate::errors::Error::is_idempotency_key_abandoned`] is true
+    /// (`ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED`). Nothing moved under the key
+    /// and it is final, not retryable and not an unknown outcome: submit the
+    /// batch under a new key.
     pub async fn batch_create(
         &self,
         params: crate::models::BatchCreateInternalTransfersParams,
@@ -435,8 +441,12 @@ impl InternalTransfersService {
     ///
     /// `request_id` is sent as given; one that is empty, over 39 characters,
     /// or not decimal digits without a leading zero is refused before
-    /// sending. A reply that breaks the contract, or names no batch, is an
-    /// [`crate::errors::Error::ResponseContract`].
+    /// sending. A reply that breaks the contract, or names no batch or
+    /// another batch than `request_id`, is an
+    /// [`crate::errors::Error::ResponseContract`]: it reads by request ID only,
+    /// so the reply must echo it. An abandoned key has no request ID and
+    /// never answers this read; [`Self::abandon_batch`] with the key reads it
+    /// (`abandoned`, with no `request_id` and no legs).
     pub async fn get_batch(
         &self,
         request_id: &str,
@@ -471,7 +481,77 @@ impl InternalTransfersService {
         )
         .await?
         .into_owned();
-        internal_transfer_batch_from_get_response(&resp)
+        let batch = internal_transfer_batch_from_get_response(&resp)?;
+        // A read by request ID must answer the batch it asked for.
+        if batch.request_id != request_id {
+            return Err(Error::response_contract(
+                "GetInternalTransferBatch",
+                format!(
+                    "reply names batch {:?}, not {request_id:?}",
+                    batch.request_id
+                ),
+            ));
+        }
+        Ok(batch)
+    }
+
+    /// Make the absence of a batch under an idempotency key final
+    /// (`AbandonInternalTransferBatch`), for example after a
+    /// [`Self::batch_create`] whose answer was lost and that may never have
+    /// reached the server.
+    ///
+    /// If a batch was submitted under the key, it answers that batch's
+    /// outcome (`accepted`, `processing` or `refused`, as [`Self::get_batch`]
+    /// reads it) and changes nothing. Otherwise it records the key as
+    /// abandoned and answers status `abandoned`, with no `request_id` and no
+    /// legs: no funds moved under the key and none ever will. Every later
+    /// [`Self::batch_create`] under the key, a retry included, is then refused
+    /// with an [`crate::errors::Error::Api`] for which
+    /// [`crate::errors::Error::is_idempotency_key_abandoned`] is true, and
+    /// every later abandon of it answers `abandoned` again. A create and an
+    /// abandon that race on one key end in exactly one of the two outcomes.
+    ///
+    /// The key is scoped as [`Self::batch_create`] scopes it, to the API key.
+    /// The key's policy must grant `INTERNAL_TRANSFER`, and to answer an
+    /// existing batch also the read permission on every source account of
+    /// the batch, refused as [`Self::get_batch`] refuses it. It needs no MFA,
+    /// as it never moves funds, and counts as one batch create against the
+    /// rate limit. Calling it again with the same key is always safe: an
+    /// error whose outcome is unknown
+    /// ([`crate::errors::Error::mutation_outcome_unknown`], such as a server
+    /// failure or a timeout) is resolved by calling it again with the same
+    /// key.
+    ///
+    /// An idempotency key that is empty or over 128 characters is refused
+    /// before sending. A reply that breaks the contract is an
+    /// [`crate::errors::Error::ResponseContract`].
+    pub async fn abandon_batch(
+        &self,
+        idempotency_key: &str,
+    ) -> crate::errors::Result<crate::models::InternalTransferBatchResult> {
+        use super::limits::{IDEMPOTENCY_KEY_MAX_LEN, check_len};
+        use crate::codecs::decode::internal_transfer_batch_from_abandon_response;
+        use crate::proto::transfer::v1::AbandonInternalTransferBatchRequest;
+        check_len(
+            "abandon_internal_transfer_batch",
+            "idempotency_key",
+            idempotency_key,
+            IDEMPOTENCY_KEY_MAX_LEN,
+        )?;
+        let req = AbandonInternalTransferBatchRequest {
+            idempotency_key: idempotency_key.to_owned(),
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = super::unary::await_auth(
+            &self.ctx.factory,
+            "/transfer.v1.InternalTransferService/AbandonInternalTransferBatch",
+            req,
+            |req, opts| client.abandon_internal_transfer_batch_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        internal_transfer_batch_from_abandon_response(&resp)
     }
 
     /// The `BatchCreateInternalTransfersRequest` [`Self::batch_create`]
@@ -1999,6 +2079,11 @@ impl RateLimitService {
 fn batch_create_failure(err: connectrpc::ConnectError, procedure: &str) -> crate::errors::Error {
     use crate::errors::Error;
     let mapped = crate::transport::Factory::map_error(err.clone()).for_procedure(procedure);
+    // An abandoned key is the one refusal that proves nothing moved and
+    // nothing ever will under the key: it stays the final refusal it maps to.
+    if mapped.is_idempotency_key_abandoned() {
+        return mapped;
+    }
     let mapped_code = match &mapped {
         Error::Api { code, .. }
         | Error::AdmissionUnavailable { code, .. }

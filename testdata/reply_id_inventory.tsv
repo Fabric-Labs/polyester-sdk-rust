@@ -431,6 +431,7 @@ swap.v1.SwapTerms.source_asset_id	not_required	reference to an asset
 swap.v1.SwapTerms.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 system.v1.StatusEvent.id	required	
 system.v1.StatusEventUpdate.id	required	
+transfer.v1.AbandonInternalTransferBatchResponse.request_id	not_required	empty when the key was abandoned (BATCH_ABANDONED) or the batch was refused before it was accepted for processing; required for an accepted or processing batch, which the decoder checks
 transfer.v1.BatchCreateInternalTransfersResponse.request_id	not_required	empty when the batch is refused before it was accepted for processing; required for an accepted or processing batch, which the decoder checks
 transfer.v1.CreateInternalTransferResponse.asset_id	not_required	reference to an asset
 transfer.v1.CreateInternalTransferResponse.flow_id	not_required	an older server sends none; the receipt decodes with an empty flow ID
@@ -443,7 +444,7 @@ transfer.v1.DustConversion.conversion_id	required
 transfer.v1.DustConversion.quote_id	not_required	reference to the quote the conversion converted
 transfer.v1.DustConversion.target_asset_id	not_required	reference to an asset
 transfer.v1.DustSource.asset_id	not_required	reference to an asset
-transfer.v1.GetInternalTransferBatchResponse.request_id	required	
+transfer.v1.GetInternalTransferBatchResponse.request_id	not_required	empty for BATCH_ABANDONED, which only a read by idempotency key answers; a read by request ID must echo the ID it asked for, which the decoder checks
 transfer.v1.GetInternalTransferResponse.flow_id	not_required	an older server sends none, as for CreateInternalTransfer
 transfer.v1.GetInternalTransferResponse.request_id	required	
 transfer.v1.GetInternalTransferResponse.transfer_id	required	

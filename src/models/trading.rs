@@ -1696,8 +1696,9 @@ pub struct InternalTransferResult {
 }
 
 /// The outcome of a batch of internal transfers, from
-/// [`crate::services::InternalTransfersService::batch_create`] or
-/// [`crate::services::InternalTransfersService::get_batch`].
+/// [`crate::services::InternalTransfersService::batch_create`],
+/// [`crate::services::InternalTransfersService::get_batch`] or
+/// [`crate::services::InternalTransfersService::abandon_batch`].
 ///
 /// A batch is all or nothing: every leg is credited, or no leg moves.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1706,7 +1707,7 @@ pub struct InternalTransferBatchResult {
     /// [`crate::services::InternalTransfersService::get_batch`]: a decimal
     /// string. Never empty for an `accepted` or `processing` batch, nor on a
     /// read; empty when the batch was refused before it was accepted for
-    /// processing.
+    /// processing, and when its key was abandoned.
     pub request_id: String,
     /// `accepted` (every leg is `credited`), `processing` (the outcome is
     /// not known yet: the batch completes on its own, ending `accepted` or
@@ -1716,7 +1717,10 @@ pub struct InternalTransferBatchResult {
     /// refusal is final for its key in every case: a retry with the same
     /// key and legs answers `refused` again, even once the leg would pass,
     /// and one with other legs is refused `IDEMPOTENCY_CONFLICT`. Fix the
-    /// cause and submit under a new key.
+    /// cause and submit under a new key. `abandoned`, which only
+    /// `abandon_batch` answers, means no batch was ever submitted under the
+    /// idempotency key and none ever will be: nothing moved, `request_id` is
+    /// empty and `legs` is empty.
     pub status: String,
     /// One result per leg, in request order.
     pub legs: Vec<InternalTransferBatchLegResult>,

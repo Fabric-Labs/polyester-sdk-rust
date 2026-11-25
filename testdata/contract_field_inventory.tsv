@@ -1,5 +1,5 @@
 # Every field of the messages the 0.93.3 contract (1945423), the 0.93.4
-# contract (5c2119f), the 0.93.5 and the 0.93.6 contracts added or changed that this SDK
+# contract (5c2119f), the 0.93.5, 0.93.6 and 0.93.11 contracts added or changed that this SDK
 # wraps, and of the lifecycle flow views every flow read and flow update
 # decodes: the request fields its calls set, and the reply fields its models
 # expose. A guard test walks the generated messages and fails when a field
@@ -228,6 +228,10 @@ transfer.v1.DustSource.asset_id	covered	DustSource.asset_id
 transfer.v1.GetDustConversionRequest.conversion_id	covered	dust.get_conversion(conversion_id)
 transfer.v1.GetDustConversionRequest.subaccount_id	covered	dust.get_conversion(subaccount_id: SubAccountScope)
 transfer.v1.GetDustConversionResponse.conversion	covered	DustConversion (get_conversion result)
+transfer.v1.AbandonInternalTransferBatchRequest.idempotency_key	covered	abandon_batch(idempotency_key)
+transfer.v1.AbandonInternalTransferBatchResponse.legs	covered	InternalTransferBatchResult.legs (abandon_batch result)
+transfer.v1.AbandonInternalTransferBatchResponse.request_id	covered	InternalTransferBatchResult.request_id (abandon_batch result)
+transfer.v1.AbandonInternalTransferBatchResponse.status	covered	InternalTransferBatchResult.status (abandon_batch result)
 transfer.v1.GetInternalTransferBatchRequest.request_id	covered	get_batch(request_id)
 transfer.v1.GetInternalTransferBatchRequest.idempotency_key	omitted	reading a batch by the key batch_create sent is not wrapped: get_batch reads it by request ID. Sending the same key and legs to batch_create again recovers the batch's stored outcome only while the caller may still move funds from every source account of the batch; a read by key needs instead the read permission on every source account
 transfer.v1.GetInternalTransferBatchResponse.legs	covered	InternalTransferBatchResult.legs (get_batch result)

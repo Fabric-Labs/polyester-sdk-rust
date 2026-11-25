@@ -281,8 +281,10 @@ procedure	access
 /swap.quickswap.v1.QuickSwapService/CreateQuickSwap	signed
 /swap.quickswap.v1.QuickSwapService/GetQuickSwap	signed
 /swap.quickswap.v1.QuickSwapService/QuoteQuickSwap	signed
+/swap.v1.SwapService/CancelSwap	signed
 /swap.v1.SwapService/CreateSwap	signed
 /swap.v1.SwapService/GetSwap	signed
+/swap.v1.SwapService/ListSwaps	signed
 /swap.v1.SwapService/QuoteSwap	signed
 /system.v1.SystemService/GetTime	public
 /system.v1.SystemService/GetVersion	public
@@ -292,6 +294,7 @@ procedure	access
 /transfer.v1.DustConversionService/ListDustBalances	signed
 /transfer.v1.DustConversionService/ListDustConversions	signed
 /transfer.v1.DustConversionService/QuoteDustConversion	signed
+/transfer.v1.InternalTransferService/AbandonInternalTransferBatch	signed
 /transfer.v1.InternalTransferService/BatchCreateInternalTransfers	signed
 /transfer.v1.InternalTransferService/CreateInternalTransfer	signed
 /transfer.v1.InternalTransferService/GetInternalTransfer	signed
