@@ -117,17 +117,10 @@ fn book_side(
     symbol_id: u32,
     field: &str,
 ) -> Result<(Option<Price>, Option<Quantity>)> {
+    // A negative size is refused whether or not the side has a price.
+    let qty = decode_qty_scaled_allow_zero(qty_scaled, None, None, Some(symbol_id), field)?;
     Ok(match decode_price_ticks(ticks, None) {
-        Some(price) => (
-            Some(price),
-            Some(decode_qty_scaled_allow_zero(
-                qty_scaled,
-                None,
-                None,
-                Some(symbol_id),
-                field,
-            )?),
-        ),
+        Some(price) => (Some(price), Some(qty)),
         None => (None, None),
     })
 }

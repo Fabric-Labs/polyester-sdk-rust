@@ -114,16 +114,20 @@ pub fn levels_from_proto(
     levels
         .iter()
         .map(|l| {
-            let price = decode_price_ticks(l.price_ticks, symbol.clone())
-                .ok_or_else(|| Error::validation("orderbook level has invalid or missing price"))?;
+            // A negative quantity is corrupt, not a missing one: refuse it
+            // before an omitted (0) price or quantity.
             let qty = decode_qty_scaled(
                 l.qty_scaled,
                 Some(quantity_scale),
                 symbol.clone(),
                 None,
                 "PriceLevel.qty_scaled",
-            )?
-            .ok_or_else(|| Error::validation("orderbook level has invalid or missing quantity"))?;
+            )?;
+            let price = decode_price_ticks(l.price_ticks, symbol.clone())
+                .ok_or_else(|| Error::validation("orderbook level has invalid or missing price"))?;
+            let qty = qty.ok_or_else(|| {
+                Error::validation("orderbook level has invalid or missing quantity")
+            })?;
             Ok(OrderbookLevel {
                 price: Some(price),
                 qty: Some(qty),
