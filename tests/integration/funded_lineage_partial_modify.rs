@@ -359,7 +359,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
             assert!(cum >= first_fill_qty);
             assert!(
                 !scoped.trades.is_empty(),
-                "POLY-4708: lineage trades empty after replacing a partially filled order"
+                "lineage trades empty after replacing a partially filled order"
             );
             cleanup().await;
             return;
@@ -374,7 +374,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
     let after_match_ids = match_ids(&history.trades);
     assert!(
         !history.trades.is_empty(),
-        "POLY-4708: GetOrder history is empty after replacing a partially filled order"
+        "GetOrder history is empty after replacing a partially filled order"
     );
     assert!(
         first_match_ids.is_subset(&after_match_ids),

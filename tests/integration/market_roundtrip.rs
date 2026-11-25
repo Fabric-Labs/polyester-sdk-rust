@@ -200,7 +200,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             if let Some(maker) = maker.as_ref() {
                 cancel_test_order(maker, &symbol, &maker_cid, "maker ask").await;
             }
-            eprintln!("skip: buy terminal wait (possible POLY-3028): {err}");
+            eprintln!("skip: buy terminal wait (possible reserve blocker): {err}");
             return;
         }
     };
@@ -215,7 +215,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         if let Some(maker) = maker.as_ref() {
             cancel_test_order(maker, &symbol, &maker_cid, "maker ask").await;
         }
-        eprintln!("skip: buy produced no fill (possible POLY-3028)");
+        eprintln!("skip: buy produced no fill (possible reserve blocker)");
         return;
     }
     let buy_projection = client
@@ -333,7 +333,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
                         cancel_test_order(maker, &symbol, maker_buy_cid, "maker bid").await;
                     }
                 }
-                eprintln!("skip: sell terminal wait (possible POLY-3028): {err}");
+                eprintln!("skip: sell terminal wait (possible reserve blocker): {err}");
                 return;
             }
         };

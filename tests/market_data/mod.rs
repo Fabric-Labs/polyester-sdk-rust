@@ -142,7 +142,7 @@ impl Api {
     }
 }
 
-// POLY-8745: the server acknowledges a subscribe to any channel but publishes
+// The server acknowledges a subscribe to any channel but publishes
 // live buckets only on public:spot:market:heatmap:<1s|1m|5m|1h>:<id>:proto.
 #[tokio::test]
 async fn heatmap_subscribe_live_receives_published_buckets_for_every_interval() {
@@ -248,7 +248,7 @@ async fn heatmap_get_requests_the_smallest_supported_depth_covering_the_request(
     assert!(api.heatmap.lock().unwrap().is_empty());
 }
 
-// POLY-8746 parity: each heatmap argument resolves against its own enum only.
+// Each heatmap argument resolves against its own enum only.
 #[tokio::test]
 async fn heatmap_get_refuses_a_value_of_the_other_enum() {
     let api = Api::spawn(ListMarketOverviewResponse::default()).await;
@@ -267,7 +267,7 @@ async fn heatmap_get_refuses_a_value_of_the_other_enum() {
     assert!(api.heatmap.lock().unwrap().is_empty());
 }
 
-// POLY-8785 parity: buckets hydrated from the API keep every digit.
+// Buckets hydrated from the API keep every digit.
 #[tokio::test]
 async fn hydrated_price_buckets_keep_sub_micro_increments() {
     let api = Api::spawn(ListMarketOverviewResponse::default()).await;
@@ -335,8 +335,7 @@ fn expected_sparklines() -> Vec<(String, Vec<i64>)> {
     ]
 }
 
-// POLY-8789 and POLY-8786 parity: list exposes requested sparklines and the
-// 24-hour change.
+// List exposes requested sparklines and the 24-hour change.
 #[tokio::test]
 async fn overview_list_exposes_requested_sparklines_and_the_24h_change() {
     let api = Api::spawn(overview_snapshot()).await;
@@ -368,8 +367,8 @@ async fn overview_list_exposes_requested_sparklines_and_the_24h_change() {
     assert_eq!(without.markets[0].change_24h_bps, -14);
 }
 
-// POLY-8783: a live update keeps the symbol and the formatted base volume, and
-// (POLY-8789) the snapshot's sparklines, which live publications never carry.
+// A live update keeps the symbol and the formatted base volume, and the
+// snapshot's sparklines, which live publications never carry.
 #[tokio::test]
 async fn managed_overview_live_updates_keep_symbol_volume_and_sparklines() {
     let api = Api::spawn(overview_snapshot()).await;
@@ -416,7 +415,7 @@ async fn managed_overview_live_updates_keep_symbol_volume_and_sparklines() {
     sub.close();
 }
 
-// POLY-8783: the raw overview stream is enriched like list rows.
+// The raw overview stream is enriched like list rows.
 #[tokio::test]
 async fn overview_subscribe_enriches_live_rows() {
     let api = Api::spawn(ListMarketOverviewResponse::default()).await;

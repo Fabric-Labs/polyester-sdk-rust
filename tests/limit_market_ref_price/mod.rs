@@ -1,4 +1,4 @@
-//! POLY-9092: `market_client_ref_price` is a market-order field. The public
+//! `market_client_ref_price` is a market-order field. The public
 //! contract carries `client_ref_price_ticks` on `MarketIoc` only, so a limit
 //! order with it is refused before anything is sent instead of having the
 //! reference price silently dropped.

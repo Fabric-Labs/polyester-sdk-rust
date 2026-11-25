@@ -2406,8 +2406,8 @@ mod tests {
         params
     }
 
-    /// POLY-5724: a trailing distance in ticks is a price delta in 1e-9
-    /// quote-unit ticks, the scale of every price tick, sent as given.
+    /// A trailing distance in ticks is a price delta in 1e-9 quote-unit
+    /// ticks, the scale of every price tick, sent as given.
     #[test]
     fn trailing_distance_ticks_are_price_ticks() {
         use crate::codecs::decode::trigger_from_proto;
@@ -2492,7 +2492,7 @@ mod tests {
                 .is_err()
         );
 
-        // POLY-9426: a modify takes 10000 (a buy stop-loss or take-profit
+        // A modify takes 10000 (a buy stop-loss or take-profit
         // market child's cap) and leaves the side check to the server.
         let modify_full = ModifyTriggerParams {
             trigger_id: "2".into(),
@@ -2571,7 +2571,7 @@ mod tests {
     }
 
     #[test]
-    fn poly_4684_standalone_trailing_slippage_bps_boundaries_preexisting() {
+    fn standalone_trailing_slippage_bps_boundaries_preexisting() {
         let client = client();
         // Every trailing stop takes at most 9999 bps, whatever its side.
         for side in [CreateSide::Buy, CreateSide::Sell] {
@@ -2608,8 +2608,8 @@ mod tests {
             ..modify_params(None, None)
         };
         // A modify does not say which trigger it changes: it takes 1 to
-        // 10000 as the contract does (POLY-9426), and the server refuses
-        // 10000 for a trailing stop.
+        // 10000 as the contract does, and the server refuses 10000 for a
+        // trailing stop.
         for bps in [1, 9_999, 10_000] {
             client
                 .triggers
@@ -2638,7 +2638,7 @@ mod tests {
     }
 
     #[test]
-    fn poly_4689_standalone_trailing_distance_bps_boundaries() {
+    fn standalone_trailing_distance_bps_boundaries() {
         let client = client();
         for bps in [1, 10_000] {
             let mut params = trailing_create(None);
@@ -3554,10 +3554,10 @@ mod tests {
         }
     }
 
-    /// POLY-8758: no trigger child has a GTD execution, so a selected Gtd is
-    /// refused for every strategy instead of being sent as IOC or GTC.
+    /// No trigger child has a GTD execution, so a selected Gtd is refused for
+    /// every strategy instead of being sent as IOC or GTC.
     #[test]
-    fn poly_8758_gtd_is_refused_for_every_trigger_strategy() {
+    fn gtd_is_refused_for_every_trigger_strategy() {
         let client = client();
         let limit_stop = create_params(
             crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
@@ -3615,10 +3615,10 @@ mod tests {
         }
     }
 
-    /// POLY-8748: a TWAP market child's tick cap is positive, as every other
-    /// create-time tick cap is.
+    /// A TWAP market child's tick cap is positive, as every other create-time
+    /// tick cap is.
     #[test]
-    fn poly_8748_twap_market_refuses_nonpositive_slippage_ticks() {
+    fn twap_market_refuses_nonpositive_slippage_ticks() {
         let client = client();
         for ticks in [-5, 0] {
             let mut params = twap_create(CreateOrderType::Market);

@@ -299,10 +299,10 @@ mod tests {
         }
     }
 
-    // POLY-8583: a positive quantity at price zero can't be rendered, so the
-    // whole delta fails closed like any malformed delta.
+    // A positive quantity at price zero can't be rendered, so the whole delta
+    // fails closed like any malformed delta.
     #[test]
-    fn ticket_8583_apply_delta_refuses_zero_price_level() {
+    fn apply_delta_refuses_zero_price_level() {
         let valid = (103, 7);
         let zero = (0, 4);
         for (name, delta) in [
@@ -326,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn ticket_8583_apply_delta_keeps_valid_deletions_and_inserts() {
+    fn apply_delta_keeps_valid_deletions_and_inserts() {
         let mut bids = BookSide::from([(100, 5), (99, 1)]);
         let mut asks = BookSide::from([(200, 3)]);
         let update = delta(10, 11, &[(99, 0), (0, 0)], &[(201, 2)], false);
@@ -336,9 +336,9 @@ mod tests {
         build_orderbook_data("BTC-USDT", 10, 11, &bids, &asks, 10, 8, true).unwrap();
     }
 
-    // POLY-8588 parity: rendered levels keep the market they were built for.
+    // Rendered levels keep the market they were built for.
     #[test]
-    fn ticket_8588_rendered_levels_are_bound_to_their_market() {
+    fn rendered_levels_are_bound_to_their_market() {
         let bids = BookSide::from([(52_320_000_000, 5)]);
         let asks = BookSide::from([(52_330_000_000, 6)]);
         for bucket in [0, 10] {
@@ -478,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    fn poly_4688_stale_or_equal_reset_never_rewinds_or_mutates_newer_snapshot() {
+    fn stale_or_equal_reset_never_rewinds_or_mutates_newer_snapshot() {
         let mut bids = BookSide::from([(100, 5)]);
         let mut asks = BookSide::from([(200, 3)]);
         for reset in [
@@ -496,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    fn poly_4688_newer_and_overlapping_resets_replace_snapshot_atomically() {
+    fn newer_and_overlapping_resets_replace_snapshot_atomically() {
         for reset in [
             delta(101, 102, &[(101, 4)], &[], true),
             delta(99, 101, &[(102, 6)], &[], true),
@@ -518,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn poly_4688_malformed_reset_is_out_of_sync_without_mutation() {
+    fn malformed_reset_is_out_of_sync_without_mutation() {
         for reset in [
             delta(102, 101, &[(101, 4)], &[], true),
             delta(101, 102, &[(101, -1)], &[], true),

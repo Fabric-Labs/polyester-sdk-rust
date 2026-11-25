@@ -2200,7 +2200,7 @@ mod tests {
     }
 
     #[test]
-    fn poly_4687_attached_risk_preserves_each_leg_runtime_state_and_legacy_stop() {
+    fn attached_risk_preserves_each_leg_runtime_state_and_legacy_stop() {
         use crate::proto::orders::v1::attached_risk_leg_state::Status;
         use crate::proto::orders::v1::{
             AttachedRiskLegState, AttachedRiskStopLoss, AttachedRiskTakeProfit,

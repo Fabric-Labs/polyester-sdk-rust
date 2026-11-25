@@ -1,4 +1,4 @@
-//! POLY-3746 L2 integration tests via public SDK APIs + local mock HTTP/WS.
+//! L2 integration tests via public SDK APIs + local mock HTTP/WS.
 //!
 //! These exercise production paths (subscribe_raw, JsonRpcClient, wait_for_catalogs,
 //! Quantity::format, SnapshotThenStream) against in-process servers — not private helpers.
@@ -3427,7 +3427,7 @@ async fn l2_wait_for_catalogs_can_retry_after_transient_failure() {
     let zipper = zipper_config_fixture();
     let http = MockHttpServer::spawn(move |req| {
         if req.path == SPOT_CONFIG_PATH {
-            // POLY-9228: startup reads a 503 again up to 3 times; fail all of
+            // Startup reads a 503 again up to 3 times; fail all of
             // them so the load itself fails.
             if attempts_h.fetch_add(1, Ordering::SeqCst) < 3 {
                 hardening_support::HttpScript::Json {
@@ -3473,7 +3473,7 @@ async fn l2_wait_for_catalogs_can_retry_after_transient_failure() {
     );
 }
 
-/// POLY-9228: a funding (zipper) failure no longer blocks spot trading.
+/// A funding (zipper) failure no longer blocks spot trading.
 #[tokio::test]
 async fn l2_wait_for_catalogs_zipper_failure_leaves_spot_ready() {
     let spot = spot_config_fixture();
@@ -6925,7 +6925,7 @@ async fn l2_market_overview_follows_token_with_unchanged_filters() {
 // Each case goes through the public helper and a capture server; both refusal and
 // supported wire values are checked, so a missing scenario cannot pass silently.
 #[tokio::test]
-async fn poly_8539_trigger_option_applicability() {
+async fn trigger_option_applicability() {
     use polyester::Price;
     use polyester::models::{CreateOrderType, CreateSide, CreateTriggerParams, CreateTriggerType};
     use polyester::proto::triggers::v1::{
@@ -6987,7 +6987,7 @@ async fn poly_8539_trigger_option_applicability() {
                 Some(1),
             )
             .unwrap();
-            // A ladder places limit orders only (POLY-9423).
+            // A ladder places limit orders only.
             let order_type = if kind == CreateTriggerType::Ladder {
                 CreateOrderType::Limit
             } else {
@@ -7099,7 +7099,7 @@ async fn poly_8539_trigger_option_applicability() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
-fn poly_8539_params(
+fn trigger_applicability_params(
     kind: polyester::models::CreateTriggerType,
     order_type: polyester::models::CreateOrderType,
 ) -> polyester::models::CreateTriggerParams {
@@ -7135,7 +7135,7 @@ fn poly_8539_params(
 }
 
 #[tokio::test]
-async fn poly_8539_trigger_execution_applicability() {
+async fn trigger_execution_applicability() {
     use polyester::Price;
     use polyester::models::{CreateOrderType, CreateTimeInForce, CreateTriggerType};
     use polyester::proto::triggers::v1::{
@@ -7177,7 +7177,7 @@ async fn poly_8539_trigger_execution_applicability() {
             if kind == CreateTriggerType::TrailingStop && order_type == CreateOrderType::Limit {
                 continue;
             }
-            // A market ladder is refused whatever its options (POLY-9423,
+            // A market ladder is refused whatever its options (see
             // trigger_reads_and_filters); its limit options are checked here.
             if kind == CreateTriggerType::Ladder && order_type == CreateOrderType::Market {
                 continue;
@@ -7189,7 +7189,7 @@ async fn poly_8539_trigger_execution_applicability() {
                 "max_slippage_ticks",
                 "max_slippage_bps",
             ] {
-                let mut p = poly_8539_params(kind, order_type);
+                let mut p = trigger_applicability_params(kind, order_type);
                 let price = || Price::from_ticks(100_000_000_000, Some("BTC-USDT".into())).unwrap();
                 if order_type == CreateOrderType::Limit && kind != CreateTriggerType::Ladder {
                     p.limit_price = Some(price());
@@ -7314,7 +7314,7 @@ async fn poly_8539_trigger_execution_applicability() {
 }
 
 #[tokio::test]
-async fn poly_8539_trailing_side_execution_and_buy_maximum() {
+async fn trailing_side_execution_and_buy_maximum() {
     use polyester::Price;
     use polyester::models::{CreateOrderType, CreateSide, CreateTriggerType};
     use polyester::proto::triggers::v1::{
@@ -7349,7 +7349,7 @@ async fn poly_8539_trailing_side_execution_and_buy_maximum() {
         (CreateSide::Buy, CreateOrderType::Limit),
         (CreateSide::Buy, CreateOrderType::Market),
     ] {
-        let mut p = poly_8539_params(CreateTriggerType::TrailingStop, order_type);
+        let mut p = trigger_applicability_params(CreateTriggerType::TrailingStop, order_type);
         p.side = side;
         if side == CreateSide::Buy {
             p.limit_price =
@@ -7437,8 +7437,9 @@ async fn create_quantity_uses_catalog_scale_on_wire_and_result() {
     }
 }
 
-// Ticket regressions use explicit protocol messages and channels as barriers.
-async fn ticket_ws(
+// Order book regressions use explicit protocol messages and channels as
+// barriers.
+async fn orderbook_regression_ws(
     setup_frames: Vec<Vec<u8>>,
     expected_symbol_id: Option<u32>,
 ) -> (
@@ -7499,7 +7500,7 @@ async fn ticket_ws(
 }
 
 #[tokio::test]
-async fn ticket_8475_setup_preserves_publication_order() {
+async fn orderbook_setup_preserves_publication_order() {
     use hardening_support::centrifugo_publication as publication;
     let ack = centrifugo_ok_reply(2);
     let first = publication(b"first");
@@ -7517,7 +7518,7 @@ async fn ticket_8475_setup_preserves_publication_order() {
         let multiple = frames[0].len() > ack.len() + first.len();
         let mut frames = frames;
         frames.push(publication(b"control"));
-        let (url, _tx, task) = ticket_ws(frames, None).await;
+        let (url, _tx, task) = orderbook_regression_ws(frames, None).await;
         let rt = RealtimeClient::new(url, "", None, None);
         let mut sub = rt.subscribe_raw(PUBLIC_CHANNEL).await.unwrap();
         let mut received = Vec::new();
@@ -7543,7 +7544,7 @@ async fn ticket_8475_setup_preserves_publication_order() {
     }
 }
 
-fn ticket_book_client(http_url: String, ws_url: String) -> Client {
+fn orderbook_regression_client(http_url: String, ws_url: String) -> Client {
     let client = Client::new(Config {
         api_url: http_url,
         ws_url,
@@ -7562,7 +7563,7 @@ fn ticket_book_client(http_url: String, ws_url: String) -> Client {
 }
 
 #[tokio::test]
-async fn ticket_8510_zero_sequence_and_availability_are_independent() {
+async fn orderbook_zero_sequence_and_availability_are_independent() {
     use polyester::proto::orderbook::v1::GetOrderBookResponse;
     for seq in [0, 1] {
         for available in [false, true] {
@@ -7576,8 +7577,9 @@ async fn ticket_8510_zero_sequence_and_availability_are_independent() {
                 })
             })
             .await;
-            let (url, _tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
-            let client = ticket_book_client(http.base_url(), url);
+            let (url, _tx, task) =
+                orderbook_regression_ws(vec![centrifugo_ok_reply(2)], None).await;
+            let client = orderbook_regression_client(http.base_url(), url);
             let unary = client.orderbook.get("BTC-USDT", Some(50)).await.unwrap();
             assert_eq!(unary.book_seq, seq.to_string());
             assert_eq!(unary.available, available);
@@ -7603,8 +7605,9 @@ async fn ticket_8510_zero_sequence_and_availability_are_independent() {
 }
 
 #[tokio::test]
-async fn ticket_8512_conflicting_selectors_rejected_before_io() {
-    let client = ticket_book_client("http://127.0.0.1:1".into(), "ws://127.0.0.1:1".into());
+async fn orderbook_conflicting_selectors_rejected_before_io() {
+    let client =
+        orderbook_regression_client("http://127.0.0.1:1".into(), "ws://127.0.0.1:1".into());
     let result = client
         .orderbook
         .create_subscription(polyester::services::CreateSubscriptionOptions {
@@ -7625,7 +7628,7 @@ async fn ticket_8512_conflicting_selectors_rejected_before_io() {
 }
 
 #[tokio::test]
-async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
+async fn orderbook_selector_controls_keep_reset_identity_and_scale() {
     use hardening_support::centrifugo_publication;
     use polyester::proto::orderbook::v1::{
         GetOrderBookRequest, GetOrderBookResponse, OrderBookDelta, PriceLevel,
@@ -7651,8 +7654,8 @@ async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
             })
         })
         .await;
-        let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], Some(id)).await;
-        let client = ticket_book_client(http.base_url(), url);
+        let (url, tx, task) = orderbook_regression_ws(vec![centrifugo_ok_reply(2)], Some(id)).await;
+        let client = orderbook_regression_client(http.base_url(), url);
         let mut sub = client
             .orderbook
             .create_subscription(polyester::services::CreateSubscriptionOptions {
@@ -7695,7 +7698,7 @@ async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
 }
 
 #[tokio::test]
-async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
+async fn orderbook_refresh_exhaustion_closes_receiver_with_typed_error() {
     use hardening_support::HttpScript;
     use polyester::proto::orderbook::v1::GetOrderBookResponse;
     let calls = Arc::new(AtomicUsize::new(0));
@@ -7719,8 +7722,8 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
         }
     })
     .await;
-    let (url, _tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
-    let client = ticket_book_client(http.base_url(), url);
+    let (url, _tx, task) = orderbook_regression_ws(vec![centrifugo_ok_reply(2)], None).await;
+    let client = orderbook_regression_client(http.base_url(), url);
     let mut sub = client
         .orderbook
         .create_subscription(polyester::services::CreateSubscriptionOptions {
@@ -7754,7 +7757,7 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
 }
 
 #[tokio::test]
-async fn ticket_8510_zero_sequence_keeps_ordering() {
+async fn orderbook_zero_sequence_keeps_ordering() {
     use hardening_support::centrifugo_publication;
     use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
     for mode in ["gap", "contiguous", "reset"] {
@@ -7771,8 +7774,8 @@ async fn ticket_8510_zero_sequence_keeps_ordering() {
             })
         })
         .await;
-        let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
-        let client = ticket_book_client(http.base_url(), url);
+        let (url, tx, task) = orderbook_regression_ws(vec![centrifugo_ok_reply(2)], None).await;
+        let client = orderbook_regression_client(http.base_url(), url);
         let mut sub = client
             .orderbook
             .create_subscription(polyester::services::CreateSubscriptionOptions {
@@ -7822,7 +7825,7 @@ async fn ticket_8510_zero_sequence_keeps_ordering() {
 }
 
 #[tokio::test]
-async fn ticket_8512_unknown_matching_selectors_require_catalogs() {
+async fn orderbook_unknown_matching_selectors_require_catalogs() {
     let client = Client::new(Config {
         api_url: "http://127.0.0.1:1".into(),
         ws_url: "ws://127.0.0.1:1".into(),
@@ -7845,11 +7848,11 @@ async fn ticket_8512_unknown_matching_selectors_require_catalogs() {
 }
 
 #[tokio::test]
-async fn ticket_8475_setup_overflow_keeps_typed_error() {
+async fn orderbook_setup_overflow_keeps_typed_error() {
     use hardening_support::centrifugo_publication;
     let mut frames = vec![centrifugo_publication(b"early"); 201];
     frames.push(centrifugo_ok_reply(2));
-    let (url, _tx, task) = ticket_ws(frames, None).await;
+    let (url, _tx, task) = orderbook_regression_ws(frames, None).await;
     let rt = RealtimeClient::new(url, "", None, None);
     let result = rt.subscribe_raw(PUBLIC_CHANNEL).await;
     assert!(
@@ -7863,7 +7866,7 @@ async fn ticket_8475_setup_overflow_keeps_typed_error() {
 }
 
 #[tokio::test]
-async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
+async fn orderbook_zero_sequence_disconnect_then_503_releases_receiver() {
     use futures_util::{SinkExt, StreamExt};
     use hardening_support::HttpScript;
     use polyester::proto::orderbook::v1::GetOrderBookResponse;
@@ -7918,7 +7921,7 @@ async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
             }
         }
     });
-    let client = ticket_book_client(http.base_url(), url);
+    let client = orderbook_regression_client(http.base_url(), url);
     let mut sub = client
         .orderbook
         .create_subscription(polyester::services::CreateSubscriptionOptions {
@@ -8663,7 +8666,7 @@ async fn l2_orderbook_coarse_buckets_preserve_zero_bid_and_round_asks_up() {
     }
 }
 
-/// POLY-9098: a snapshot applied with a buffered delta is one book state, so it
+/// A snapshot applied with a buffered delta is one book state, so it
 /// must yield one view. A second, identical view stayed queued, and the next
 /// bucket change read that stale view instead of its own.
 #[tokio::test]
@@ -8772,7 +8775,7 @@ async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
     }
 }
 
-/// POLY-8563: a stalled publisher must be distinguishable from a quiet market.
+/// A stalled publisher must be distinguishable from a quiet market.
 /// The server republishes every book about every 30 s, so the time since the
 /// stream's last publication tells them apart; the managed book reports it.
 #[tokio::test]

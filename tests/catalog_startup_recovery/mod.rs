@@ -1,4 +1,4 @@
-//! POLY-9228: catalog startup when a connection drops or stalls during a
+//! Catalog startup when a connection drops or stalls during a
 //! catalog read.
 //!
 //! A local keep-alive HTTP/1.1 Connect API decides each request by a plan:
@@ -623,7 +623,7 @@ async fn deposit_addresses_and_withdrawals_do_not_wait_for_the_funding_config() 
                     .unwrap(),
                     payload_signature: vec![1; 65],
                     destination_address: String::new(),
-                    idempotency_key: "poly-9228-control".into(),
+                    idempotency_key: "catalog-startup-control".into(),
                     amount_scale: Some(18),
                     deadline_ts_sec: Some(4_102_444_800),
                     nonce: 1,

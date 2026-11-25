@@ -2500,8 +2500,8 @@ mod tests {
         assert!(err.to_string().contains("only valid for limit GTD"));
     }
 
-    /// POLY-5724: an attached trailing distance in ticks is a price delta in
-    /// 1e-9 quote-unit ticks, sent as given: 0.5 USDT is 500_000_000.
+    /// An attached trailing distance in ticks is a price delta in 1e-9
+    /// quote-unit ticks, sent as given: 0.5 USDT is 500_000_000.
     #[test]
     fn attached_trailing_distance_ticks_are_price_ticks() {
         use crate::proto::orders::v1::trailing_stop_policy;
@@ -3389,7 +3389,7 @@ mod tests {
 
     #[test]
     #[allow(deprecated)]
-    fn poly_4684_slippage_bps_boundaries_for_market_and_attached_trailing() {
+    fn slippage_bps_boundaries_for_market_and_attached_trailing() {
         let client = client();
         let mut market = create_params(
             Quantity::from_scaled(
@@ -3637,7 +3637,7 @@ mod tests {
 
     #[test]
     #[allow(deprecated)]
-    fn poly_4689_attached_trailing_distance_bps_boundaries() {
+    fn attached_trailing_distance_bps_boundaries() {
         let client = client();
         let mut params = create_params(
             Quantity::from_scaled(
@@ -3689,7 +3689,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn poly_4686_batch_create_rejects_duplicate_non_empty_client_order_ids_locally() {
+    async fn batch_create_rejects_duplicate_non_empty_client_order_ids_locally() {
         let client = client();
         client
             .catalogs
@@ -3761,7 +3761,7 @@ mod tests {
 
     #[test]
     #[allow(deprecated)]
-    fn poly_4690_oco_requires_take_profit_and_exactly_one_stop_leg() {
+    fn oco_requires_take_profit_and_exactly_one_stop_leg() {
         let client = client();
         let base = create_params(
             Quantity::from_scaled(

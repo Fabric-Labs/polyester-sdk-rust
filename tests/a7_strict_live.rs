@@ -1,4 +1,4 @@
-//! POLY-3746 A7: STRICT_LIVE fail-closed + live harness counts (fast tests).
+//! A7: STRICT_LIVE fail-closed + live harness counts (fast tests).
 //!
 //! Suite commands (document / CI):
 //! - Public (no API key): `cargo test --test integration money::`

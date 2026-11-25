@@ -842,10 +842,10 @@ async fn future_typed_code_keeps_its_label_on_a_recognised_refusal_control() {
     }
 }
 
-/// POLY-8757: a REST 403 that names a service refusal denies the operation,
+/// A REST 403 that names a service refusal denies the operation,
 /// so it is a permission refusal, not a rejected API key.
 #[tokio::test(flavor = "multi_thread")]
-async fn poly_8757_rest_service_refusal_is_a_permission_refusal() {
+async fn rest_service_refusal_is_a_permission_refusal() {
     for code in ["SUBACCOUNT_READ_FORBIDDEN", "QUICKSWAP_NOT_PERMITTED"] {
         for op in OPS {
             let case = format!("{code}/{op}");
@@ -884,10 +884,10 @@ async fn poly_8757_rest_service_refusal_is_a_permission_refusal() {
     }
 }
 
-/// POLY-8757 control: a credential refusal stays a rejected API key, at 401
+/// Control: a credential refusal stays a rejected API key, at 401
 /// or 403.
 #[tokio::test(flavor = "multi_thread")]
-async fn poly_8757_credential_refusal_stays_api_key_rejected_control() {
+async fn credential_refusal_stays_api_key_rejected_control() {
     for (status, code) in [
         (401, "IP_NOT_ALLOWED"),
         (403, "IP_NOT_ALLOWED"),
@@ -912,10 +912,10 @@ async fn poly_8757_credential_refusal_stays_api_key_rejected_control() {
     }
 }
 
-/// POLY-8756: the documented HTTP 400 `MISSING_HEADERS` problem keeps its
+/// The documented HTTP 400 `MISSING_HEADERS` problem keeps its
 /// auth reason, as the HTTP 401 one does.
 #[tokio::test(flavor = "multi_thread")]
-async fn poly_8756_missing_headers_keeps_its_auth_reason_at_400() {
+async fn missing_headers_keeps_its_auth_reason_at_400() {
     use polyester::proto::auth::v1::AuthErrorCode;
 
     for status in [400, 401] {

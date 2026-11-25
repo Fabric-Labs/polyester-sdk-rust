@@ -1,4 +1,4 @@
-//! POLY-8563: every live test that writes opts in to writes first.
+//! Every live test that writes opts in to writes first.
 //!
 //! The live suite runs with read-only expectations unless
 //! `POLYESTER_TEST_MUTATION` is set, so a live test that calls a client

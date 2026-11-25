@@ -530,7 +530,7 @@ fn assert_response_contract(err: &Error, operation: &str) {
     assert!(err.mutation_outcome_unknown(), "{operation}: {err:?}");
 }
 
-/// POLY-9918: a create, update or cancel answer without its alert, or with an
+/// A create, update or cancel answer without its alert, or with an
 /// alert that has no ID, breaks the response contract instead of reading as a
 /// zero-ID alert. Every update outcome is checked.
 #[tokio::test]
@@ -655,7 +655,7 @@ fn uncatalogued_client(server: &MockHttpServer, hydrate_catalogs: bool) -> Clien
     .unwrap()
 }
 
-/// POLY-9919: without catalogs that name symbol_id 1, an ETH-bound price is
+/// Without catalogs that name symbol_id 1, an ETH-bound price is
 /// never sent for it, whether the catalogs were never loaded or failed to
 /// load, and whatever symbol is named beside the ID. Unbound prices still go.
 #[tokio::test]

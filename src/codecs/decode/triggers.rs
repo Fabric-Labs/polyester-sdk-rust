@@ -1088,11 +1088,11 @@ mod tests {
         assert_eq!(got.max_slippage, Some(MaxSlippage::Bps(10)));
     }
 
-    /// POLY-9396: a market TWAP's per-slice cap (`twap.market_ioc.max_slippage`)
-    /// reads back as `max_slippage`, in its own variant, through every decoder;
-    /// no cap reads `None` (each slice uses the pair's default slippage).
+    /// A market TWAP's per-slice cap (`twap.market_ioc.max_slippage`) reads
+    /// back as `max_slippage`, in its own variant, through every decoder; no
+    /// cap reads `None` (each slice uses the pair's default slippage).
     #[test]
-    fn poly_9396_trigger_reads_a_market_twap_slice_cap() {
+    fn trigger_reads_a_market_twap_slice_cap() {
         use crate::proto::triggers::v1::{TwapMarketIoc, TwapTrigger, twap_market_ioc};
 
         let twap = |cap: Option<twap_market_ioc::MaxSlippage>| ProtoTrigger {
@@ -1179,11 +1179,11 @@ mod tests {
         assert!(failures.is_empty(), "TWAP slice cap lost: {failures:#?}");
     }
 
-    /// POLY-9425: a trailing stop's cap reads at the top level, from its
-    /// configuration, or from its runtime details when it has none; the
-    /// details keep their own copy.
+    /// A trailing stop's cap reads at the top level, from its configuration,
+    /// or from its runtime details when it has none; the details keep their
+    /// own copy.
     #[test]
-    fn poly_9425_trailing_stop_cap_reads_at_the_top_level() {
+    fn trailing_stop_cap_reads_at_the_top_level() {
         use crate::proto::triggers::v1::{TrailingDetails, TrailingStopTrigger};
 
         let configured = |cap| ProtoTrigger {
@@ -1494,9 +1494,9 @@ mod tests {
         assert!(trigger_status_from_label("nope").is_err());
     }
 
-    /// POLY-9303: a canceled trigger reads `canceled`, the contract's
-    /// spelling, as its events and the order statuses do. The British
-    /// `cancelled` is neither returned nor accepted as a filter.
+    /// A canceled trigger reads `canceled`, the contract's spelling, as its
+    /// events and the order statuses do. The British `cancelled` is neither
+    /// returned nor accepted as a filter.
     #[test]
     fn canceled_trigger_reads_and_filters_as_canceled() {
         let read = trigger_from_proto(&ProtoTrigger {
