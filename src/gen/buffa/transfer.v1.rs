@@ -86,6 +86,10 @@ pub enum ErrorCode {
     ERROR_CODE_DUST_CONVERSION_FAILED = 36i32,
     /// The batch debits more distinct source accounts than its limit of 10.
     ERROR_CODE_BATCH_TOO_MANY_SOURCES = 37i32,
+    /// The idempotency key was abandoned with AbandonInternalTransferBatch
+    /// before any batch was submitted under it. Nothing moved under the key,
+    /// and nothing ever will: submit the batch under a new idempotency key.
+    ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED = 38i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -202,6 +206,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_BATCH_TOO_MANY_SOURCES`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const BatchTooManySources: Self = Self::ERROR_CODE_BATCH_TOO_MANY_SOURCES;
+    ///Idiomatic alias for [`Self::ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IdempotencyKeyAbandoned: Self = Self::ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -355,6 +362,9 @@ impl ::buffa::Enumeration for ErrorCode {
             37i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_BATCH_TOO_MANY_SOURCES)
             }
+            38i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -418,6 +428,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_BATCH_TOO_MANY_SOURCES => {
                 "ERROR_CODE_BATCH_TOO_MANY_SOURCES"
+            }
+            Self::ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED => {
+                "ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED"
             }
         }
     }
@@ -539,6 +552,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_BATCH_TOO_MANY_SOURCES" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_BATCH_TOO_MANY_SOURCES)
             }
+            "ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -582,6 +598,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_DUST_BALANCE_CHANGED,
             Self::ERROR_CODE_DUST_CONVERSION_FAILED,
             Self::ERROR_CODE_BATCH_TOO_MANY_SOURCES,
+            Self::ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED,
         ]
     }
 }
@@ -781,6 +798,11 @@ pub enum InternalTransferBatchStatus {
     BATCH_PROCESSING = 3i32,
     /// Every leg is credited to its destination.
     BATCH_ACCEPTED = 4i32,
+    /// The idempotency key was abandoned before any batch was submitted under
+    /// it (AbandonInternalTransferBatch). This is final: no funds moved under
+    /// the key, and none ever will; a later batch under it is refused. The
+    /// answer carries no request ID and no legs.
+    BATCH_ABANDONED = 8i32,
 }
 impl InternalTransferBatchStatus {
     ///Idiomatic alias for [`Self::BATCH_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -795,6 +817,9 @@ impl InternalTransferBatchStatus {
     ///Idiomatic alias for [`Self::BATCH_ACCEPTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const BatchAccepted: Self = Self::BATCH_ACCEPTED;
+    ///Idiomatic alias for [`Self::BATCH_ABANDONED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BatchAbandoned: Self = Self::BATCH_ABANDONED;
 }
 impl ::core::default::Default for InternalTransferBatchStatus {
     fn default() -> Self {
@@ -897,6 +922,7 @@ impl ::buffa::Enumeration for InternalTransferBatchStatus {
             2i32 => ::core::option::Option::Some(Self::BATCH_REFUSED),
             3i32 => ::core::option::Option::Some(Self::BATCH_PROCESSING),
             4i32 => ::core::option::Option::Some(Self::BATCH_ACCEPTED),
+            8i32 => ::core::option::Option::Some(Self::BATCH_ABANDONED),
             _ => ::core::option::Option::None,
         }
     }
@@ -909,6 +935,7 @@ impl ::buffa::Enumeration for InternalTransferBatchStatus {
             Self::BATCH_REFUSED => "BATCH_REFUSED",
             Self::BATCH_PROCESSING => "BATCH_PROCESSING",
             Self::BATCH_ACCEPTED => "BATCH_ACCEPTED",
+            Self::BATCH_ABANDONED => "BATCH_ABANDONED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -919,6 +946,7 @@ impl ::buffa::Enumeration for InternalTransferBatchStatus {
             "BATCH_REFUSED" => ::core::option::Option::Some(Self::BATCH_REFUSED),
             "BATCH_PROCESSING" => ::core::option::Option::Some(Self::BATCH_PROCESSING),
             "BATCH_ACCEPTED" => ::core::option::Option::Some(Self::BATCH_ACCEPTED),
+            "BATCH_ABANDONED" => ::core::option::Option::Some(Self::BATCH_ABANDONED),
             _ => ::core::option::Option::None,
         }
     }
@@ -928,6 +956,7 @@ impl ::buffa::Enumeration for InternalTransferBatchStatus {
             Self::BATCH_REFUSED,
             Self::BATCH_PROCESSING,
             Self::BATCH_ACCEPTED,
+            Self::BATCH_ABANDONED,
         ]
     }
 }
@@ -3885,6 +3914,337 @@ pub const __GET_INTERNAL_TRANSFER_BATCH_RESPONSE_JSON_ANY: ::buffa::type_registr
     type_url: "type.googleapis.com/transfer.v1.GetInternalTransferBatchResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetInternalTransferBatchResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetInternalTransferBatchResponse>,
+    is_wkt: false,
+};
+/// AbandonInternalTransferBatchRequest names the idempotency key to abandon.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AbandonInternalTransferBatchRequest {
+    /// Idempotency key the caller sends, or may have sent, to
+    /// BatchCreateInternalTransfers, scoped to the authenticated caller as that
+    /// request scopes it: the session's account, or the API key.
+    ///
+    /// Field 1: `idempotency_key`
+    #[serde(
+        rename = "idempotencyKey",
+        alias = "idempotency_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub idempotency_key: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AbandonInternalTransferBatchRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AbandonInternalTransferBatchRequest")
+            .field("idempotency_key", &self.idempotency_key)
+            .finish()
+    }
+}
+impl AbandonInternalTransferBatchRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchRequest";
+}
+::buffa::impl_default_instance!(AbandonInternalTransferBatchRequest);
+impl ::buffa::MessageName for AbandonInternalTransferBatchRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "AbandonInternalTransferBatchRequest";
+    const FULL_NAME: &'static str = "transfer.v1.AbandonInternalTransferBatchRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchRequest";
+}
+impl ::buffa::Message for AbandonInternalTransferBatchRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.idempotency_key.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.idempotency_key.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.idempotency_key, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.idempotency_key.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AbandonInternalTransferBatchRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.AbandonInternalTransferBatchRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AbandonInternalTransferBatchRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ABANDON_INTERNAL_TRANSFER_BATCH_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchRequest",
+    to_json: ::buffa::type_registry::any_to_json::<AbandonInternalTransferBatchRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        AbandonInternalTransferBatchRequest,
+    >,
+    is_wkt: false,
+};
+/// AbandonInternalTransferBatchResponse is the key's current outcome: the
+/// batch submitted under it, as GetInternalTransferBatch reads it by key,
+/// which may still be BATCH_PROCESSING, or BATCH_ABANDONED, which is final and
+/// guarantees that no funds moved under the key.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AbandonInternalTransferBatchResponse {
+    /// Stable server-owned identifier of the batch; empty for BATCH_ABANDONED.
+    ///
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Outcome of the batch, or BATCH_ABANDONED.
+    ///
+    /// Field 2: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<InternalTransferBatchStatus>,
+    /// One result per leg, in request order; empty for BATCH_ABANDONED.
+    ///
+    /// Field 3: `legs`
+    #[serde(
+        rename = "legs",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub legs: ::buffa::alloc::vec::Vec<InternalTransferBatchLegResult>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AbandonInternalTransferBatchResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AbandonInternalTransferBatchResponse")
+            .field("request_id", &self.request_id)
+            .field("status", &self.status)
+            .field("legs", &self.legs)
+            .finish()
+    }
+}
+impl AbandonInternalTransferBatchResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchResponse";
+}
+::buffa::impl_default_instance!(AbandonInternalTransferBatchResponse);
+impl ::buffa::MessageName for AbandonInternalTransferBatchResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "AbandonInternalTransferBatchResponse";
+    const FULL_NAME: &'static str = "transfer.v1.AbandonInternalTransferBatchResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchResponse";
+}
+impl ::buffa::Message for AbandonInternalTransferBatchResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        for v in &self.legs {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        for v in &self.legs {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.legs.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.status = ::buffa::EnumValue::from(0);
+        self.legs.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AbandonInternalTransferBatchResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.AbandonInternalTransferBatchResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AbandonInternalTransferBatchResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ABANDON_INTERNAL_TRANSFER_BATCH_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchResponse",
+    to_json: ::buffa::type_registry::any_to_json::<AbandonInternalTransferBatchResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        AbandonInternalTransferBatchResponse,
+    >,
     is_wkt: false,
 };
 /// GetInternalTransferRequest selects an accepted transfer from the source account.
@@ -12437,6 +12797,678 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// AbandonInternalTransferBatchRequest names the idempotency key to abandon.
+        #[derive(Clone, Debug, Default)]
+        pub struct AbandonInternalTransferBatchRequestView<'a> {
+            /// Idempotency key the caller sends, or may have sent, to
+            /// BatchCreateInternalTransfers, scoped to the authenticated caller as that
+            /// request scopes it: the session's account, or the API key.
+            ///
+            /// Field 1: `idempotency_key`
+            pub idempotency_key: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for AbandonInternalTransferBatchRequestView<'a> {
+            type Owned = super::super::AbandonInternalTransferBatchRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AbandonInternalTransferBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AbandonInternalTransferBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AbandonInternalTransferBatchRequest {
+                    idempotency_key: self.idempotency_key.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for AbandonInternalTransferBatchRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.idempotency_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.idempotency_key)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.idempotency_key.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.idempotency_key, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AbandonInternalTransferBatchRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
+                    __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AbandonInternalTransferBatchRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "AbandonInternalTransferBatchRequest";
+            const FULL_NAME: &'static str = "transfer.v1.AbandonInternalTransferBatchRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchRequest";
+        }
+        ::buffa::impl_default_view_instance!(AbandonInternalTransferBatchRequestView);
+        ::buffa::impl_view_reborrow!(AbandonInternalTransferBatchRequestView);
+        /** Self-contained, `'static` owned view of a `AbandonInternalTransferBatchRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AbandonInternalTransferBatchRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AbandonInternalTransferBatchRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AbandonInternalTransferBatchRequestOwnedView(
+            ::buffa::OwnedView<AbandonInternalTransferBatchRequestView<'static>>,
+        );
+        impl AbandonInternalTransferBatchRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AbandonInternalTransferBatchRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AbandonInternalTransferBatchRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AbandonInternalTransferBatchRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AbandonInternalTransferBatchRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AbandonInternalTransferBatchRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AbandonInternalTransferBatchRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AbandonInternalTransferBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Idempotency key the caller sends, or may have sent, to
+            /// BatchCreateInternalTransfers, scoped to the authenticated caller as that
+            /// request scopes it: the session's account, or the API key.
+            ///
+            /// Field 1: `idempotency_key`
+            #[must_use]
+            pub fn idempotency_key(&self) -> &'_ str {
+                self.0.reborrow().idempotency_key
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AbandonInternalTransferBatchRequestView<'static>>,
+        > for AbandonInternalTransferBatchRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    AbandonInternalTransferBatchRequestView<'static>,
+                >,
+            ) -> Self {
+                AbandonInternalTransferBatchRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AbandonInternalTransferBatchRequestOwnedView>
+        for ::buffa::OwnedView<AbandonInternalTransferBatchRequestView<'static>> {
+            fn from(wrapper: AbandonInternalTransferBatchRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AbandonInternalTransferBatchRequestView<'static>>,
+        > for AbandonInternalTransferBatchRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AbandonInternalTransferBatchRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::AbandonInternalTransferBatchRequest {
+            type View<'a> = AbandonInternalTransferBatchRequestView<'a>;
+            type ViewHandle = AbandonInternalTransferBatchRequestOwnedView;
+        }
+        impl ::serde::Serialize for AbandonInternalTransferBatchRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AbandonInternalTransferBatchResponse is the key's current outcome: the
+        /// batch submitted under it, as GetInternalTransferBatch reads it by key,
+        /// which may still be BATCH_PROCESSING, or BATCH_ABANDONED, which is final and
+        /// guarantees that no funds moved under the key.
+        #[derive(Clone, Debug, Default)]
+        pub struct AbandonInternalTransferBatchResponseView<'a> {
+            /// Stable server-owned identifier of the batch; empty for BATCH_ABANDONED.
+            ///
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            /// Outcome of the batch, or BATCH_ABANDONED.
+            ///
+            /// Field 2: `status`
+            pub status: ::buffa::EnumValue<super::super::InternalTransferBatchStatus>,
+            /// One result per leg, in request order; empty for BATCH_ABANDONED.
+            ///
+            /// Field 3: `legs`
+            pub legs: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::InternalTransferBatchLegResultView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for AbandonInternalTransferBatchResponseView<'a> {
+            type Owned = super::super::AbandonInternalTransferBatchResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.legs
+                            .push(
+                                <super::super::__buffa::view::InternalTransferBatchLegResultView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AbandonInternalTransferBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AbandonInternalTransferBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AbandonInternalTransferBatchResponse {
+                    request_id: self.request_id.to_string(),
+                    status: self.status,
+                    legs: self
+                        .legs
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for AbandonInternalTransferBatchResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                for v in &self.legs {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                for v in &self.legs {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for AbandonInternalTransferBatchResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if !self.legs.is_empty() {
+                    __map.serialize_entry("legs", &*self.legs)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AbandonInternalTransferBatchResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "AbandonInternalTransferBatchResponse";
+            const FULL_NAME: &'static str = "transfer.v1.AbandonInternalTransferBatchResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.AbandonInternalTransferBatchResponse";
+        }
+        ::buffa::impl_default_view_instance!(AbandonInternalTransferBatchResponseView);
+        ::buffa::impl_view_reborrow!(AbandonInternalTransferBatchResponseView);
+        /** Self-contained, `'static` owned view of a `AbandonInternalTransferBatchResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AbandonInternalTransferBatchResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AbandonInternalTransferBatchResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AbandonInternalTransferBatchResponseOwnedView(
+            ::buffa::OwnedView<AbandonInternalTransferBatchResponseView<'static>>,
+        );
+        impl AbandonInternalTransferBatchResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AbandonInternalTransferBatchResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AbandonInternalTransferBatchResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AbandonInternalTransferBatchResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AbandonInternalTransferBatchResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AbandonInternalTransferBatchResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AbandonInternalTransferBatchResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AbandonInternalTransferBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable server-owned identifier of the batch; empty for BATCH_ABANDONED.
+            ///
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Outcome of the batch, or BATCH_ABANDONED.
+            ///
+            /// Field 2: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::InternalTransferBatchStatus> {
+                self.0.reborrow().status
+            }
+            /// One result per leg, in request order; empty for BATCH_ABANDONED.
+            ///
+            /// Field 3: `legs`
+            #[must_use]
+            pub fn legs(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::InternalTransferBatchLegResultView<'_>,
+            > {
+                &self.0.reborrow().legs
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AbandonInternalTransferBatchResponseView<'static>>,
+        > for AbandonInternalTransferBatchResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    AbandonInternalTransferBatchResponseView<'static>,
+                >,
+            ) -> Self {
+                AbandonInternalTransferBatchResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AbandonInternalTransferBatchResponseOwnedView>
+        for ::buffa::OwnedView<AbandonInternalTransferBatchResponseView<'static>> {
+            fn from(wrapper: AbandonInternalTransferBatchResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AbandonInternalTransferBatchResponseView<'static>>,
+        > for AbandonInternalTransferBatchResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AbandonInternalTransferBatchResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::AbandonInternalTransferBatchResponse {
+            type View<'a> = AbandonInternalTransferBatchResponseView<'a>;
+            type ViewHandle = AbandonInternalTransferBatchResponseOwnedView;
+        }
+        impl ::serde::Serialize for AbandonInternalTransferBatchResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// GetInternalTransferRequest selects an accepted transfer from the source account.
         #[derive(Clone, Debug, Default)]
         pub struct GetInternalTransferRequestView<'a> {
@@ -19413,6 +20445,10 @@ pub mod __buffa {
         );
         reg.register_json_any(super::__GET_INTERNAL_TRANSFER_BATCH_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_INTERNAL_TRANSFER_BATCH_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ABANDON_INTERNAL_TRANSFER_BATCH_REQUEST_JSON_ANY);
+        reg.register_json_any(
+            super::__ABANDON_INTERNAL_TRANSFER_BATCH_RESPONSE_JSON_ANY,
+        );
         reg.register_json_any(super::__GET_INTERNAL_TRANSFER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_INTERNAL_TRANSFER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DUST_BALANCE_JSON_ANY);
@@ -19471,6 +20507,14 @@ pub use self::__buffa::view::GetInternalTransferBatchRequestOwnedView;
 pub use self::__buffa::view::GetInternalTransferBatchResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetInternalTransferBatchResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AbandonInternalTransferBatchRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AbandonInternalTransferBatchRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AbandonInternalTransferBatchResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AbandonInternalTransferBatchResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetInternalTransferRequestView;
 #[doc(inline)]
