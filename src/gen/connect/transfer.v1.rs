@@ -42,6 +42,18 @@ pub type OwnedGetInternalTransferBatchResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<AbandonInternalTransferBatchRequestView<'static>>`.
+pub type OwnedAbandonInternalTransferBatchRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<AbandonInternalTransferBatchResponseView<'static>>`.
+pub type OwnedAbandonInternalTransferBatchResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::transfer::v1::GetInternalTransferResponse>
 for crate::proto::transfer::v1::__buffa::view::GetInternalTransferResponseView<'_> {
     fn encode(
@@ -138,6 +150,34 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::transfer::v1::AbandonInternalTransferBatchResponse,
+>
+for crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::transfer::v1::AbandonInternalTransferBatchResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const INTERNAL_TRANSFER_SERVICE_SERVICE_NAME: &str = "transfer.v1.InternalTransferService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetInternalTransfer` RPC.
@@ -173,6 +213,15 @@ pub const INTERNAL_TRANSFER_SERVICE_BATCH_CREATE_INTERNAL_TRANSFERS_SPEC: ::conn
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const INTERNAL_TRANSFER_SERVICE_GET_INTERNAL_TRANSFER_BATCH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/transfer.v1.InternalTransferService/GetInternalTransferBatch",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `AbandonInternalTransferBatch` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const INTERNAL_TRANSFER_SERVICE_ABANDON_INTERNAL_TRANSFER_BATCH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.InternalTransferService/AbandonInternalTransferBatch",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -334,7 +383,8 @@ pub trait InternalTransferService: Send + Sync + 'static {
     /// both: a batch its checks refused reads its refusal, and a caller who may
     /// not read one of its sources is refused PERMISSION_DENIED, or UNAVAILABLE
     /// while that permission cannot be decided yet (retry). NOT_FOUND means the
-    /// caller submitted no batch under that key.
+    /// caller submitted no batch under that key. A key the caller abandoned
+    /// (AbandonInternalTransferBatch) reads BATCH_ABANDONED.
     /// This read does not submit or retry the batch and requires no fresh MFA.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -355,6 +405,43 @@ pub trait InternalTransferService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::transfer::v1::GetInternalTransferBatchResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Make the absence of a batch under an idempotency key final. If a batch
+    /// was submitted under the key, this answers its outcome exactly as
+    /// GetInternalTransferBatch reads it by key, and changes nothing. Otherwise
+    /// it records the key as abandoned and answers BATCH_ABANDONED: no funds
+    /// moved under the key and none ever will. Every later
+    /// BatchCreateInternalTransfers under it, a retry included, is refused
+    /// FAILED_PRECONDITION with ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED, and every
+    /// later read or abandon under it answers BATCH_ABANDONED. A create and an
+    /// abandon racing on one key end in exactly one of the two outcomes.
+    /// The key is scoped to the caller as BatchCreateInternalTransfers scopes
+    /// it: the session's account, or the API key. The caller needs the
+    /// INTERNAL_TRANSFER permission, and to answer an existing batch also the
+    /// read permission on every source account of the batch, refused as the
+    /// read is. It requires no MFA, as it never moves funds, and is charged as
+    /// one BatchCreateInternalTransfers admission.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn abandon_internal_transfer_batch<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::AbandonInternalTransferBatchRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::AbandonInternalTransferBatchResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -506,6 +593,35 @@ impl<S: InternalTransferService> InternalTransferServiceExt for S {
                 },
             )
             .with_spec(INTERNAL_TRANSFER_SERVICE_GET_INTERNAL_TRANSFER_BATCH_SPEC)
+            .route_view(
+                INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
+                "AbandonInternalTransferBatch",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::AbandonInternalTransferBatchRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.abandon_internal_transfer_batch(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::AbandonInternalTransferBatchResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(INTERNAL_TRANSFER_SERVICE_ABANDON_INTERNAL_TRANSFER_BATCH_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -590,6 +706,14 @@ for InternalTransferServiceServer<T> {
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(
                             INTERNAL_TRANSFER_SERVICE_GET_INTERNAL_TRANSFER_BATCH_SPEC,
+                        ),
+                )
+            }
+            "AbandonInternalTransferBatch" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            INTERNAL_TRANSFER_SERVICE_ABANDON_INTERNAL_TRANSFER_BATCH_SPEC,
                         ),
                 )
             }
@@ -690,6 +814,27 @@ for InternalTransferServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::transfer::v1::GetInternalTransferBatchResponse,
+                        >(format)
+                })
+            }
+            "AbandonInternalTransferBatch" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::AbandonInternalTransferBatchRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::AbandonInternalTransferBatchRequest,
+                    >::from_parts(&req, &body);
+                    svc.abandon_internal_transfer_batch(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::AbandonInternalTransferBatchResponse,
                         >(format)
                 })
             }
@@ -973,6 +1118,51 @@ where
                 &self.config,
                 INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
                 "GetInternalTransferBatch",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AbandonInternalTransferBatch RPC. Sends a request to /transfer.v1.InternalTransferService/AbandonInternalTransferBatch.
+    pub async fn abandon_internal_transfer_batch(
+        &self,
+        request: crate::proto::transfer::v1::AbandonInternalTransferBatchRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.abandon_internal_transfer_batch_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AbandonInternalTransferBatch RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn abandon_internal_transfer_batch_with_options(
+        &self,
+        request: crate::proto::transfer::v1::AbandonInternalTransferBatchRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::AbandonInternalTransferBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
+                "AbandonInternalTransferBatch",
                 request,
                 options,
             )

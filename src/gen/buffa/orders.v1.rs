@@ -11281,6 +11281,29 @@ pub mod trailing_stop_policy {
 /// TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL. If no exit ran and the
 /// parent's whole fill is below one step, the legs fail.
 ///
+/// When the parent order ends after a partial fill and no exit has run, the
+/// filled quantity is final, and each leg is checked again against the
+/// pair's minimums at that quantity, valued where its exit would execute as
+/// at creation. This applies however the parent ends, for example canceled
+/// alone, by a cancel-all or the dead-man switch, or with the unfilled
+/// remainder of an immediate-or-cancel or market order. A leg whose exit
+/// would be below the minimum order value could never be placed, so it ends
+/// at once, without firing, with status STATUS_FAILED and failure reason
+/// TRIGGER_FAILURE_REASON_MIN_NOTIONAL (TRIGGER_FAILURE_REASON_MIN_QUANTITY
+/// below the minimum quantity); its quantity shows the filled quantity,
+/// rounded down to the pair's quantity step, that it was checked at. The
+/// parent's other legs whose exits meet the minimums stay active and protect
+/// that quantity. A trailing sell exit has no price to value it at, so only the
+/// minimum quantity is checked when the parent ends; if it would be below
+/// the minimum order value when it fires, it ends failed with
+/// TRIGGER_FAILURE_REASON_MIN_NOTIONAL then. For example, with a minimum
+/// order value of 5, a buy that fills 0.071 at 70 and then ends keeps its
+/// take-profit at 90 (an exit worth about 6.39) and fails its stop-loss at
+/// 60 (about 4.26). This differs from
+/// EVENT_FIRE_REFUSED: while the parent order is still open, its position
+/// can still grow, so an exit refused below the minimums leaves the leg
+/// active until a later fill makes the exit large enough.
+///
 /// The legs reserve what their exits would sell or spend, once for both legs:
 /// the base a sell exit sells, as each parent fill settles, and the quote a
 /// buy-back may spend at its legs' highest maximum price. A buy-back is
@@ -21654,8 +21677,15 @@ pub struct Order {
     pub post_only: bool,
     /// Current accepted total order quantity, updated by successful modifies,
     /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
-    /// 0 as a placeholder for the replacement order of a batch item refused when
-    /// it applied, which carries no order terms: the client knows them from the
+    /// Above 0 while the order is working. It carries the filled quantity, equal
+    /// to cum_qty_scaled and so 0 when the order had no fill, on a base-quantity
+    /// order that self-trade prevention decremented to its end
+    /// (CANCEL_REASON_STP_DECREMENT) and on an order that a modify ended by
+    /// setting its total at or below its filled quantity
+    /// (CANCEL_REASON_QTY_AT_OR_BELOW_FILLED). A quote-sized buy never ends at 0
+    /// through STP: with no fill it keeps its original quantity. Also 0 as a
+    /// placeholder for the replacement order of a batch item refused when it
+    /// applied, which carries no order terms: the client knows them from the
     /// batch it sent.
     ///
     /// Field 12: `orig_qty_scaled`
@@ -36817,6 +36847,29 @@ pub mod __buffa {
         /// TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL. If no exit ran and the
         /// parent's whole fill is below one step, the legs fail.
         ///
+        /// When the parent order ends after a partial fill and no exit has run, the
+        /// filled quantity is final, and each leg is checked again against the
+        /// pair's minimums at that quantity, valued where its exit would execute as
+        /// at creation. This applies however the parent ends, for example canceled
+        /// alone, by a cancel-all or the dead-man switch, or with the unfilled
+        /// remainder of an immediate-or-cancel or market order. A leg whose exit
+        /// would be below the minimum order value could never be placed, so it ends
+        /// at once, without firing, with status STATUS_FAILED and failure reason
+        /// TRIGGER_FAILURE_REASON_MIN_NOTIONAL (TRIGGER_FAILURE_REASON_MIN_QUANTITY
+        /// below the minimum quantity); its quantity shows the filled quantity,
+        /// rounded down to the pair's quantity step, that it was checked at. The
+        /// parent's other legs whose exits meet the minimums stay active and protect
+        /// that quantity. A trailing sell exit has no price to value it at, so only the
+        /// minimum quantity is checked when the parent ends; if it would be below
+        /// the minimum order value when it fires, it ends failed with
+        /// TRIGGER_FAILURE_REASON_MIN_NOTIONAL then. For example, with a minimum
+        /// order value of 5, a buy that fills 0.071 at 70 and then ends keeps its
+        /// take-profit at 90 (an exit worth about 6.39) and fails its stop-loss at
+        /// 60 (about 4.26). This differs from
+        /// EVENT_FIRE_REFUSED: while the parent order is still open, its position
+        /// can still grow, so an exit refused below the minimums leaves the leg
+        /// active until a later fill makes the exit large enough.
+        ///
         /// The legs reserve what their exits would sell or spend, once for both legs:
         /// the base a sell exit sells, as each parent fill settles, and the quote a
         /// buy-back may spend at its legs' highest maximum price. A buy-back is
@@ -50734,8 +50787,15 @@ pub mod __buffa {
             pub post_only: bool,
             /// Current accepted total order quantity, updated by successful modifies,
             /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
-            /// 0 as a placeholder for the replacement order of a batch item refused when
-            /// it applied, which carries no order terms: the client knows them from the
+            /// Above 0 while the order is working. It carries the filled quantity, equal
+            /// to cum_qty_scaled and so 0 when the order had no fill, on a base-quantity
+            /// order that self-trade prevention decremented to its end
+            /// (CANCEL_REASON_STP_DECREMENT) and on an order that a modify ended by
+            /// setting its total at or below its filled quantity
+            /// (CANCEL_REASON_QTY_AT_OR_BELOW_FILLED). A quote-sized buy never ends at 0
+            /// through STP: with no fill it keeps its original quantity. Also 0 as a
+            /// placeholder for the replacement order of a batch item refused when it
+            /// applied, which carries no order terms: the client knows them from the
             /// batch it sent.
             ///
             /// Field 12: `orig_qty_scaled`
@@ -52402,8 +52462,15 @@ pub mod __buffa {
             }
             /// Current accepted total order quantity, updated by successful modifies,
             /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
-            /// 0 as a placeholder for the replacement order of a batch item refused when
-            /// it applied, which carries no order terms: the client knows them from the
+            /// Above 0 while the order is working. It carries the filled quantity, equal
+            /// to cum_qty_scaled and so 0 when the order had no fill, on a base-quantity
+            /// order that self-trade prevention decremented to its end
+            /// (CANCEL_REASON_STP_DECREMENT) and on an order that a modify ended by
+            /// setting its total at or below its filled quantity
+            /// (CANCEL_REASON_QTY_AT_OR_BELOW_FILLED). A quote-sized buy never ends at 0
+            /// through STP: with no fill it keeps its original quantity. Also 0 as a
+            /// placeholder for the replacement order of a batch item refused when it
+            /// applied, which carries no order terms: the client knows them from the
             /// batch it sent.
             ///
             /// Field 12: `orig_qty_scaled`

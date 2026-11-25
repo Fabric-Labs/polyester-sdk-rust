@@ -516,8 +516,13 @@ pub trait OrdersService: Send + Sync + 'static {
     /// - An attached leg whose working exit is canceled ends canceled, and so
     /// do the parent's other legs when oco is set. Attached legs without a
     /// working exit keep protecting the parent's filled position, even when
-    /// the parent order itself is canceled; they end only if the parent is
-    /// canceled before any fill.
+    /// the parent order itself is canceled. They end canceled if the parent
+    /// is canceled before any fill. If it is canceled after a partial fill, a
+    /// leg whose exit of that filled quantity would be below the pair's
+    /// minimum order value ends failed with
+    /// TRIGGER_FAILURE_REASON_MIN_NOTIONAL, because its exit could never be
+    /// placed, while the parent's other legs whose exits meet the minimums
+    /// keep protecting it (RiskPolicy).
     /// - A paused trigger stays paused and can be resumed.
     /// To stop all automated trading in one request, set `include_triggers`:
     /// every matching trigger ends canceled with reason
@@ -557,7 +562,9 @@ pub trait OrdersService: Send + Sync + 'static {
     /// triggers. Without it, standalone stop-loss, take-profit and trailing
     /// stops and running TWAPs stay active and can place new orders after it
     /// fires, and attached legs end or keep protecting the position exactly
-    /// as after CancelAllOrders.
+    /// as after CancelAllOrders, including a leg that ends failed with
+    /// TRIGGER_FAILURE_REASON_MIN_NOTIONAL because its parent's partial fill
+    /// is too small for its exit.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

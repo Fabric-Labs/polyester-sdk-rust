@@ -24,6 +24,22 @@ pub type OwnedGetSwapRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetSwapResponseView = ::buffa::view::OwnedView<
     crate::proto::swap::v1::__buffa::view::GetSwapResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CancelSwapRequestView<'static>>`.
+pub type OwnedCancelSwapRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::v1::__buffa::view::CancelSwapRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CancelSwapResponseView<'static>>`.
+pub type OwnedCancelSwapResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::v1::__buffa::view::CancelSwapResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListSwapsRequestView<'static>>`.
+pub type OwnedListSwapsRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::v1::__buffa::view::ListSwapsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListSwapsResponseView<'static>>`.
+pub type OwnedListSwapsResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::v1::__buffa::view::ListSwapsResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::swap::v1::QuoteSwapResponse>
 for crate::proto::swap::v1::__buffa::view::QuoteSwapResponseView<'_> {
     fn encode(
@@ -84,6 +100,46 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::swap::v1::CancelSwapResponse>
+for crate::proto::swap::v1::__buffa::view::CancelSwapResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::v1::CancelSwapResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::v1::__buffa::view::CancelSwapResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::v1::ListSwapsResponse>
+for crate::proto::swap::v1::__buffa::view::ListSwapsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::v1::ListSwapsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::v1::__buffa::view::ListSwapsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const SWAP_SERVICE_SERVICE_NAME: &str = "swap.v1.SwapService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `QuoteSwap` RPC.
@@ -113,9 +169,27 @@ pub const SWAP_SERVICE_GET_SWAP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::s
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CancelSwap` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const SWAP_SERVICE_CANCEL_SWAP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.v1.SwapService/CancelSwap",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListSwaps` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const SWAP_SERVICE_LIST_SWAPS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.v1.SwapService/ListSwaps",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// SwapService converts one asset of an account's Trading balance into another
 /// through Polyester's spot order books, on the direct market or through USDT
-/// or USDC, at market or as a TWAP over up to 60 minutes. A Swap
+/// or USDC, at market or as a TWAP over up to 24 hours. A Swap
 /// executes as immediate-or-cancel spot orders on the account, at the
 /// account's spot taker fee on each market and with no other fee, protected by
 /// the end-to-end min_amount_out the caller accepts: each order's price limit
@@ -131,7 +205,10 @@ pub const SWAP_SERVICE_GET_SWAP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::s
 /// action. A Swap's orders also remain subject to the sub-account's spot
 /// trading policy.
 /// Follow a Swap with GetSwap until is_terminal is true; a market Swap usually
-/// completes within seconds, a TWAP by its deadline.
+/// completes within seconds, a TWAP by its deadline. CancelSwap stops a Swap
+/// that has not ended: no further slice starts, and what already traded
+/// stays traded. ListSwaps finds an account's Swaps again, those that have
+/// not ended among them.
 ///
 /// # Implementing handlers
 ///
@@ -256,6 +333,8 @@ pub trait SwapService: Send + Sync + 'static {
         >,
     > + Send;
     /// GetSwap returns one of the caller's Swaps by swap_id or idempotency key.
+    /// It needs the SWAP permission on the Swap's funding account; the Swaps of
+    /// a sub-account that is not active can still be read.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed selector.
     /// - NOT_FOUND: SWAP_NOT_FOUND.
@@ -278,6 +357,107 @@ pub trait SwapService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::swap::v1::GetSwapResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// CancelSwap cancels one of the caller's Swaps that has not ended. From
+    /// the cancel on, no new slice starts and no further first-leg order is
+    /// placed. A first-leg order placed just before the cancel arrives may
+    /// still be accepted, once; it is immediate-or-cancel and finishes. A
+    /// slice whose first leg traded still sends its second leg for that slice's
+    /// own intermediate asset; intermediate asset carried from earlier slices
+    /// is not converted and stays on the account. Nothing that traded is
+    /// undone. Until that work ends the Swap is CANCELING, or RECONCILING
+    /// while an order's outcome is being confirmed (it can move between the
+    /// two); it then becomes terminal: CANCELED with reason USER_CANCELED; or,
+    /// when the cancel came too late to stop anything, the outcome it would
+    /// have had (COMPLETED, PARTIALLY_COMPLETED or FAILED); or FAILED with
+    /// MINIMUM_NOT_MET, which still applies to what traded. A cancel usually
+    /// takes effect within seconds; confirming an order's outcome can take
+    /// longer, and the Swap stays non-terminal until it is confirmed. A cancel
+    /// after the Swap's deadline changes nothing: a Swap that has not ended is
+    /// returned as it is, EXECUTING or RECONCILING, without
+    /// cancel_requested_at, and one that has ended answers SWAP_ALREADY_FINAL.
+    /// Keep polling GetSwap until is_terminal is true.
+    /// The cancel is idempotent: repeating a cancel that was recorded in time,
+    /// before or after the Swap ends, returns the Swap with its original
+    /// cancel_requested_at, so an unknown outcome is resolved by repeating the
+    /// request. Canceling needs the SWAP
+    /// permission on the funding account, through the caller's role or the API
+    /// key's policy; the sub-account's policy does not restrict it, and it
+    /// works on a sub-account that is not active, since a cancel only stops
+    /// trading.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: SWAP_NOT_FOUND.
+    /// - FAILED_PRECONDITION: SWAP_ALREADY_FINAL when the Swap ended with no
+    /// cancel recorded (also after its deadline); SWAP_NOT_CANCELABLE for an
+    /// auto-withdraw conversion.
+    /// - PERMISSION_DENIED: SWAP_NOT_PERMITTED.
+    /// - UNAVAILABLE, DEADLINE_EXCEEDED: SERVICE_UNAVAILABLE or an unknown
+    /// outcome; retry the same request.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn cancel_swap<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::v1::CancelSwapRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::v1::CancelSwapResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListSwaps lists the caller's Swaps funded by one account, the root
+    /// account or a sub-account, newest first, each as GetSwap returns it. With
+    /// open_only it lists only the Swaps that have not ended, so a client can
+    /// find the Swaps it still follows. A sub-account that is not active is
+    /// listed too, so its open Swaps can be found and canceled. Each page
+    /// continues strictly after the last Swap of the page before it, in the
+    /// listing order, and holds the Swaps as they are when it is read: a
+    /// listing never repeats a Swap and never skips one that existed when the
+    /// listing started and still matches the filter. A Swap created while a
+    /// listing is under way is listed on a later page only if it sorts after
+    /// the last Swap already listed; otherwise it appears only when listing
+    /// starts again. With open_only, a Swap that ends between pages is left out
+    /// of the later ones.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request or page_token, or
+    /// INVALID_SUBACCOUNT_ID.
+    /// - NOT_FOUND: SUBACCOUNT_NOT_FOUND.
+    /// - PERMISSION_DENIED: SWAP_NOT_PERMITTED.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_swaps<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::v1::ListSwapsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::v1::ListSwapsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -396,6 +576,62 @@ impl<S: SwapService> SwapServiceExt for S {
                 },
             )
             .with_spec(SWAP_SERVICE_GET_SWAP_SPEC)
+            .route_view(
+                SWAP_SERVICE_SERVICE_NAME,
+                "CancelSwap",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::v1::__buffa::view::CancelSwapRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::v1::CancelSwapRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.cancel_swap(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::v1::CancelSwapResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SWAP_SERVICE_CANCEL_SWAP_SPEC)
+            .route_view(
+                SWAP_SERVICE_SERVICE_NAME,
+                "ListSwaps",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::v1::__buffa::view::ListSwapsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::v1::ListSwapsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_swaps(ctx, sreq)
+                                .await?
+                                .encode::<crate::proto::swap::v1::ListSwapsResponse>(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SWAP_SERVICE_LIST_SWAPS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -468,6 +704,18 @@ impl<T: SwapService> ::connectrpc::Dispatcher for SwapServiceServer<T> {
                         .with_spec(SWAP_SERVICE_GET_SWAP_SPEC),
                 )
             }
+            "CancelSwap" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(SWAP_SERVICE_CANCEL_SWAP_SPEC),
+                )
+            }
+            "ListSwaps" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(SWAP_SERVICE_LIST_SWAPS_SPEC),
+                )
+            }
             _ => None,
         }
     }
@@ -538,6 +786,44 @@ impl<T: SwapService> ::connectrpc::Dispatcher for SwapServiceServer<T> {
                     svc.get_swap(ctx, req)
                         .await?
                         .encode::<crate::proto::swap::v1::GetSwapResponse>(format)
+                })
+            }
+            "CancelSwap" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::v1::CancelSwapRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::v1::__buffa::view::CancelSwapRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::v1::CancelSwapRequest,
+                    >::from_parts(&req, &body);
+                    svc.cancel_swap(ctx, req)
+                        .await?
+                        .encode::<crate::proto::swap::v1::CancelSwapResponse>(format)
+                })
+            }
+            "ListSwaps" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::v1::ListSwapsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::v1::__buffa::view::ListSwapsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::v1::ListSwapsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_swaps(ctx, req)
+                        .await?
+                        .encode::<crate::proto::swap::v1::ListSwapsResponse>(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -757,6 +1043,88 @@ where
                 &self.config,
                 SWAP_SERVICE_SERVICE_NAME,
                 "GetSwap",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CancelSwap RPC. Sends a request to /swap.v1.SwapService/CancelSwap.
+    pub async fn cancel_swap(
+        &self,
+        request: crate::proto::swap::v1::CancelSwapRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::v1::__buffa::view::CancelSwapResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.cancel_swap_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CancelSwap RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn cancel_swap_with_options(
+        &self,
+        request: crate::proto::swap::v1::CancelSwapRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::v1::__buffa::view::CancelSwapResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SWAP_SERVICE_SERVICE_NAME,
+                "CancelSwap",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListSwaps RPC. Sends a request to /swap.v1.SwapService/ListSwaps.
+    pub async fn list_swaps(
+        &self,
+        request: crate::proto::swap::v1::ListSwapsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::v1::__buffa::view::ListSwapsResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_swaps_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListSwaps RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_swaps_with_options(
+        &self,
+        request: crate::proto::swap::v1::ListSwapsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::v1::__buffa::view::ListSwapsResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SWAP_SERVICE_SERVICE_NAME,
+                "ListSwaps",
                 request,
                 options,
             )

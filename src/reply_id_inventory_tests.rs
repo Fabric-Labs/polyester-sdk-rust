@@ -361,7 +361,7 @@ fn inventory_lists_every_reply_id_field() {
 /// The messages of the 0.93.3 to 0.93.6 contract changes, and the lifecycle
 /// flow views, whose every field the SDK sets from a parameter or exposes on
 /// a model, unless the inventory says why not.
-const FIELD_INVENTORY_MESSAGES: [&str; 54] = [
+const FIELD_INVENTORY_MESSAGES: [&str; 56] = [
     "ledger.read.v1.CreateStatementExportRequest",
     "ledger.read.v1.GetStatementExportRequest",
     "ledger.read.v1.ListStatementExportsRequest",
@@ -380,6 +380,8 @@ const FIELD_INVENTORY_MESSAGES: [&str; 54] = [
     "transfer.v1.BatchCreateInternalTransfersResponse",
     "transfer.v1.GetInternalTransferBatchRequest",
     "transfer.v1.GetInternalTransferBatchResponse",
+    "transfer.v1.AbandonInternalTransferBatchRequest",
+    "transfer.v1.AbandonInternalTransferBatchResponse",
     "transfer.v1.InternalTransferBatchLegResult",
     "transfer.v1.ResolvedDestination",
     "transfer.v1.ListDustBalancesRequest",
