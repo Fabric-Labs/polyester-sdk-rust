@@ -1697,7 +1697,7 @@ SDK notes:
   failed its checks included: a retry with the same key and legs answers
   `refused` again even once the leg would pass, and one with other legs is
   refused `IDEMPOTENCY_CONFLICT`; fix the cause and submit under a new key.
-  Every failure of the call itself is an unknown outcome
+  Every other failure of the call itself is an unknown outcome
   (`mutation_outcome_unknown()`) that the SDK does not retry, whatever the
   server answered, keeping the answer's status, `Retry-After` and code: send
   the batch again under the same idempotency key and legs (after
@@ -1715,6 +1715,17 @@ SDK notes:
   batch exists or not, and its message names the action to grant. A key
   allowed to read transfers gets `ERROR_CODE_NOT_FOUND` for an unknown batch
   and for one it may not read.
+- **Giving up a batch:** `client.internal_transfers.abandon_batch(key)` makes
+  the absence of a batch under an idempotency key final, for a `batch_create`
+  whose answer was lost. If a batch was submitted under the key, it answers
+  that batch and changes nothing; otherwise its status is `abandoned`, with no
+  `request_id` and no legs: nothing moved under the key and nothing ever will.
+  A later `batch_create` under that key, a retry included, is refused with an
+  `Error::Api` for which `is_idempotency_key_abandoned()` is true
+  (`ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED`): the one batch create failure that
+  is final, not retryable and not an unknown outcome, so submit under a new
+  key. Abandoning needs `INTERNAL_TRANSFER` on the API key's policy but no
+  MFA, and calling it again with the same key is always safe.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {

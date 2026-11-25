@@ -161,8 +161,23 @@ pub enum SwapStatus {
     /// reason says why, and the amounts show what was traded.
     FAILED = 4i32,
     /// An order's outcome is being established. Balances already reflect any
-    /// settled fill; the Swap stays here until the outcome is confirmed.
+    /// settled fill; the Swap stays here until the outcome is confirmed. A
+    /// canceled Swap shows RECONCILING too while it waits for such an outcome
+    /// (see CancelSwap).
     RECONCILING = 5i32,
+    /// The Swap's owner canceled it (CancelSwap) and the cancel is taking
+    /// effect: no new slice or first-leg order is sent. An order already sent
+    /// finishes, and a slice whose first leg traded still sends its second
+    /// leg. The Swap then becomes terminal: CANCELED, or the outcome it would
+    /// have had when the cancel came too late to stop anything. This usually
+    /// takes seconds. While an order's outcome is being confirmed the Swap is
+    /// RECONCILING instead, and CANCELING again once it is, until it ends.
+    CANCELING = 6i32,
+    /// The Swap's owner canceled it (CancelSwap) before its whole amount
+    /// traded. The amounts show exactly what traded and settled; the unspent
+    /// amount and any intermediate_remainder_e18 stay on the account. reason is
+    /// USER_CANCELED.
+    CANCELED = 7i32,
 }
 impl SwapStatus {
     ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -183,6 +198,12 @@ impl SwapStatus {
     ///Idiomatic alias for [`Self::RECONCILING`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Reconciling: Self = Self::RECONCILING;
+    ///Idiomatic alias for [`Self::CANCELING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Canceling: Self = Self::CANCELING;
+    ///Idiomatic alias for [`Self::CANCELED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Canceled: Self = Self::CANCELED;
 }
 impl ::core::default::Default for SwapStatus {
     fn default() -> Self {
@@ -284,6 +305,8 @@ impl ::buffa::Enumeration for SwapStatus {
             3i32 => ::core::option::Option::Some(Self::PARTIALLY_COMPLETED),
             4i32 => ::core::option::Option::Some(Self::FAILED),
             5i32 => ::core::option::Option::Some(Self::RECONCILING),
+            6i32 => ::core::option::Option::Some(Self::CANCELING),
+            7i32 => ::core::option::Option::Some(Self::CANCELED),
             _ => ::core::option::Option::None,
         }
     }
@@ -298,6 +321,8 @@ impl ::buffa::Enumeration for SwapStatus {
             Self::PARTIALLY_COMPLETED => "PARTIALLY_COMPLETED",
             Self::FAILED => "FAILED",
             Self::RECONCILING => "RECONCILING",
+            Self::CANCELING => "CANCELING",
+            Self::CANCELED => "CANCELED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -312,6 +337,8 @@ impl ::buffa::Enumeration for SwapStatus {
             }
             "FAILED" => ::core::option::Option::Some(Self::FAILED),
             "RECONCILING" => ::core::option::Option::Some(Self::RECONCILING),
+            "CANCELING" => ::core::option::Option::Some(Self::CANCELING),
+            "CANCELED" => ::core::option::Option::Some(Self::CANCELED),
             _ => ::core::option::Option::None,
         }
     }
@@ -323,6 +350,8 @@ impl ::buffa::Enumeration for SwapStatus {
             Self::PARTIALLY_COMPLETED,
             Self::FAILED,
             Self::RECONCILING,
+            Self::CANCELING,
+            Self::CANCELED,
         ]
     }
 }
@@ -359,6 +388,9 @@ pub enum SwapReason {
     /// order, with later slices' intermediate added where a TWAP had slices
     /// left, stays on the account, unconverted (intermediate_remainder_e18).
     INTERMEDIATE_BELOW_MINIMUM = 10i32,
+    /// The Swap's owner canceled it (CancelSwap) before its whole amount
+    /// traded.
+    USER_CANCELED = 11i32,
 }
 impl SwapReason {
     ///Idiomatic alias for [`Self::REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -394,6 +426,9 @@ impl SwapReason {
     ///Idiomatic alias for [`Self::INTERMEDIATE_BELOW_MINIMUM`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const IntermediateBelowMinimum: Self = Self::INTERMEDIATE_BELOW_MINIMUM;
+    ///Idiomatic alias for [`Self::USER_CANCELED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UserCanceled: Self = Self::USER_CANCELED;
 }
 impl ::core::default::Default for SwapReason {
     fn default() -> Self {
@@ -500,6 +535,7 @@ impl ::buffa::Enumeration for SwapReason {
             8i32 => ::core::option::Option::Some(Self::MINIMUM_NOT_MET),
             9i32 => ::core::option::Option::Some(Self::MAX_ORDER_QUANTITY),
             10i32 => ::core::option::Option::Some(Self::INTERMEDIATE_BELOW_MINIMUM),
+            11i32 => ::core::option::Option::Some(Self::USER_CANCELED),
             _ => ::core::option::Option::None,
         }
     }
@@ -519,6 +555,7 @@ impl ::buffa::Enumeration for SwapReason {
             Self::MINIMUM_NOT_MET => "MINIMUM_NOT_MET",
             Self::MAX_ORDER_QUANTITY => "MAX_ORDER_QUANTITY",
             Self::INTERMEDIATE_BELOW_MINIMUM => "INTERMEDIATE_BELOW_MINIMUM",
+            Self::USER_CANCELED => "USER_CANCELED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -546,6 +583,7 @@ impl ::buffa::Enumeration for SwapReason {
             "INTERMEDIATE_BELOW_MINIMUM" => {
                 ::core::option::Option::Some(Self::INTERMEDIATE_BELOW_MINIMUM)
             }
+            "USER_CANCELED" => ::core::option::Option::Some(Self::USER_CANCELED),
             _ => ::core::option::Option::None,
         }
     }
@@ -562,6 +600,7 @@ impl ::buffa::Enumeration for SwapReason {
             Self::MINIMUM_NOT_MET,
             Self::MAX_ORDER_QUANTITY,
             Self::INTERMEDIATE_BELOW_MINIMUM,
+            Self::USER_CANCELED,
         ]
     }
 }
@@ -783,6 +822,12 @@ pub enum ErrorCode {
     /// A market of the route trades its two assets but cannot execute a Swap in
     /// this direction: a buy there would pay its fee in the asset it spends.
     DIRECTION_UNSUPPORTED = 13i32,
+    /// The Swap ended before it was canceled; the error carries its swap_id.
+    /// Read it with GetSwap.
+    SWAP_ALREADY_FINAL = 14i32,
+    /// The Swap converts an auto-withdraw payout and ends only with its
+    /// auto-withdraw run.
+    SWAP_NOT_CANCELABLE = 15i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -827,6 +872,12 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::DIRECTION_UNSUPPORTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const DirectionUnsupported: Self = Self::DIRECTION_UNSUPPORTED;
+    ///Idiomatic alias for [`Self::SWAP_ALREADY_FINAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SwapAlreadyFinal: Self = Self::SWAP_ALREADY_FINAL;
+    ///Idiomatic alias for [`Self::SWAP_NOT_CANCELABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SwapNotCancelable: Self = Self::SWAP_NOT_CANCELABLE;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -936,6 +987,8 @@ impl ::buffa::Enumeration for ErrorCode {
             11i32 => ::core::option::Option::Some(Self::SWAP_NOT_PERMITTED),
             12i32 => ::core::option::Option::Some(Self::SERVICE_UNAVAILABLE),
             13i32 => ::core::option::Option::Some(Self::DIRECTION_UNSUPPORTED),
+            14i32 => ::core::option::Option::Some(Self::SWAP_ALREADY_FINAL),
+            15i32 => ::core::option::Option::Some(Self::SWAP_NOT_CANCELABLE),
             _ => ::core::option::Option::None,
         }
     }
@@ -958,6 +1011,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::SWAP_NOT_PERMITTED => "SWAP_NOT_PERMITTED",
             Self::SERVICE_UNAVAILABLE => "SERVICE_UNAVAILABLE",
             Self::DIRECTION_UNSUPPORTED => "DIRECTION_UNSUPPORTED",
+            Self::SWAP_ALREADY_FINAL => "SWAP_ALREADY_FINAL",
+            Self::SWAP_NOT_CANCELABLE => "SWAP_NOT_CANCELABLE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -994,6 +1049,12 @@ impl ::buffa::Enumeration for ErrorCode {
             "DIRECTION_UNSUPPORTED" => {
                 ::core::option::Option::Some(Self::DIRECTION_UNSUPPORTED)
             }
+            "SWAP_ALREADY_FINAL" => {
+                ::core::option::Option::Some(Self::SWAP_ALREADY_FINAL)
+            }
+            "SWAP_NOT_CANCELABLE" => {
+                ::core::option::Option::Some(Self::SWAP_NOT_CANCELABLE)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1013,6 +1074,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::SWAP_NOT_PERMITTED,
             Self::SERVICE_UNAVAILABLE,
             Self::DIRECTION_UNSUPPORTED,
+            Self::SWAP_ALREADY_FINAL,
+            Self::SWAP_NOT_CANCELABLE,
         ]
     }
 }
@@ -1533,7 +1596,7 @@ pub const __MARKET_EXECUTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
 /// price limit allows for the taker fee in force when the order can match
 /// within its window, the highest rate scheduled from when the order is
 /// prepared until it can last be accepted, some minutes after its sending
-/// window since a resent copy of it can still be accepted then. An order the
+/// window since a delayed order can still be accepted then. An order the
 /// exchange first accepts after that window (only under severe delay) may pay
 /// a later scheduled fee, and a slice it takes below the minimum fails the
 /// Swap closed (MINIMUM_NOT_MET). A slice's first order is sent only within
@@ -1554,7 +1617,8 @@ pub const __MARKET_EXECUTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
 #[serde(default)]
 pub struct TwapExecution {
     /// Total execution duration in milliseconds, from 60000 (1 minute) to
-    /// 3600000 (60 minutes). The duration starts when execution starts.
+    /// 86400000 (24 hours). The duration starts when execution starts, not when
+    /// the Swap is created.
     ///
     /// Field 1: `duration_ms`
     #[serde(
@@ -4117,6 +4181,9 @@ pub mod swap_slice {
         INSUFFICIENT_LIQUIDITY = 8i32,
         /// The execution ended before this slot was used.
         EXECUTION_ENDED = 9i32,
+        /// The Swap was canceled (CancelSwap) before this slot was used, or before
+        /// a later slice could convert this slice's intermediate.
+        CANCELED = 10i32,
     }
     impl Reason {
         ///Idiomatic alias for [`Self::SLICE_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -4149,6 +4216,9 @@ pub mod swap_slice {
         ///Idiomatic alias for [`Self::EXECUTION_ENDED`]; `Debug` prints the variant name.
         #[allow(non_upper_case_globals)]
         pub const ExecutionEnded: Self = Self::EXECUTION_ENDED;
+        ///Idiomatic alias for [`Self::CANCELED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Canceled: Self = Self::CANCELED;
     }
     impl ::core::default::Default for Reason {
         fn default() -> Self {
@@ -4254,6 +4324,7 @@ pub mod swap_slice {
                 7i32 => ::core::option::Option::Some(Self::REFUSED),
                 8i32 => ::core::option::Option::Some(Self::INSUFFICIENT_LIQUIDITY),
                 9i32 => ::core::option::Option::Some(Self::EXECUTION_ENDED),
+                10i32 => ::core::option::Option::Some(Self::CANCELED),
                 _ => ::core::option::Option::None,
             }
         }
@@ -4272,6 +4343,7 @@ pub mod swap_slice {
                 Self::REFUSED => "REFUSED",
                 Self::INSUFFICIENT_LIQUIDITY => "INSUFFICIENT_LIQUIDITY",
                 Self::EXECUTION_ENDED => "EXECUTION_ENDED",
+                Self::CANCELED => "CANCELED",
             }
         }
         fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -4294,6 +4366,7 @@ pub mod swap_slice {
                     ::core::option::Option::Some(Self::INSUFFICIENT_LIQUIDITY)
                 }
                 "EXECUTION_ENDED" => ::core::option::Option::Some(Self::EXECUTION_ENDED),
+                "CANCELED" => ::core::option::Option::Some(Self::CANCELED),
                 _ => ::core::option::Option::None,
             }
         }
@@ -4309,6 +4382,7 @@ pub mod swap_slice {
                 Self::REFUSED,
                 Self::INSUFFICIENT_LIQUIDITY,
                 Self::EXECUTION_ENDED,
+                Self::CANCELED,
             ]
         }
     }
@@ -4686,8 +4760,8 @@ pub struct Swap {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub status: ::buffa::EnumValue<SwapStatus>,
-    /// Why the Swap did not trade its whole amount; set with PARTIALLY_COMPLETED
-    /// and FAILED.
+    /// Why the Swap did not trade its whole amount; set with
+    /// PARTIALLY_COMPLETED, FAILED and CANCELED.
     ///
     /// Field 9: `reason`
     #[serde(
@@ -4696,7 +4770,8 @@ pub struct Swap {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub reason: ::buffa::EnumValue<SwapReason>,
-    /// True once the status is final: COMPLETED, PARTIALLY_COMPLETED or FAILED.
+    /// True once the status is final: COMPLETED, PARTIALLY_COMPLETED, FAILED or
+    /// CANCELED.
     ///
     /// Field 10: `is_terminal`
     #[serde(
@@ -4807,6 +4882,20 @@ pub struct Swap {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub progress: ::buffa::MessageField<SwapProgress>,
+    /// When the Swap's owner first canceled it (CancelSwap); unset when it was
+    /// never canceled. Set once and never changed. A cancel that came when
+    /// nothing was left to stop leaves the Swap's outcome as it would have been
+    /// (for example COMPLETED), with this set.
+    ///
+    /// Field 22: `cancel_requested_at`
+    #[serde(
+        rename = "cancelRequestedAt",
+        alias = "cancel_requested_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub cancel_requested_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4834,6 +4923,7 @@ impl ::core::fmt::Debug for Swap {
             .field("intermediate_remainder_e18", &self.intermediate_remainder_e18)
             .field("legs", &self.legs)
             .field("progress", &self.progress)
+            .field("cancel_requested_at", &self.cancel_requested_at)
             .finish()
     }
 }
@@ -4993,6 +5083,14 @@ impl ::buffa::Message for Swap {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.cancel_requested_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.cancel_requested_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5079,6 +5177,10 @@ impl ::buffa::Message for Swap {
         if self.progress.is_set() {
             ::buffa::types::put_len_delimited_header(21u32, __cache.consume_next(), buf);
             self.progress.write_to(__cache, buf);
+        }
+        if self.cancel_requested_at.is_set() {
+            ::buffa::types::put_len_delimited_header(22u32, __cache.consume_next(), buf);
+            self.cancel_requested_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5277,6 +5379,17 @@ impl ::buffa::Message for Swap {
                     ctx,
                 )?;
             }
+            22u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.cancel_requested_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5305,6 +5418,7 @@ impl ::buffa::Message for Swap {
         self.intermediate_remainder_e18 = ::buffa::MessageField::none();
         self.legs.clear();
         self.progress = ::buffa::MessageField::none();
+        self.cancel_requested_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6390,6 +6504,641 @@ pub const __GET_SWAP_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     from_json: ::buffa::type_registry::any_from_json::<GetSwapResponse>,
     is_wkt: false,
 };
+/// CancelSwapRequest cancels one of the caller's Swaps.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CancelSwapRequest {
+    /// Swap ID.
+    ///
+    /// Field 1: `swap_id`
+    #[serde(
+        rename = "swapId",
+        alias = "swap_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub swap_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CancelSwapRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CancelSwapRequest").field("swap_id", &self.swap_id).finish()
+    }
+}
+impl CancelSwapRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.CancelSwapRequest";
+}
+::buffa::impl_default_instance!(CancelSwapRequest);
+impl ::buffa::MessageName for CancelSwapRequest {
+    const PACKAGE: &'static str = "swap.v1";
+    const NAME: &'static str = "CancelSwapRequest";
+    const FULL_NAME: &'static str = "swap.v1.CancelSwapRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.CancelSwapRequest";
+}
+impl ::buffa::Message for CancelSwapRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.swap_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.swap_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.swap_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.swap_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.swap_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CancelSwapRequest {
+    const PROTO_FQN: &'static str = "swap.v1.CancelSwapRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelSwapRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CANCEL_SWAP_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/swap.v1.CancelSwapRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CancelSwapRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CancelSwapRequest>,
+    is_wkt: false,
+};
+/// CancelSwapResponse is the Swap as the cancel left it.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CancelSwapResponse {
+    /// The Swap: CANCELING until what was already placed finishes, or
+    /// RECONCILING while an order's outcome is being confirmed; already
+    /// terminal; or, after the Swap's deadline, unchanged (EXECUTING or
+    /// RECONCILING, without cancel_requested_at).
+    ///
+    /// Field 1: `swap`
+    #[serde(
+        rename = "swap",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub swap: ::buffa::MessageField<Swap>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CancelSwapResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CancelSwapResponse").field("swap", &self.swap).finish()
+    }
+}
+impl CancelSwapResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.CancelSwapResponse";
+}
+::buffa::impl_default_instance!(CancelSwapResponse);
+impl ::buffa::MessageName for CancelSwapResponse {
+    const PACKAGE: &'static str = "swap.v1";
+    const NAME: &'static str = "CancelSwapResponse";
+    const FULL_NAME: &'static str = "swap.v1.CancelSwapResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.CancelSwapResponse";
+}
+impl ::buffa::Message for CancelSwapResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.swap.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.swap.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.swap.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.swap.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.swap.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.swap = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CancelSwapResponse {
+    const PROTO_FQN: &'static str = "swap.v1.CancelSwapResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelSwapResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CANCEL_SWAP_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/swap.v1.CancelSwapResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CancelSwapResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CancelSwapResponse>,
+    is_wkt: false,
+};
+/// ListSwapsRequest lists the caller's Swaps funded by one account, newest
+/// first.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListSwapsRequest {
+    /// Optional sub-account public ID whose Swaps to list. When omitted, the
+    /// Swaps funded by the caller's root account are listed, or those of the
+    /// sub-account an API key is bound to.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// When true, only Swaps that have not ended (is_terminal false) are listed.
+    ///
+    /// Field 2: `open_only`
+    #[serde(
+        rename = "openOnly",
+        alias = "open_only",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub open_only: bool,
+    /// Maximum number of Swaps to return: 0 means 20, at most 50.
+    ///
+    /// Field 3: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub limit: u32,
+    /// Opaque, exclusive, keyset-backed cursor from a previous response's
+    /// next_page_token. It is bound to the caller, subaccount_id and open_only,
+    /// and to the newest-first creation order with a stable tie-breaker for
+    /// Swaps created at the same instant; reuse it only with the same values.
+    /// Empty for the first page.
+    ///
+    /// Field 4: `page_token`
+    #[serde(
+        rename = "pageToken",
+        alias = "page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListSwapsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListSwapsRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("open_only", &self.open_only)
+            .field("limit", &self.limit)
+            .field("page_token", &self.page_token)
+            .finish()
+    }
+}
+impl ListSwapsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.ListSwapsRequest";
+}
+::buffa::impl_default_instance!(ListSwapsRequest);
+impl ::buffa::MessageName for ListSwapsRequest {
+    const PACKAGE: &'static str = "swap.v1";
+    const NAME: &'static str = "ListSwapsRequest";
+    const FULL_NAME: &'static str = "swap.v1.ListSwapsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.ListSwapsRequest";
+}
+impl ::buffa::Message for ListSwapsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.open_only {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if self.limit != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+        }
+        if !self.page_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if self.open_only {
+            ::buffa::types::put_bool_field(2u32, self.open_only, buf);
+        }
+        if self.limit != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.limit, buf);
+        }
+        if !self.page_token.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.open_only = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.open_only = false;
+        self.limit = 0u32;
+        self.page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListSwapsRequest {
+    const PROTO_FQN: &'static str = "swap.v1.ListSwapsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListSwapsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_SWAPS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/swap.v1.ListSwapsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListSwapsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListSwapsRequest>,
+    is_wkt: false,
+};
+/// ListSwapsResponse returns one page of Swaps, newest first.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListSwapsResponse {
+    /// Swaps ordered by creation time, newest first, each as GetSwap returns
+    /// it.
+    ///
+    /// Field 1: `swaps`
+    #[serde(
+        rename = "swaps",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub swaps: ::buffa::alloc::vec::Vec<Swap>,
+    /// Cursor for the next page. Empty when no more results exist.
+    ///
+    /// Field 2: `next_page_token`
+    #[serde(
+        rename = "nextPageToken",
+        alias = "next_page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub next_page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListSwapsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListSwapsResponse")
+            .field("swaps", &self.swaps)
+            .field("next_page_token", &self.next_page_token)
+            .finish()
+    }
+}
+impl ListSwapsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.ListSwapsResponse";
+}
+::buffa::impl_default_instance!(ListSwapsResponse);
+impl ::buffa::MessageName for ListSwapsResponse {
+    const PACKAGE: &'static str = "swap.v1";
+    const NAME: &'static str = "ListSwapsResponse";
+    const FULL_NAME: &'static str = "swap.v1.ListSwapsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.ListSwapsResponse";
+}
+impl ::buffa::Message for ListSwapsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.swaps {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.next_page_token.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.swaps {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.next_page_token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.swaps.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.swaps.clear();
+        self.next_page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListSwapsResponse {
+    const PROTO_FQN: &'static str = "swap.v1.ListSwapsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListSwapsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_SWAPS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/swap.v1.ListSwapsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListSwapsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListSwapsResponse>,
+    is_wkt: false,
+};
 /// ErrorDetail is attached to Swap errors as an error detail of type
 /// swap.v1.ErrorDetail.
 #[derive(Clone, PartialEq, Default)]
@@ -6405,7 +7154,8 @@ pub struct ErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ErrorCode>,
-    /// IDEMPOTENCY_CONFLICT only: the Swap bound to the idempotency key.
+    /// IDEMPOTENCY_CONFLICT and SWAP_ALREADY_FINAL only: the Swap bound to the
+    /// idempotency key, or the Swap that ended.
     ///
     /// Field 2: `swap_id`
     #[serde(
@@ -7403,7 +8153,7 @@ pub mod __buffa {
         /// price limit allows for the taker fee in force when the order can match
         /// within its window, the highest rate scheduled from when the order is
         /// prepared until it can last be accepted, some minutes after its sending
-        /// window since a resent copy of it can still be accepted then. An order the
+        /// window since a delayed order can still be accepted then. An order the
         /// exchange first accepts after that window (only under severe delay) may pay
         /// a later scheduled fee, and a slice it takes below the minimum fails the
         /// Swap closed (MINIMUM_NOT_MET). A slice's first order is sent only within
@@ -7422,7 +8172,8 @@ pub mod __buffa {
         #[derive(Clone, Debug, Default)]
         pub struct TwapExecutionView<'a> {
             /// Total execution duration in milliseconds, from 60000 (1 minute) to
-            /// 3600000 (60 minutes). The duration starts when execution starts.
+            /// 86400000 (24 hours). The duration starts when execution starts, not when
+            /// the Swap is created.
             ///
             /// Field 1: `duration_ms`
             pub duration_ms: u64,
@@ -7689,7 +8440,8 @@ pub mod __buffa {
                 self.0.into_bytes()
             }
             /// Total execution duration in milliseconds, from 60000 (1 minute) to
-            /// 3600000 (60 minutes). The duration starts when execution starts.
+            /// 86400000 (24 hours). The duration starts when execution starts, not when
+            /// the Swap is created.
             ///
             /// Field 1: `duration_ms`
             #[must_use]
@@ -12333,12 +13085,13 @@ pub mod __buffa {
             ///
             /// Field 8: `status`
             pub status: ::buffa::EnumValue<super::super::SwapStatus>,
-            /// Why the Swap did not trade its whole amount; set with PARTIALLY_COMPLETED
-            /// and FAILED.
+            /// Why the Swap did not trade its whole amount; set with
+            /// PARTIALLY_COMPLETED, FAILED and CANCELED.
             ///
             /// Field 9: `reason`
             pub reason: ::buffa::EnumValue<super::super::SwapReason>,
-            /// True once the status is final: COMPLETED, PARTIALLY_COMPLETED or FAILED.
+            /// True once the status is final: COMPLETED, PARTIALLY_COMPLETED, FAILED or
+            /// CANCELED.
             ///
             /// Field 10: `is_terminal`
             pub is_terminal: bool,
@@ -12413,6 +13166,15 @@ pub mod __buffa {
             /// Field 21: `progress`
             pub progress: ::buffa::MessageFieldView<
                 super::super::__buffa::view::SwapProgressView<'a>,
+            >,
+            /// When the Swap's owner first canceled it (CancelSwap); unset when it was
+            /// never canceled. Set once and never changed. A cancel that came when
+            /// nothing was left to stop leaves the Swap's outcome as it would have been
+            /// (for example COMPLETED), with this set.
+            ///
+            /// Field 22: `cancel_requested_at`
+            pub cancel_requested_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -12743,6 +13505,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    22u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.cancel_requested_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.cancel_requested_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     15u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -12886,6 +13673,14 @@ pub mod __buffa {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 super::super::SwapProgress,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    cancel_requested_at: match self.cancel_requested_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -13041,6 +13836,14 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.cancel_requested_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.cancel_requested_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -13180,6 +13983,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.progress.write_to(__cache, buf);
+                }
+                if self.cancel_requested_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        22u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.cancel_requested_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -13327,6 +14138,14 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.progress.as_option()
                     {
                         __map.serialize_entry("progress", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .cancel_requested_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("cancelRequestedAt", __v)?;
                     }
                 }
                 __map.end()
@@ -13487,15 +14306,16 @@ pub mod __buffa {
             pub fn status(&self) -> ::buffa::EnumValue<super::super::SwapStatus> {
                 self.0.reborrow().status
             }
-            /// Why the Swap did not trade its whole amount; set with PARTIALLY_COMPLETED
-            /// and FAILED.
+            /// Why the Swap did not trade its whole amount; set with
+            /// PARTIALLY_COMPLETED, FAILED and CANCELED.
             ///
             /// Field 9: `reason`
             #[must_use]
             pub fn reason(&self) -> ::buffa::EnumValue<super::super::SwapReason> {
                 self.0.reborrow().reason
             }
-            /// True once the status is final: COMPLETED, PARTIALLY_COMPLETED or FAILED.
+            /// True once the status is final: COMPLETED, PARTIALLY_COMPLETED, FAILED or
+            /// CANCELED.
             ///
             /// Field 10: `is_terminal`
             #[must_use]
@@ -13621,6 +14441,20 @@ pub mod __buffa {
                 super::super::__buffa::view::SwapProgressView<'_>,
             > {
                 &self.0.reborrow().progress
+            }
+            /// When the Swap's owner first canceled it (CancelSwap); unset when it was
+            /// never canceled. Set once and never changed. A cancel that came when
+            /// nothing was left to stop leaves the Swap's outcome as it would have been
+            /// (for example COMPLETED), with this set.
+            ///
+            /// Field 22: `cancel_requested_at`
+            #[must_use]
+            pub fn cancel_requested_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().cancel_requested_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SwapView<'static>>>
@@ -15771,6 +16605,1289 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// CancelSwapRequest cancels one of the caller's Swaps.
+        #[derive(Clone, Debug, Default)]
+        pub struct CancelSwapRequestView<'a> {
+            /// Swap ID.
+            ///
+            /// Field 1: `swap_id`
+            pub swap_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CancelSwapRequestView<'a> {
+            type Owned = super::super::CancelSwapRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.swap_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelSwapRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CancelSwapRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CancelSwapRequest {
+                    swap_id: self.swap_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CancelSwapRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.swap_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.swap_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.swap_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CancelSwapRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.swap_id) {
+                    __map
+                        .serialize_entry(
+                            "swapId",
+                            &::buffa::json_helpers::ProtoJson(&self.swap_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CancelSwapRequestView<'a> {
+            const PACKAGE: &'static str = "swap.v1";
+            const NAME: &'static str = "CancelSwapRequest";
+            const FULL_NAME: &'static str = "swap.v1.CancelSwapRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.CancelSwapRequest";
+        }
+        ::buffa::impl_default_view_instance!(CancelSwapRequestView);
+        ::buffa::impl_view_reborrow!(CancelSwapRequestView);
+        /** Self-contained, `'static` owned view of a `CancelSwapRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CancelSwapRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CancelSwapRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CancelSwapRequestOwnedView(
+            ::buffa::OwnedView<CancelSwapRequestView<'static>>,
+        );
+        impl CancelSwapRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelSwapRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelSwapRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CancelSwapRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelSwapRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CancelSwapRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CancelSwapRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelSwapRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Swap ID.
+            ///
+            /// Field 1: `swap_id`
+            #[must_use]
+            pub fn swap_id(&self) -> u64 {
+                self.0.reborrow().swap_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CancelSwapRequestView<'static>>>
+        for CancelSwapRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<CancelSwapRequestView<'static>>) -> Self {
+                CancelSwapRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CancelSwapRequestOwnedView>
+        for ::buffa::OwnedView<CancelSwapRequestView<'static>> {
+            fn from(wrapper: CancelSwapRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CancelSwapRequestView<'static>>>
+        for CancelSwapRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CancelSwapRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CancelSwapRequest {
+            type View<'a> = CancelSwapRequestView<'a>;
+            type ViewHandle = CancelSwapRequestOwnedView;
+        }
+        impl ::serde::Serialize for CancelSwapRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CancelSwapResponse is the Swap as the cancel left it.
+        #[derive(Clone, Debug, Default)]
+        pub struct CancelSwapResponseView<'a> {
+            /// The Swap: CANCELING until what was already placed finishes, or
+            /// RECONCILING while an order's outcome is being confirmed; already
+            /// terminal; or, after the Swap's deadline, unchanged (EXECUTING or
+            /// RECONCILING, without cancel_requested_at).
+            ///
+            /// Field 1: `swap`
+            pub swap: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SwapView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CancelSwapResponseView<'a> {
+            type Owned = super::super::CancelSwapResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.swap.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.swap = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SwapView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelSwapResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CancelSwapResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CancelSwapResponse {
+                    swap: match self.swap.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Swap,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CancelSwapResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.swap.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.swap.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.swap.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.swap.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CancelSwapResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.swap.as_option() {
+                        __map.serialize_entry("swap", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CancelSwapResponseView<'a> {
+            const PACKAGE: &'static str = "swap.v1";
+            const NAME: &'static str = "CancelSwapResponse";
+            const FULL_NAME: &'static str = "swap.v1.CancelSwapResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.CancelSwapResponse";
+        }
+        ::buffa::impl_default_view_instance!(CancelSwapResponseView);
+        ::buffa::impl_view_reborrow!(CancelSwapResponseView);
+        /** Self-contained, `'static` owned view of a `CancelSwapResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CancelSwapResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CancelSwapResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CancelSwapResponseOwnedView(
+            ::buffa::OwnedView<CancelSwapResponseView<'static>>,
+        );
+        impl CancelSwapResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelSwapResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelSwapResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CancelSwapResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelSwapResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CancelSwapResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CancelSwapResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelSwapResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The Swap: CANCELING until what was already placed finishes, or
+            /// RECONCILING while an order's outcome is being confirmed; already
+            /// terminal; or, after the Swap's deadline, unchanged (EXECUTING or
+            /// RECONCILING, without cancel_requested_at).
+            ///
+            /// Field 1: `swap`
+            #[must_use]
+            pub fn swap(
+                &self,
+            ) -> &::buffa::MessageFieldView<super::super::__buffa::view::SwapView<'_>> {
+                &self.0.reborrow().swap
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CancelSwapResponseView<'static>>>
+        for CancelSwapResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<CancelSwapResponseView<'static>>) -> Self {
+                CancelSwapResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CancelSwapResponseOwnedView>
+        for ::buffa::OwnedView<CancelSwapResponseView<'static>> {
+            fn from(wrapper: CancelSwapResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CancelSwapResponseView<'static>>>
+        for CancelSwapResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CancelSwapResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CancelSwapResponse {
+            type View<'a> = CancelSwapResponseView<'a>;
+            type ViewHandle = CancelSwapResponseOwnedView;
+        }
+        impl ::serde::Serialize for CancelSwapResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListSwapsRequest lists the caller's Swaps funded by one account, newest
+        /// first.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListSwapsRequestView<'a> {
+            /// Optional sub-account public ID whose Swaps to list. When omitted, the
+            /// Swaps funded by the caller's root account are listed, or those of the
+            /// sub-account an API key is bound to.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            /// When true, only Swaps that have not ended (is_terminal false) are listed.
+            ///
+            /// Field 2: `open_only`
+            pub open_only: bool,
+            /// Maximum number of Swaps to return: 0 means 20, at most 50.
+            ///
+            /// Field 3: `limit`
+            pub limit: u32,
+            /// Opaque, exclusive, keyset-backed cursor from a previous response's
+            /// next_page_token. It is bound to the caller, subaccount_id and open_only,
+            /// and to the newest-first creation order with a stable tie-breaker for
+            /// Swaps created at the same instant; reuse it only with the same values.
+            /// Empty for the first page.
+            ///
+            /// Field 4: `page_token`
+            pub page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListSwapsRequestView<'a> {
+            type Owned = super::super::ListSwapsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.open_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSwapsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListSwapsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListSwapsRequest {
+                    subaccount_id: self.subaccount_id,
+                    open_only: self.open_only,
+                    limit: self.limit,
+                    page_token: self.page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListSwapsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.open_only {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if self.limit != 0u32 {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+                }
+                if !self.page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if self.open_only {
+                    ::buffa::types::put_bool_field(2u32, self.open_only, buf);
+                }
+                if self.limit != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.limit, buf);
+                }
+                if !self.page_token.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListSwapsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if self.open_only {
+                    __map.serialize_entry("openOnly", &self.open_only)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&self.limit),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
+                    __map.serialize_entry("pageToken", self.page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListSwapsRequestView<'a> {
+            const PACKAGE: &'static str = "swap.v1";
+            const NAME: &'static str = "ListSwapsRequest";
+            const FULL_NAME: &'static str = "swap.v1.ListSwapsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.ListSwapsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListSwapsRequestView);
+        ::buffa::impl_view_reborrow!(ListSwapsRequestView);
+        /** Self-contained, `'static` owned view of a `ListSwapsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListSwapsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListSwapsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListSwapsRequestOwnedView(
+            ::buffa::OwnedView<ListSwapsRequestView<'static>>,
+        );
+        impl ListSwapsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSwapsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSwapsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListSwapsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSwapsRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ListSwapsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListSwapsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSwapsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional sub-account public ID whose Swaps to list. When omitted, the
+            /// Swaps funded by the caller's root account are listed, or those of the
+            /// sub-account an API key is bound to.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// When true, only Swaps that have not ended (is_terminal false) are listed.
+            ///
+            /// Field 2: `open_only`
+            #[must_use]
+            pub fn open_only(&self) -> bool {
+                self.0.reborrow().open_only
+            }
+            /// Maximum number of Swaps to return: 0 means 20, at most 50.
+            ///
+            /// Field 3: `limit`
+            #[must_use]
+            pub fn limit(&self) -> u32 {
+                self.0.reborrow().limit
+            }
+            /// Opaque, exclusive, keyset-backed cursor from a previous response's
+            /// next_page_token. It is bound to the caller, subaccount_id and open_only,
+            /// and to the newest-first creation order with a stable tie-breaker for
+            /// Swaps created at the same instant; reuse it only with the same values.
+            /// Empty for the first page.
+            ///
+            /// Field 4: `page_token`
+            #[must_use]
+            pub fn page_token(&self) -> &'_ str {
+                self.0.reborrow().page_token
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ListSwapsRequestView<'static>>>
+        for ListSwapsRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<ListSwapsRequestView<'static>>) -> Self {
+                ListSwapsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListSwapsRequestOwnedView>
+        for ::buffa::OwnedView<ListSwapsRequestView<'static>> {
+            fn from(wrapper: ListSwapsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ListSwapsRequestView<'static>>>
+        for ListSwapsRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ListSwapsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListSwapsRequest {
+            type View<'a> = ListSwapsRequestView<'a>;
+            type ViewHandle = ListSwapsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListSwapsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListSwapsResponse returns one page of Swaps, newest first.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListSwapsResponseView<'a> {
+            /// Swaps ordered by creation time, newest first, each as GetSwap returns
+            /// it.
+            ///
+            /// Field 1: `swaps`
+            pub swaps: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::SwapView<'a>,
+            >,
+            /// Cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            pub next_page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListSwapsResponseView<'a> {
+            type Owned = super::super::ListSwapsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.swaps
+                            .push(
+                                <super::super::__buffa::view::SwapView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSwapsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListSwapsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListSwapsResponse {
+                    swaps: self
+                        .swaps
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_page_token: self.next_page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListSwapsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.swaps {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.next_page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.next_page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.swaps {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.next_page_token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListSwapsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.swaps.is_empty() {
+                    __map.serialize_entry("swaps", &*self.swaps)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
+                    __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListSwapsResponseView<'a> {
+            const PACKAGE: &'static str = "swap.v1";
+            const NAME: &'static str = "ListSwapsResponse";
+            const FULL_NAME: &'static str = "swap.v1.ListSwapsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/swap.v1.ListSwapsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListSwapsResponseView);
+        ::buffa::impl_view_reborrow!(ListSwapsResponseView);
+        /** Self-contained, `'static` owned view of a `ListSwapsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListSwapsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListSwapsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListSwapsResponseOwnedView(
+            ::buffa::OwnedView<ListSwapsResponseView<'static>>,
+        );
+        impl ListSwapsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSwapsResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSwapsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListSwapsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSwapsResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ListSwapsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListSwapsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSwapsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Swaps ordered by creation time, newest first, each as GetSwap returns
+            /// it.
+            ///
+            /// Field 1: `swaps`
+            #[must_use]
+            pub fn swaps(
+                &self,
+            ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::SwapView<'_>> {
+                &self.0.reborrow().swaps
+            }
+            /// Cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            #[must_use]
+            pub fn next_page_token(&self) -> &'_ str {
+                self.0.reborrow().next_page_token
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ListSwapsResponseView<'static>>>
+        for ListSwapsResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<ListSwapsResponseView<'static>>) -> Self {
+                ListSwapsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListSwapsResponseOwnedView>
+        for ::buffa::OwnedView<ListSwapsResponseView<'static>> {
+            fn from(wrapper: ListSwapsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ListSwapsResponseView<'static>>>
+        for ListSwapsResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ListSwapsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListSwapsResponse {
+            type View<'a> = ListSwapsResponseView<'a>;
+            type ViewHandle = ListSwapsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListSwapsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ErrorDetail is attached to Swap errors as an error detail of type
         /// swap.v1.ErrorDetail.
         #[derive(Clone, Debug, Default)]
@@ -15779,7 +17896,8 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ErrorCode>,
-            /// IDEMPOTENCY_CONFLICT only: the Swap bound to the idempotency key.
+            /// IDEMPOTENCY_CONFLICT and SWAP_ALREADY_FINAL only: the Swap bound to the
+            /// idempotency key, or the Swap that ended.
             ///
             /// Field 2: `swap_id`
             pub swap_id: u64,
@@ -16172,7 +18290,8 @@ pub mod __buffa {
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
                 self.0.reborrow().code
             }
-            /// IDEMPOTENCY_CONFLICT only: the Swap bound to the idempotency key.
+            /// IDEMPOTENCY_CONFLICT and SWAP_ALREADY_FINAL only: the Swap bound to the
+            /// idempotency key, or the Swap that ended.
             ///
             /// Field 2: `swap_id`
             #[must_use]
@@ -16441,6 +18560,10 @@ pub mod __buffa {
         reg.register_json_any(super::__CREATE_SWAP_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_SWAP_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_SWAP_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CANCEL_SWAP_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CANCEL_SWAP_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_SWAPS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SWAPS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
     }
 }
@@ -16512,6 +18635,22 @@ pub use self::__buffa::view::GetSwapRequestOwnedView;
 pub use self::__buffa::view::GetSwapResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetSwapResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelSwapRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelSwapRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelSwapResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelSwapResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSwapsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSwapsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSwapsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSwapsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ErrorDetailView;
 #[doc(inline)]

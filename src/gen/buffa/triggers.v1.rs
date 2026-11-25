@@ -420,15 +420,20 @@ pub enum TriggerEventType {
     /// A fire of the trigger was refused and the trigger stayed live: an
     /// attached take-profit, stop-loss or trailing stop waits for the next price
     /// through its trigger price, or, refused because its order would be below
-    /// the market's minimums, waits until its position changes; a trigger
-    /// refused for a rate limit or an account repair fires again shortly. An
+    /// the market's minimums while its parent order is still open, waits until
+    /// its position grows; a trigger refused for a rate limit or an account
+    /// repair fires again shortly. An
     /// attached take-profit, stop-loss or trailing stop whose order self-trade
     /// prevention expired against another of the account's resting orders stays
     /// live too (TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED), reported once
     /// while that order blocks it. New trades and price updates do not fire it
     /// while the other order is first in line at the best price; once that order
     /// is gone or no longer first there, it fires again if its trigger condition
-    /// still holds. Not terminal: the trigger keeps its status. child_seq names
+    /// still holds. Once the parent order has ended, the position can no
+    /// longer grow: an attached leg whose exit is then below the minimums ends
+    /// with EVENT_FAILED and TRIGGER_FAILURE_REASON_MIN_NOTIONAL or
+    /// TRIGGER_FAILURE_REASON_MIN_QUANTITY instead (orders.v1.RiskPolicy).
+    /// Not terminal: the trigger keeps its status. child_seq names
     /// the refused attempt, which placed no child order, and fire_refusal_reason
     /// says why; the next fire takes the next child_seq.
     /// With TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED, child_seq names the
@@ -1001,7 +1006,10 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL = 1i32,
     /// The trading pair was not accepting new orders.
     TRIGGER_FAILURE_REASON_PAIR_DISABLED = 2i32,
-    /// The child order value was below the pair's minimum notional.
+    /// The child order value was below the pair's minimum notional. An attached
+    /// take-profit, stop-loss or trailing stop also ends with it, without
+    /// firing, when its parent order ends with a filled quantity whose exit
+    /// would be below the minimum order value (orders.v1.RiskPolicy).
     TRIGGER_FAILURE_REASON_MIN_NOTIONAL = 3i32,
     /// The child order price was not aligned to the pair's tick size.
     TRIGGER_FAILURE_REASON_TICK_SIZE = 4i32,
@@ -16134,6 +16142,12 @@ pub struct Trigger {
     )]
     pub order_list_id: ::core::option::Option<u64>,
     /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
+    /// An attached leg shows its parent order's quantity until a parent fill
+    /// arms it, then the filled position it protects, rounded down to the
+    /// pair's quantity step. A leg that ends with
+    /// TRIGGER_FAILURE_REASON_MIN_NOTIONAL or TRIGGER_FAILURE_REASON_MIN_QUANTITY
+    /// when its parent order ends shows that rounded filled quantity, the one
+    /// it was checked at.
     ///
     /// Field 20: `qty_scaled`
     #[serde(
@@ -37556,6 +37570,12 @@ pub mod __buffa {
             /// Field 9: `order_list_id`
             pub order_list_id: ::core::option::Option<u64>,
             /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
+            /// An attached leg shows its parent order's quantity until a parent fill
+            /// arms it, then the filled position it protects, rounded down to the
+            /// pair's quantity step. A leg that ends with
+            /// TRIGGER_FAILURE_REASON_MIN_NOTIONAL or TRIGGER_FAILURE_REASON_MIN_QUANTITY
+            /// when its parent order ends shows that rounded filled quantity, the one
+            /// it was checked at.
             ///
             /// Field 20: `qty_scaled`
             pub qty_scaled: i64,
@@ -39097,6 +39117,12 @@ pub mod __buffa {
                 self.0.reborrow().order_list_id
             }
             /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
+            /// An attached leg shows its parent order's quantity until a parent fill
+            /// arms it, then the filled position it protects, rounded down to the
+            /// pair's quantity step. A leg that ends with
+            /// TRIGGER_FAILURE_REASON_MIN_NOTIONAL or TRIGGER_FAILURE_REASON_MIN_QUANTITY
+            /// when its parent order ends shows that rounded filled quantity, the one
+            /// it was checked at.
             ///
             /// Field 20: `qty_scaled`
             #[must_use]

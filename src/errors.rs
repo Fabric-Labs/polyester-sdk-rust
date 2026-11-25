@@ -718,6 +718,11 @@ pub mod transfer_codes {
     /// accounts (`invalid_argument`, HTTP 400). Final: send fewer source
     /// accounts per batch.
     pub const BATCH_TOO_MANY_SOURCES: &str = "ERROR_CODE_BATCH_TOO_MANY_SOURCES";
+    /// A batch of internal transfers under an idempotency key that was
+    /// abandoned before any batch was submitted under it
+    /// (`failed_precondition`, HTTP 400); see
+    /// [`super::Error::is_idempotency_key_abandoned`].
+    pub const IDEMPOTENCY_KEY_ABANDONED: &str = "ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED";
 }
 
 /// `ledger.read.v1.ErrorCode` names of statement export refusals.
@@ -1883,6 +1888,17 @@ impl Error {
     /// [`Self::is_retryable`]: choose another destination.
     pub fn is_withdraw_destination_swap_deposit_address(&self) -> bool {
         matches!(self, Self::Api { code, .. } if code == withdraw_codes::DESTINATION_SWAP_DEPOSIT_ADDRESS)
+    }
+
+    /// True for `ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED` (REST
+    /// `IDEMPOTENCY_KEY_ABANDONED`): a batch of internal transfers was refused
+    /// because its idempotency key was abandoned with
+    /// [`crate::services::InternalTransfersService::abandon_batch`] before any
+    /// batch was submitted under it. Nothing moved under the key and nothing
+    /// ever will. Final and not [`Self::is_retryable`], and not an unknown
+    /// outcome: submit the batch under a new idempotency key.
+    pub fn is_idempotency_key_abandoned(&self) -> bool {
+        matches!(self, Self::Api { code, .. } if code == transfer_codes::IDEMPOTENCY_KEY_ABANDONED)
     }
 
     /// With `AUTH_SOCIAL_ACCOUNT_COOLDOWN` or

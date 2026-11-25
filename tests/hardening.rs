@@ -41,6 +41,8 @@ mod error_chain_redaction;
 mod hardening_support;
 #[path = "history_time_window/mod.rs"]
 mod history_time_window;
+#[path = "internal_transfer_abandon/mod.rs"]
+mod internal_transfer_abandon;
 #[path = "limit_market_ref_price/mod.rs"]
 mod limit_market_ref_price;
 #[path = "live_write_gates/mod.rs"]

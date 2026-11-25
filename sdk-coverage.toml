@@ -128,7 +128,7 @@ reason = "Auto-withdraw run reads are not wrapped in the API-key SDK."
 
 [[allowlist]]
 service = "swap.v1.SwapService"
-reason = "Swap quote, create and get are not wrapped in the API-key SDK."
+reason = "Swaps (quote, create, get, list and cancel) are not wrapped in the API-key SDK."
 
 [[allowlist]]
 procedure = "/checkpoints.v1.CheckpointService/ListMyCheckpoints"

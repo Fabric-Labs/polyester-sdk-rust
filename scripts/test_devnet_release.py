@@ -326,6 +326,18 @@ class VerifyGoTest(unittest.TestCase):
         with self.assertRaisesRegex(dr.ReleaseError, "already exists"):
             dr.verify_go(self.repo, self.version, self.sha)
 
+    def test_git_starts_no_background_maintenance(self) -> None:
+        # A fetch starts `git maintenance run --auto`, which detaches by
+        # default: a repack still running in the go command's VCS cache made
+        # removing the temporary directory fail with "Directory not empty".
+        trace = Path(self.tmp.name) / "trace2.json"
+        with mock.patch.dict(os.environ, {"GIT_TRACE2_EVENT": str(trace)}):
+            dr.verify_go(self.repo, self.version, self.sha)
+        events = [json.loads(line) for line in trace.read_text().splitlines()]
+        started = [event["argv"] for event in events if event["event"] == "start"]
+        self.assertTrue([argv for argv in started if "fetch" in argv], "go fetched with git")
+        self.assertEqual([argv for argv in started if {"maintenance", "gc"} & set(argv)], [])
+
     def test_a_launcher_logging_to_stdout_does_not_break_resolution(self) -> None:
         run_git(self.repo, "tag", f"v{self.version}", self.sha)
         real_go = shutil.which("go")
