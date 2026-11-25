@@ -2,9 +2,9 @@
 """Fail if the public repository discloses internal references.
 
 README.md and CHANGELOG.md are checked for every internal/QA disclosure
-pattern in FORBIDDEN. Every other tracked file outside the generated src/gen/
-tree is checked for internal tracker references, in its path and, unless it
-is binary, in its text, so they cannot come back.
+pattern in FORBIDDEN. Every other tracked file outside the generated tree
+(GENERATED_PREFIXES) is checked for internal tracker references, in its path
+and, unless it is binary, in its text, so they cannot come back.
 """
 
 from __future__ import annotations
@@ -37,10 +37,19 @@ FORBIDDEN: list[tuple[re.Pattern[str], str]] = [
 # test name. The one legitimate term of that shape, the Poly1305
 # authenticator (poly1305), is excluded by name.
 TICKET_REFERENCE = re.compile(r"poly(?!1305(?!\d))[-_]?\d+|ticket[-_]?\d+", re.IGNORECASE)
-# The tracker's other project keys with a hyphen and an issue number, and
-# an internal merge request number: "!" and at least three digits, at the
-# start of a line or after a space, comma or opening bracket.
-TRACKER_REFERENCE = re.compile(r"\b(?:ADMIN|CHAIN|HULY|ODY|ZIP)-\d+\b|(?<![^\s(\[,])!\d{3,}\b")
+# One of the tracker's other project keys, a hyphen and an issue number, in
+# any case. A key joined to the word or hyphen before it, as in a fixture
+# name such as depth-chain-00, is not a reference.
+PROJECT_REFERENCE = re.compile(r"(?<![\w-])(?:admin|chain|huly|ody|zip)-\d+\b", re.IGNORECASE)
+# A candidate internal merge request number: "!" and at least three digits,
+# at the start of a line or after whitespace. It is a reference only in
+# prose; see is_merge_request.
+MERGE_REQUEST = re.compile(r"(?<!\S)!\d{3,}\b")
+# Before a merge request number, nothing but a comment marker reads as prose.
+COMMENT_PREFIX = re.compile(r"\s*(?:#+|//[/!]?)?")
+# Rust keywords that take an expression, so a "!" after one is the unary
+# operator, not a merge request.
+EXPRESSION_KEYWORDS = frozenset({"break", "if", "match", "mut", "return", "while", "yield"})
 # Generated code, copied from the published contract, is not checked.
 GENERATED_PREFIXES = ("src/gen/",)
 # Git reads a file as binary when its first 8000 bytes hold a NUL byte.
@@ -69,9 +78,26 @@ def is_binary(content: bytes) -> bool:
     return False
 
 
+def is_merge_request(text: str) -> bool:
+    """Reports whether text holds a merge request number in prose: one that
+    starts the line or a comment, or follows a word. After an operator, a
+    bracket, punctuation or an expression keyword, "!" and digits are the
+    unary operator of code such as Rust's, and are not a reference."""
+    for match in MERGE_REQUEST.finditer(text):
+        before = text[: match.start()].rstrip()
+        if COMMENT_PREFIX.fullmatch(before):
+            return True
+        word = re.search(r"\w+$", before)
+        if word and word.group() not in EXPRESSION_KEYWORDS:
+            return True
+    return False
+
+
 def is_reference(text: str) -> bool:
     """Reports whether text holds an internal tracker reference."""
-    return bool(TICKET_REFERENCE.search(text) or TRACKER_REFERENCE.search(text))
+    return bool(
+        TICKET_REFERENCE.search(text) or PROJECT_REFERENCE.search(text) or is_merge_request(text)
+    )
 
 
 def ticket_references(root: Path, names: Iterable[str]) -> list[str]:
@@ -120,8 +146,8 @@ def main() -> int:
         print("\n".join(failures), file=sys.stderr)
         return 1
     print(
-        "ok: public disclosure checks passed for README.md, CHANGELOG.md"
-        " and every tracked file outside src/gen/"
+        "ok: public disclosure checks passed for README.md, CHANGELOG.md and every"
+        f" tracked file outside {', '.join(GENERATED_PREFIXES)}"
     )
     return 0
 
