@@ -19,8 +19,8 @@ use crate::proto::chain::withdraw::v1::{
     WithdrawDestinationValidationCode,
 };
 use crate::proto::transfer::v1::{
-    BatchCreateInternalTransfersResponse, CreateInternalTransferResponse,
-    GetInternalTransferBatchResponse,
+    AbandonInternalTransferBatchResponse, BatchCreateInternalTransfersResponse,
+    CreateInternalTransferResponse, GetInternalTransferBatchResponse,
     InternalTransferBatchLegResult as ProtoInternalTransferBatchLegResult,
     InternalTransferBatchLegStatus, InternalTransferBatchStatus, InternalTransferStatus,
 };
@@ -236,6 +236,41 @@ pub fn internal_transfer_batch_from_get_response(
         return Err(Error::response_contract(OP, "batch has no legs"));
     }
     internal_transfer_batch(OP, &msg.request_id, &msg.status, &msg.legs, true)
+}
+
+/// Decode the answer to abandoning a batch's idempotency key.
+///
+/// `BATCH_ABANDONED` is status `abandoned` with no request ID and no legs:
+/// nothing moved under the key and nothing ever will. Any other answer is the
+/// batch submitted under the key, refused with [`Error::ResponseContract`] as
+/// [`internal_transfer_batch`] says, and when it has no legs. An abandoned
+/// answer with a request ID or legs is refused too. Abandoning again with the
+/// same key is safe.
+pub fn internal_transfer_batch_from_abandon_response(
+    msg: &AbandonInternalTransferBatchResponse,
+) -> Result<InternalTransferBatchResult> {
+    const OP: &str = "AbandonInternalTransferBatch";
+    if msg.status.as_known() == Some(InternalTransferBatchStatus::BATCH_ABANDONED) {
+        if !msg.request_id.is_empty() || !msg.legs.is_empty() {
+            return Err(Error::response_contract(
+                OP,
+                format!(
+                    "abandoned batch has request_id {:?} and {} leg results",
+                    msg.request_id,
+                    msg.legs.len()
+                ),
+            ));
+        }
+        return Ok(InternalTransferBatchResult {
+            request_id: String::new(),
+            status: "abandoned".to_owned(),
+            legs: Vec::new(),
+        });
+    }
+    if msg.legs.is_empty() {
+        return Err(Error::response_contract(OP, "batch has no legs"));
+    }
+    internal_transfer_batch(OP, &msg.request_id, &msg.status, &msg.legs, false)
 }
 
 /// A batch's outcome. Refused with [`Error::ResponseContract`]: a batch
