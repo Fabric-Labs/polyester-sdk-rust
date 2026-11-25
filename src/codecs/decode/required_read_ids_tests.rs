@@ -9,15 +9,14 @@ use crate::errors::{Error, Result};
 use crate::proto::alerts::v1::{ListAlertsResponse, PriceAlert};
 use crate::proto::auth::v1::{
     AddressBookEntriesView, AddressBookEntry, AddressBookTag, AddressBookTagSummary, ApiKey,
-    CreateAddressBookEntryResponse, CreateApiKeyResponse, CreateSubaccountResponse,
-    ExternalAddressBookEntry, GetAddressBookViewResponse, GetApiKeyResponse, GetSubaccountResponse,
-    InternalAddressBookEntry, InternalTransferWhitelistEntry, ListAddressBookEntriesResponse,
-    ListApiKeysResponse, ListInternalTransferWhitelistEntriesResponse,
-    ListSubaccountInvitesResponse, ListSubaccountMembersResponse, ListSubaccountsResponse,
-    ListTransferCounterpartiesResponse, ListTransferDestinationsResponse, MeResponse,
-    ResolveAccountResponse, ResolvedAccount, SessionInfo, Subaccount, SubaccountInvite,
-    SubaccountMemberView, SubaccountPolicyView, TransferCounterparty, TransferDestination,
-    UpdateApiKeyResponse,
+    CreateAddressBookEntryResponse, CreateApiKeyResponse, ExternalAddressBookEntry,
+    GetAddressBookViewResponse, GetApiKeyResponse, GetSubaccountResponse, InternalAddressBookEntry,
+    InternalTransferWhitelistEntry, ListAddressBookEntriesResponse, ListApiKeysResponse,
+    ListInternalTransferWhitelistEntriesResponse, ListSubaccountInvitesResponse,
+    ListSubaccountMembersResponse, ListSubaccountsResponse, ListTransferCounterpartiesResponse,
+    ListTransferDestinationsResponse, MeResponse, ResolveAccountResponse, ResolvedAccount,
+    SessionInfo, Subaccount, SubaccountInvite, SubaccountMemberView, SubaccountPolicyView,
+    TransferCounterparty, TransferDestination, UpdateApiKeyResponse,
 };
 use crate::proto::chain::analytics::v1::GetZippedAssetSupplyGroupResponse;
 use crate::proto::chain::lifecycle::v1::{
@@ -685,13 +684,6 @@ fn more_replies_refuse_a_zero_required_id() {
         })
     };
     check("ResolveAccount", resolved(0), Some(resolved(8)));
-    let created = |subaccount_id| {
-        create_subaccount_from_proto(&CreateSubaccountResponse {
-            subaccount_id,
-            ..Default::default()
-        })
-    };
-    check("CreateSubaccount", created(0), Some(created(4)));
     let created_key = |key_id: &str| {
         api_key_from_create_proto(&CreateApiKeyResponse {
             api_key: ApiKey {

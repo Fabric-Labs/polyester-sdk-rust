@@ -14,17 +14,17 @@ use crate::models::{
     ActivityDetails, ActivityElevatedAction, ActivityInviteDetails, ActivityItem, ActivityItemId,
     ActivityListChange, ActivityMemberDetails, ActivityPolicyDetails, ActivitySecurityDetails,
     ActivitySessionDetails, ActivitySignInFailure, ActivitySignInMethod, ActivitySubaccountDetails,
-    ActivitySystemReason, CreateSubaccountResult, GetSubaccountResult, SubAccount,
-    SubAccountActivityEvent, SubAccountActivityList, SubAccountInvite, SubAccountInvitesList,
-    SubAccountMember, SubAccountMembersList, SubAccountsList,
+    ActivitySystemReason, GetSubaccountResult, SubAccount, SubAccountActivityEvent,
+    SubAccountActivityList, SubAccountInvite, SubAccountInvitesList, SubAccountMember,
+    SubAccountMembersList, SubAccountsList,
 };
 use crate::proto::auth::v1 as pb;
 use crate::proto::auth::v1::{
-    ActivityEvent as ProtoActivityEvent, CreateSubaccountResponse, GetSubaccountResponse,
-    InviteSubaccountMemberResponse, ListAccountActivityResponse, ListSubaccountEventsResponse,
-    ListSubaccountInvitesResponse, ListSubaccountMembersResponse, ListSubaccountsResponse,
-    RespondSubaccountInviteResponse, Subaccount, SubaccountInvite, SubaccountInviteDirection,
-    SubaccountMemberView, SubaccountRole, SubaccountStatus,
+    ActivityEvent as ProtoActivityEvent, GetSubaccountResponse, InviteSubaccountMemberResponse,
+    ListAccountActivityResponse, ListSubaccountEventsResponse, ListSubaccountInvitesResponse,
+    ListSubaccountMembersResponse, ListSubaccountsResponse, RespondSubaccountInviteResponse,
+    Subaccount, SubaccountInvite, SubaccountInviteDirection, SubaccountMemberView, SubaccountRole,
+    SubaccountStatus,
 };
 
 fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> i64 {
@@ -148,18 +148,6 @@ pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> SdkResult<GetSu
             })
             .transpose()?,
         balances: msg.balances.as_option().map(balances_list_from_proto),
-    })
-}
-
-/// Decode a `CreateSubaccount` answer, refused with `Error::ResponseContract`
-/// without the new sub-account's ID.
-pub fn create_subaccount_from_proto(
-    msg: &CreateSubaccountResponse,
-) -> SdkResult<CreateSubaccountResult> {
-    require_id("CreateSubaccount", "subaccount_id", msg.subaccount_id)?;
-    Ok(CreateSubaccountResult {
-        subaccount_id: format_uint64_id(msg.subaccount_id),
-        revision: msg.revision,
     })
 }
 
@@ -885,18 +873,6 @@ mod tests {
         let result = subaccount_activity_list_from_proto(&msg);
         assert_eq!(result.events[0].event_type, "invite:created");
         assert_eq!(result.next_page_token, "n");
-    }
-
-    #[test]
-    fn create_subaccount_maps_revision() {
-        let result = create_subaccount_from_proto(&CreateSubaccountResponse {
-            subaccount_id: 42,
-            revision: 1,
-            ..Default::default()
-        })
-        .unwrap();
-        assert_eq!(result.subaccount_id, format_uint64_id(42));
-        assert_eq!(result.revision, 1);
     }
 
     #[test]
