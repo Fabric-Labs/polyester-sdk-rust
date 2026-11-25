@@ -581,30 +581,17 @@ def verify_go(root: Path, version: str, sha: str) -> list[str]:
     with tempfile.TemporaryDirectory() as tmp:
         home = Path(tmp)
         mirror = home / "mirror.git"
-        run(["git", "clone", "--quiet", "--bare", "--no-local", str(root), str(mirror)])
-        # After a publish the checkout already has the tag (fetch-depth: 0), so
-        # a re-run reuses it when it names this commit.
-        existing = subprocess.run(
-            [
-                "git",
-                "--git-dir",
-                str(mirror),
-                "rev-parse",
-                "--verify",
-                "--quiet",
-                f"refs/tags/{tag}^{{commit}}",
-            ],
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        if not existing:
-            run(["git", "--git-dir", str(mirror), "tag", tag, sha])
-        elif existing != sha:
-            raise ReleaseError(f"{tag} already exists at {existing}, not {sha}")
         gitconfig = home / "gitconfig"
+        # Every git here, the go command's included, reads only this config.
+        # A fetch otherwise starts `git maintenance run --auto`, which detaches
+        # by default and can still be repacking the go command's VCS cache
+        # after go exits, so removing this directory fails with "Directory not
+        # empty". Auto maintenance stays off, and in the foreground if any runs.
         gitconfig.write_text(
             f'[url "file://{mirror}"]\n\tinsteadOf = https://{module}\n'
-            '[protocol "file"]\n\tallow = always\n',
+            '[protocol "file"]\n\tallow = always\n'
+            "[gc]\n\tauto = 0\n\tautoDetach = false\n"
+            "[maintenance]\n\tauto = false\n\tautoDetach = false\n",
             encoding="utf-8",
         )
         env = go_env(
@@ -617,6 +604,27 @@ def verify_go(root: Path, version: str, sha: str) -> list[str]:
                 "GIT_CONFIG_NOSYSTEM": "1",
             },
         )
+        run(["git", "clone", "--quiet", "--bare", "--no-local", str(root), str(mirror)], env=env)
+        # After a publish the checkout already has the tag (fetch-depth: 0), so
+        # a re-run reuses it when it names this commit.
+        existing = subprocess.run(
+            [
+                "git",
+                "--git-dir",
+                str(mirror),
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                f"refs/tags/{tag}^{{commit}}",
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if not existing:
+            run(["git", "--git-dir", str(mirror), "tag", tag, sha], env=env)
+        elif existing != sha:
+            raise ReleaseError(f"{tag} already exists at {existing}, not {sha}")
         resolved = go_query(home, env, f"{module}@{tag}")
         latest = go_query(home, env, f"{module}@latest")
     if resolved != tag:
