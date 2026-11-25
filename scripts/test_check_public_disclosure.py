@@ -133,6 +133,48 @@ class TicketReferenceTest(unittest.TestCase):
             ["docs/guide.md:16: contains an internal tracker reference"],
         )
 
+    def check_guide(self, *lines: str) -> list[str]:
+        return self.check({"docs/guide.md": ("\n".join(lines) + "\n").encode()})
+
+    def test_an_indented_fence_is_one_code_line_not_a_fence(self) -> None:
+        # Indented 4 spaces, a fence is an indented code line: that line is
+        # skipped, and the prose after it is still checked.
+        failures = self.check_guide(
+            "# Guide",
+            "",
+            "    ```rust",
+            "    let mask = !" + "1024;",
+            "",
+            "Fixed: " + MR,
+        )
+        self.assertEqual(failures, ["docs/guide.md:6: contains an internal tracker reference"])
+        tabbed = self.check_guide("# Guide", "\t```", "Fixed: " + MR)
+        self.assertEqual(tabbed, ["docs/guide.md:3: contains an internal tracker reference"])
+
+    def test_a_fence_in_a_blockquote_is_code(self) -> None:
+        self.assertEqual(
+            self.check_guide(
+                "> ```rust",
+                "> let mask = !" + "1024;",
+                "> > Fixed: " + MR,
+                ">```",
+                "> > ~~~",
+                "> > !" + "1024",
+                "> > ~~~",
+                "Back in prose.",
+            ),
+            [],
+        )
+        # A fence opened in a blockquote ends with the blockquote.
+        failures = self.check_guide("> ```", "> !" + "1024", "", "Fixed: " + MR)
+        self.assertEqual(failures, ["docs/guide.md:4: contains an internal tracker reference"])
+
+    def test_a_code_span_across_lines_is_checked_as_prose(self) -> None:
+        # Only a code span within one line is code; one that spans lines is
+        # read as prose, so its merge request number fails closed.
+        failures = self.check_guide("Run `make", MR + "` first.")
+        self.assertEqual(failures, ["docs/guide.md:2: contains an internal tracker reference"])
+
     def test_never_checks_source_for_a_merge_request_number(self) -> None:
         # "!" and digits are code in source files, comments included: only
         # Markdown prose is checked for a merge request number.

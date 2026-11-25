@@ -5,8 +5,9 @@ README.md and CHANGELOG.md are checked for every internal/QA disclosure
 pattern in FORBIDDEN. Every other tracked file outside the generated tree
 (GENERATED_PREFIXES) is checked for internal tracker references, in its path
 and, unless it is binary, in its text, so they cannot come back. Markdown
-prose, outside code blocks and code spans, is also checked for internal merge
-request numbers; source files are not, as "!" and digits are code there.
+prose is also checked for internal merge request numbers; source files are
+not, as "!" and digits are code there. See markdown_prose for what counts as
+Markdown code.
 """
 
 from __future__ import annotations
@@ -47,10 +48,15 @@ PROJECT_REFERENCE = re.compile(r"(?<![\w-])(?:admin|chain|huly|ody|zip)-\d+\b", 
 # joined to a word before it. Only Markdown prose is checked for one.
 MERGE_REQUEST = re.compile(r"(?<!\w)!\d{3,}\b")
 PROSE_SUFFIXES = (".md",)
-# A fenced code block opens and closes with three or more backticks or
-# tildes; the closing fence is at least as long as the opening one.
-CODE_FENCE = re.compile(r"\s*(`{3,}|~{3,})")
-# An inline code span: a run of backticks, then text, then a run as long.
+# Blockquote markers: ">" and an optional space, each after up to 3 spaces.
+BLOCKQUOTE = re.compile(r"(?: {0,3}> ?)*")
+# A code fence: up to 3 spaces, then three or more backticks or tildes. The
+# closing fence is at least as long as the opening one.
+CODE_FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")
+# An indented code line: 4 spaces, or a tab after up to 3 spaces.
+INDENTED_CODE = re.compile(r" {4}| {0,3}\t")
+# An inline code span on one line: a run of backticks, then text, then a
+# run as long.
 CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)")
 # Generated code, copied from the published contract, is not checked.
 GENERATED_PREFIXES = ("src/gen/",)
@@ -86,19 +92,31 @@ def is_reference(text: str) -> bool:
 
 
 def markdown_prose(text: str) -> dict[int, str]:
-    """Returns Markdown text's prose by line number: every line outside a
-    fenced code block, without its inline code spans."""
+    """Returns Markdown text's prose by line number, without its code.
+
+    Code is a subset of CommonMark's: a fenced code block, whose fences are
+    indented at most 3 spaces, inside blockquotes too (a fence opened in a
+    blockquote ends with it); an indented code line, outside a fence; and an
+    inline code span within one line. Everything else is prose, so a code
+    span that spans lines is checked as prose, which fails closed."""
     prose: dict[int, str] = {}
     fence = ""
+    fence_depth = 0
     for number, line in enumerate(text.splitlines(), start=1):
-        if fence:
-            closing = CODE_FENCE.match(line)
-            if closing and closing.group(1).startswith(fence) and not line[closing.end() :].strip():
+        quote = BLOCKQUOTE.match(line)
+        assert quote is not None
+        depth = quote.group().count(">")
+        body = line[quote.end() :]
+        marker = CODE_FENCE.match(body)
+        if fence and depth >= fence_depth:
+            if marker and marker.group(1).startswith(fence) and not body[marker.end() :].strip():
                 fence = ""
             continue
-        opening = CODE_FENCE.match(line)
-        if opening:
-            fence = opening.group(1)
+        fence = ""
+        if marker:
+            fence, fence_depth = marker.group(1), depth
+            continue
+        if INDENTED_CODE.match(body):
             continue
         prose[number] = CODE_SPAN.sub("", line)
     return prose
