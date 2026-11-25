@@ -1422,6 +1422,100 @@ mod tests {
         }
     }
 
+    /// Each reply's own negative quantity path, inside an otherwise valid
+    /// reply: a user trade, a create, a preview and a batch create item.
+    #[test]
+    fn replies_refuse_a_negative_quantity_naming_the_field() {
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateResultItem as ProtoItem, CreateOrderResponse,
+            batch_create_result_item,
+        };
+        use buffa_types::google::protobuf::Timestamp;
+
+        fn contract<T: std::fmt::Debug>(result: Result<T>) -> (String, String) {
+            match result {
+                Err(Error::ResponseContract { context, message }) => (context, message),
+                other => panic!("want Error::ResponseContract, got {other:?}"),
+            }
+        }
+        let want =
+            |field: &str, scaled: i64| (field.to_owned(), format!("negative quantity {scaled}"));
+
+        let trade = ProtoUserTrade {
+            order_id: 1,
+            match_id: 2,
+            symbol_id: 3,
+            price_ticks: 5000,
+            qty_scaled: 4,
+            ..Default::default()
+        };
+        user_trade_from_proto(&trade).unwrap();
+        assert_eq!(
+            contract(user_trade_from_proto(&ProtoUserTrade {
+                qty_scaled: -5,
+                ..trade
+            })),
+            want("UserTrade.qty_scaled", -5)
+        );
+
+        let create = |qty| CreateOrderResponse {
+            order_id: 42,
+            resolved_base_qty_scaled: qty,
+            ..Default::default()
+        };
+        order_mutation_from_create(&create(6)).unwrap();
+        assert_eq!(
+            contract(order_mutation_from_create(&create(-6))),
+            want("CreateOrderResponse.resolved_base_qty_scaled", -6)
+        );
+
+        let preview = |qty| PreviewOrderResponse {
+            admissible: Some(true),
+            resolved_base_qty_scaled: Some(qty),
+            evaluated_at: Timestamp {
+                seconds: 1,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let zero = preview_order_from_proto(&preview(0), 8, "BTC-USDT", Some(3)).unwrap();
+        assert_eq!(zero.resolved_base_qty.map(|q| q.as_scaled()), Some(0));
+        assert_eq!(
+            contract(preview_order_from_proto(
+                &preview(-8),
+                8,
+                "BTC-USDT",
+                Some(3)
+            )),
+            want("PreviewOrderResponse.resolved_base_qty_scaled", -8)
+        );
+
+        let batch = |qty| BatchCreateOrdersResponse {
+            results: vec![ProtoItem {
+                client_order_id: "a".into(),
+                outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                    BatchCreateAccepted {
+                        order_id: 9,
+                        resolved_base_qty_scaled: qty,
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            }],
+            accepted_count: 1,
+            ..Default::default()
+        };
+        batch_create_from_proto(&batch(5)).unwrap();
+        assert_eq!(
+            contract(batch_create_from_proto(&batch(-9))),
+            want(
+                "BatchCreateResultItem.accepted.resolved_base_qty_scaled",
+                -9
+            )
+        );
+    }
+
     fn order_with_id() -> ProtoOrder {
         ProtoOrder {
             order_id: 1,

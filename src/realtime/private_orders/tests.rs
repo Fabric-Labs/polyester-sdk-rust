@@ -567,6 +567,60 @@ async fn a_sequence_gap_resubscribes_from_the_last_applied_cursor() {
     assert_eq!(expect_unit(&mut consumer).await.orders, vec![order(1, 2)]);
 }
 
+/// A unit that breaks the contract (an order with a negative quantity) is
+/// its own account's error alone: another account on the same socket sees
+/// nothing of it. The affected account gets nothing of the unit and
+/// subscribes again from its last applied cursor.
+#[tokio::test(start_paused = true)]
+async fn a_unit_that_breaks_the_contract_is_reported_only_to_its_account() {
+    const OTHER: u64 = 43;
+    let mut harness = Harness::new();
+    let mut first = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut first).await;
+    let seq = server.snapshot("s1", 1, "c1", &[1]).await;
+    expect_snapshot(&mut first).await;
+
+    let mut second = harness.connect(OTHER);
+    let request = server.subscribe().await;
+    assert_eq!(request.account, OTHER);
+    server.confirm(&request, "s2").await;
+    expect_connected(&mut second).await;
+    let other_seq = server.snapshot("s2", 1, "d1", &[2]).await;
+    expect_snapshot(&mut second).await;
+
+    let mut corrupt = unit("c1", "c2", &[1]);
+    corrupt.orders[0].orig_qty_scaled = -1;
+    server.send("s1", seq, corrupt).await;
+    match expect_error(&mut first).await {
+        Error::ResponseContract { context, message } => assert_eq!(
+            (context.as_str(), message.as_str()),
+            ("Order.orig_qty_scaled", "negative quantity -1")
+        ),
+        other => panic!("expected a response contract error, got {other:?}"),
+    }
+    match server.recv().await {
+        client_message::Op::Unsubscribe(unsubscribe) => assert_eq!(unsubscribe.sub, "s1"),
+        other => panic!("expected unsubscribe, got {other:?}"),
+    }
+    let resubscribe = server.subscribe().await;
+    assert_eq!(
+        (resubscribe.account, resubscribe.cursor.as_str()),
+        (ACCOUNT, "c1")
+    );
+    expect_disconnected(&mut first).await;
+    expect_quiet(&mut second, Duration::from_millis(100)).await;
+
+    // The other account keeps its stream; the affected one resumes.
+    server.send("s2", other_seq, unit("d1", "d2", &[2])).await;
+    assert_eq!(expect_unit(&mut second).await.orders, vec![order(2, 2)]);
+    server.confirm(&resubscribe, "s3").await;
+    expect_connected(&mut first).await;
+    server.send("s3", 1, unit("c1", "c2", &[1])).await;
+    assert_eq!(expect_unit(&mut first).await.orders, vec![order(1, 2)]);
+    expect_quiet(&mut second, Duration::from_millis(100)).await;
+}
+
 #[tokio::test(start_paused = true)]
 async fn an_unknown_frame_kind_is_skipped_but_counted() {
     let mut harness = Harness::new();
