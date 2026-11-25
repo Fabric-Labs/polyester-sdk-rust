@@ -1,4 +1,5 @@
-//! Live API-key coverage for POLY-4996 wrappers (read-only / dry-run).
+//! Live API-key coverage for market data, trigger, cancel-all and funding
+//! wrappers (read-only / dry-run).
 
 use crate::support::{
     call_optional, call_required, hydrate_spot_and_zipper, pair_for_symbol, require_live_client,
@@ -518,7 +519,7 @@ async fn withdraw_error_detail_from_impossible_funding_move() {
             asset_id,
             amount,
             destination_address: String::new(),
-            idempotency_key: unique_client_order_id("poly4996-wd"),
+            idempotency_key: unique_client_order_id("api-key-wd"),
             amount_scale: Some(LEDGER_SCALE),
             deadline_ts_sec: None,
             nonce: None,
@@ -567,7 +568,7 @@ async fn transfer_error_detail_from_unknown_destination() {
         .create(CreateInternalTransferParams {
             asset_id,
             quantity,
-            idempotency_key: unique_client_order_id("poly4996-xfer"),
+            idempotency_key: unique_client_order_id("api-key-xfer"),
             subaccount_id: SubAccountScope::Default,
             destination_account_id: None,
             destination_subaccount_id: None,

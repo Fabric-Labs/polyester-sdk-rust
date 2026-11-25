@@ -1617,8 +1617,8 @@ async fn late_joiner_schedule(seed: u64) {
     }
 }
 
-/// POLY-9302: with the catalogs loaded, the stream's orders and fills carry
-/// the pair's base quantity scale, as the order reads do.
+/// With the catalogs loaded, the stream's orders and fills carry the pair's
+/// base quantity scale, as the order reads do.
 #[tokio::test(start_paused = true)]
 async fn orders_and_fills_carry_the_catalog_base_scale() {
     use crate::proto::privatews::v1::{Fill, OrderEvent};

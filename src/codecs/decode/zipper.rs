@@ -397,11 +397,11 @@ mod tests {
         assert!(zipped_asset_supply_update_from_proto(&missing, |_| None).is_ok());
     }
 
-    /// POLY-9102: a network's memo rule, label and format hint reach the
-    /// chain config as sent. An unspecified rule reads as empty, not as
+    /// A network's memo rule, label and format hint reach the chain config
+    /// as sent. An unspecified rule reads as empty, not as
     /// "no memo needed", and a rule newer than this SDK keeps its number.
     #[test]
-    fn poly_9102_chain_config_keeps_memo_rule_label_and_hint() {
+    fn chain_config_keeps_memo_rule_label_and_hint() {
         use crate::proto::chain::zipper::v1::MemoRequirement;
 
         let chain = |requirement: buffa::EnumValue<MemoRequirement>| {

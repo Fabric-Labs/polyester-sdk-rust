@@ -485,7 +485,7 @@ mod tests {
 
     #[test]
     fn qty_accepts_trailing_zeros_beyond_scale() {
-        // POLY-4685: extra zeros past scale are padding, not extra precision.
+        // Extra zeros past scale are padding, not extra precision.
         let padded = parse_qty_scaled_str("1.500000000", 8, "qty").unwrap();
         let short = parse_qty_scaled_str("1.5", 8, "qty").unwrap();
         assert_eq!(padded, short);

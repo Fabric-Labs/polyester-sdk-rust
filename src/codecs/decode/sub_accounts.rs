@@ -790,12 +790,12 @@ mod tests {
         assert_eq!(result.subaccounts[0].revision, 4);
     }
 
-    /// POLY-9397: a sub-account update keeps `removed` and the caller's role.
+    /// A sub-account update keeps `removed` and the caller's role.
     /// A removal (`removed`, role unspecified) never reads as an active viewer,
     /// even with the same revision and `updated_at`, through the stream
     /// decoder and in proto JSON.
     #[test]
-    fn poly_9397_subaccount_update_keeps_removed_and_role() {
+    fn subaccount_update_keeps_removed_and_role() {
         let update = |removed: bool, role: SubaccountRole, revision: u64| Subaccount {
             id: 42,
             role: role.into(),
@@ -1163,8 +1163,8 @@ mod activity_tests {
         format_uint64_id(value)
     }
 
-    /// The ticket's case: an API key created through the API names the key
-    /// that acted (`ak_…`), its kind and label, and its account.
+    /// An API key created through the API names the key that acted
+    /// (`ak_…`), its kind and label, and its account.
     #[test]
     fn api_key_actor_names_the_key() {
         let (actor, _, _) = decode(event(

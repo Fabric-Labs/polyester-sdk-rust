@@ -1436,7 +1436,7 @@ mod tests {
     }
 
     #[test]
-    fn poly_4693_api_base_rejects_query_and_fragment_but_allows_local_http() {
+    fn api_base_rejects_query_and_fragment_but_allows_local_http() {
         for api_url in [
             "https://api.example.test?x=1",
             "https://api.example.test/base?x=1",

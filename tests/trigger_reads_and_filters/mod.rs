@@ -1,9 +1,8 @@
 //! Trigger reads, the list filters and the create/modify refusals through the
-//! public `triggers` service against a local server, in binary and JSON:
-//! POLY-9396 (a market TWAP's slice cap), POLY-9424 (the pair's symbol),
-//! POLY-9425 (a trailing stop's cap), POLY-9433 (`trigger_type` and
-//! `parent_order_id` filters), POLY-9423 (a ladder takes no market order type)
-//! and POLY-9426 (modify takes a buy stop's 10000 bps cap).
+//! public `triggers` service against a local server, in binary and JSON: a
+//! market TWAP's slice cap, the pair's symbol, a trailing stop's cap, the
+//! `trigger_type` and `parent_order_id` filters, a ladder taking no market
+//! order type, and modify taking a buy stop's 10000 bps cap.
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer};
 use buffa::Message as _;
@@ -236,11 +235,11 @@ fn hydrate(client: &Client) {
 
 const WIRES: [WireFormat; 2] = [WireFormat::Binary, WireFormat::Json];
 
-/// POLY-9396 and POLY-9425: `triggers.get` and `triggers.list` report a
-/// market TWAP's slice cap and a trailing stop's cap in `max_slippage`, in
-/// the variant the server sent, and `None` when it sent none.
+/// `triggers.get` and `triggers.list` report a market TWAP's slice cap and a
+/// trailing stop's cap in `max_slippage`, in the variant the server sent, and
+/// `None` when it sent none.
 #[tokio::test]
-async fn poly_9396_9425_trigger_reads_report_the_twap_and_trailing_caps() {
+async fn trigger_reads_report_the_twap_and_trailing_caps() {
     let mut failures = Vec::new();
     for wire in WIRES {
         let s = server(wire, true).await;
@@ -272,11 +271,11 @@ async fn poly_9396_9425_trigger_reads_report_the_twap_and_trailing_caps() {
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
-/// POLY-9424: with catalogs loaded, `triggers.get`, `triggers.list` and
+/// With catalogs loaded, `triggers.get`, `triggers.list` and
 /// `triggers.subscribe` name the trigger's pair; without them `symbol` stays
 /// empty, as before.
 #[tokio::test]
-async fn poly_9424_trigger_reads_and_stream_name_the_pair() {
+async fn trigger_reads_and_stream_name_the_pair() {
     for wire in WIRES {
         for (catalogs, want) in [(true, "BTC-USDT"), (false, "")] {
             let s = server(wire, catalogs).await;
@@ -321,11 +320,11 @@ async fn poly_9424_trigger_reads_and_stream_name_the_pair() {
     }
 }
 
-/// POLY-9433: `list_with` sends `trigger_type` and `parent_order_id` as the
+/// `list_with` sends `trigger_type` and `parent_order_id` as the
 /// contract's `ListTriggersRequest` filters; without them the request is as
 /// before. A parent order ID that is not one is refused before sending.
 #[tokio::test]
-async fn poly_9433_list_sends_the_trigger_type_and_parent_order_filters() {
+async fn list_sends_the_trigger_type_and_parent_order_filters() {
     // The ID a trigger read reports. The same ID with a leading base58 zero
     // (`1`) and the decimal spelling are refused below.
     let parent = polyester::codecs::format_uint64_id(10_203);
@@ -415,11 +414,11 @@ fn ladder(order_type: CreateOrderType) -> CreateTriggerParams {
     params
 }
 
-/// POLY-9423: a ladder places limit GTC orders only, so an explicit market
+/// A ladder places limit GTC orders only, so an explicit market
 /// order type is refused before anything is sent, never remapped to limit.
 /// A ladder with a limit order type is still sent.
 #[tokio::test]
-async fn poly_9423_ladder_refuses_a_market_order_type_before_sending() {
+async fn ladder_refuses_a_market_order_type_before_sending() {
     for wire in WIRES {
         let s = server(wire, true).await;
         let err = s
@@ -459,12 +458,12 @@ fn modify_bps(bps: i32) -> ModifyTriggerParams {
     }
 }
 
-/// POLY-9426: modify accepts `max_slippage_bps` from 0 (clear) to 10000, as
-/// the contract does, and leaves the side and type checks to the server; a
+/// Modify accepts `max_slippage_bps` from 0 (clear) to 10000, as the
+/// contract does, and leaves the side and type checks to the server; a
 /// buy stop-loss or take-profit market child may take 10000, as on create.
 /// 10001 and negatives are still refused before sending.
 #[tokio::test]
-async fn poly_9426_modify_sends_a_10000_bps_cap() {
+async fn modify_sends_a_10000_bps_cap() {
     for wire in WIRES {
         let s = server(wire, true).await;
         for bps in [0, 1, 9_999, 10_000] {

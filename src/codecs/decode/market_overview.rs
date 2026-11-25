@@ -319,7 +319,7 @@ mod tests {
         assert!(market_overview_list_from_proto(&list).is_err());
     }
 
-    /// The Devnet BTC-USDT row from POLY-9019.
+    /// A Devnet BTC-USDT market overview row.
     fn devnet_row() -> ProtoMarketOverview {
         ProtoMarketOverview {
             symbol_id: 1,
@@ -344,8 +344,8 @@ mod tests {
         qty.as_ref().map(|qty| qty.as_scaled())
     }
 
-    // POLY-9019: rows keep the 24h range, the top of book with sizes, and the
-    // last-trade and listing times, exactly as sent.
+    // Rows keep the 24h range, the top of book with sizes, and the last-trade
+    // and listing times, exactly as sent.
     #[test]
     fn overview_keeps_range_top_of_book_and_times() {
         let list = market_overview_list_from_proto(&ListMarketOverviewResponse {
@@ -371,7 +371,7 @@ mod tests {
         }
     }
 
-    // POLY-9019: an empty book side and missing times decode as unset, not 0.
+    // An empty book side and missing times decode as unset, not 0.
     #[test]
     fn overview_empty_side_and_missing_times_are_unset() {
         for bid in [true, false] {

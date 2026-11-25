@@ -4311,10 +4311,10 @@ mod tests {
         );
     }
 
-    /// POLY-9102: a path and body ID mismatch keeps its specific code on
-    /// either service and is no retryable or credential refusal.
+    /// A path and body ID mismatch keeps its specific code on either service
+    /// and is no retryable or credential refusal.
     #[test]
-    fn poly_9102_path_body_id_mismatch_codes_stay_specific() {
+    fn path_body_id_mismatch_codes_stay_specific() {
         let order = map_order(
             OrderErrorCode::ERROR_CODE_PATH_BODY_ID_MISMATCH,
             ErrorCode::InvalidArgument,

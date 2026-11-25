@@ -500,10 +500,10 @@ mod tests {
         }
     }
 
-    /// POLY-8824: receipts that differ only in their status decode to
-    /// different results.
+    /// Receipts that differ only in their status decode to different
+    /// results.
     #[test]
-    fn poly_8824_internal_transfer_receipt_keeps_its_status() {
+    fn internal_transfer_receipt_keeps_its_status() {
         let decode = |status| internal_transfer_from_proto(&one_token_receipt(status)).unwrap();
         let accepted = decode(InternalTransferStatus::Accepted);
         let rejected = decode(InternalTransferStatus::Rejected);
@@ -616,10 +616,10 @@ mod tests {
         assert!(internal_transfer_from_proto(&CreateInternalTransferResponse::default()).is_err());
     }
 
-    /// POLY-9102: the receipt's lifecycle flow ID reaches the result, so the
-    /// transfer can be read back as a flow.
+    /// The receipt's lifecycle flow ID reaches the result, so the transfer
+    /// can be read back as a flow.
     #[test]
-    fn poly_9102_internal_transfer_receipt_keeps_its_flow_id() {
+    fn internal_transfer_receipt_keeps_its_flow_id() {
         let mut receipt = one_token_receipt(InternalTransferStatus::Accepted);
         receipt.flow_id = "flow-7f3a".into();
         let result = internal_transfer_from_proto(&receipt).unwrap();

@@ -1,4 +1,4 @@
-//! POLY-9127: a method that names a market by symbol, or needs a pair's
+//! A method that names a market by symbol, or needs a pair's
 //! catalog scales, waits for construction-time catalog hydration.
 //!
 //! The stub API holds `GetSpotConfig` until the test releases it, so every
@@ -620,7 +620,7 @@ async fn labelled_reads_wait_for_hydration_but_tolerate_failure() {
 #[tokio::test]
 async fn zipped_asset_supply_waits_for_the_scales_it_decodes_with() {
     for fail in [false, true] {
-        // POLY-9228: the stream waits for the funding config.
+        // The stream waits for the funding config.
         let stub = Stub::spawn_holding_funding(true).await;
         let client = stub.client(true);
         let probe: Probe = |c, _| {
@@ -646,7 +646,7 @@ async fn zipped_asset_supply_waits_for_the_scales_it_decodes_with() {
     }
 }
 
-/// POLY-9228: a failed spot config does not stop the supply stream, which
+/// A failed spot config does not stop the supply stream, which
 /// decodes with the funding config only.
 #[tokio::test]
 async fn zipped_asset_supply_does_not_need_the_spot_config() {

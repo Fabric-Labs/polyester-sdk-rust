@@ -1,5 +1,5 @@
-//! POLY-8563: order create, preview and batch create take a market ID, as the
-//! Go and Python SDKs do, through the public services against a local socket.
+//! Order create, preview and batch create take a market ID, as the Go and
+//! Python SDKs do, through the public services against a local socket.
 
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;

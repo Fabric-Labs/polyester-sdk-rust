@@ -2,12 +2,12 @@
 //! sell TWAP slippage and contradictory market selectors, through the public
 //! services against a local socket.
 //!
-//! POLY-8960: each rejected batch item keeps the server's field violations.
-//! POLY-8920: a rejected batch cancel that resolved no order keeps its ID empty.
-//! POLY-8959: a TWAP slice sent without a fire price keeps it absent.
-//! POLY-8961: a sell TWAP market slice takes at most 9999 bps; a buy, 10000.
-//! POLY-8886: a market name that contradicts the market ID is refused before
-//! anything is sent.
+//! Each rejected batch item keeps the server's field violations.
+//! A rejected batch cancel that resolved no order keeps its ID empty.
+//! A TWAP slice sent without a fire price keeps it absent.
+//! A sell TWAP market slice takes at most 9999 bps; a buy, 10000.
+//! A market name that contradicts the market ID is refused before anything
+//! is sent.
 
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;

@@ -1,4 +1,4 @@
-//! POLY-9237: `ZipperService::get_deposit_withdraw_config` keeps each asset
+//! `ZipperService::get_deposit_withdraw_config` keeps each asset
 //! variant's supply, `supply_q` at its asset's quantity scale, and the
 //! catalogs hydrated at construction know it before any supply update. A
 //! variant whose supply is missing reads no supply, in both places.

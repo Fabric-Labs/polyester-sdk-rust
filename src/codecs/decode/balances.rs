@@ -784,10 +784,10 @@ mod tests {
         }
     }
 
-    /// POLY-9102: seeding an account from a system account is a system
+    /// Seeding an account from a system account is a system
     /// adjustment (1074) credit; `is_debit` alone gives its direction.
     #[test]
-    fn poly_9102_system_adjustment_seeding_credit() {
+    fn system_adjustment_seeding_credit() {
         let transfer = transfer_row_from_proto(&system_adjustment_row(false));
         assert_eq!(transfer.transfer_type, 1074);
         assert!(!transfer.is_debit, "a seeding credit is no debit");
@@ -798,19 +798,19 @@ mod tests {
         );
     }
 
-    /// POLY-9102: a balance correction that takes value back is a system
+    /// A balance correction that takes value back is a system
     /// adjustment (1074) debit, never counted as a credit.
     #[test]
-    fn poly_9102_system_adjustment_debit_correction() {
+    fn system_adjustment_debit_correction() {
         let transfer = transfer_row_from_proto(&system_adjustment_row(true));
         assert_eq!(transfer.transfer_type, 1074);
         assert!(transfer.is_debit, "a debit correction must stay a debit");
     }
 
-    /// POLY-9102: every transfer code the contract added keeps its number on
-    /// a decoded row.
+    /// Every transfer code the contract added keeps its number on a decoded
+    /// row.
     #[test]
-    fn poly_9102_added_transfer_codes_keep_their_numbers() {
+    fn added_transfer_codes_keep_their_numbers() {
         use crate::proto::ledger::v1::TransferCode;
         use buffa::Enumeration;
 

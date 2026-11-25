@@ -1,8 +1,8 @@
 //! Typed reads keep contract fields the server sends, through the public
 //! services against a local server, in binary and JSON, and through the
-//! stream decoders: an API key's policy, sub-account, IP allowlist and expiry
-//! (POLY-9894), an order's batch replace ID (POLY-9896), and each
-//! address-book view entry's own revision (POLY-9893).
+//! stream decoders: an API key's policy, sub-account, IP allowlist and
+//! expiry, an order's batch replace ID, and each address-book view entry's
+//! own revision.
 
 use super::hardening_support::{HttpScript, MockHttpServer};
 use buffa::Message as _;
@@ -98,7 +98,7 @@ async fn server(wire: WireFormat, fixture: Fixture) -> (Client, MockHttpServer) 
     (client, http)
 }
 
-// --- POLY-9894: API-key policy, sub-account, IP allowlist and expiry -------
+// --- API-key policy, sub-account, IP allowlist and expiry ------------------
 
 const PUBLIC_KEY: [u8; 32] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
@@ -223,7 +223,7 @@ fn api_key_stream_keeps_policy_subaccount_allowlist_and_expiry() {
     assert_absent("stream", &got);
 }
 
-// --- POLY-9896: order batch_request_id -------------------------------------
+// --- Order batch_request_id ------------------------------------------------
 
 const BATCH_CASES: [(u64, &str); 3] = [
     (7, "8"),
@@ -341,7 +341,7 @@ fn order_stream_keeps_batch_request_id() {
     }
 }
 
-// --- POLY-9893: address-book view entry revisions --------------------------
+// --- Address-book view entry revisions -------------------------------------
 
 fn address_book_view() -> GetAddressBookViewResponse {
     GetAddressBookViewResponse {

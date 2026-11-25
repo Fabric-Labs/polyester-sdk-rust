@@ -1,4 +1,4 @@
-//! POLY-9301: the public contract executes a market order only as
+//! The public contract executes a market order only as
 //! `market_ioc` ("Market orders always execute as immediate-or-cancel").
 //! A market order or a market / trailing-stop trigger child with any other
 //! time in force is refused before anything is sent, instead of being sent

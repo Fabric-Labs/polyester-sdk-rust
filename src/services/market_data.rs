@@ -1522,8 +1522,8 @@ mod tests {
         }
     }
 
-    // POLY-9019: list and live rows carry the best bid and ask sizes at the
-    // pair's base quantity scale, with its symbol.
+    // List and live rows carry the best bid and ask sizes at the pair's base
+    // quantity scale, with its symbol.
     #[test]
     fn overview_rows_size_the_top_of_book_from_the_catalogs() {
         use buffa::Message as _;
@@ -1830,7 +1830,7 @@ mod tests {
         assert!(finished.is_none());
     }
     #[tokio::test]
-    async fn ticket_8511_terminal_transport_unblocks_recv() {
+    async fn terminal_transport_unblocks_recv() {
         let (tx, rx) = mpsc::channel::<crate::models::OrderbookData>(2);
         let tx_slot = Arc::new(Mutex::new(Some(tx)));
         let closed = Arc::new(AtomicBool::new(false));

@@ -1,6 +1,6 @@
-//! POLY-9302: order and trigger reads carry the pair's base quantity scale
-//! from the loaded catalogs, as the order book does, so their quantities
-//! format without the caller passing the scale. Without catalogs a read
+//! Order and trigger reads carry the pair's base quantity scale from the
+//! loaded catalogs, as the order book does, so their quantities format
+//! without the caller passing the scale. Without catalogs a read
 //! decodes as before: quantities without a scale.
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer, connect_proto_ok};

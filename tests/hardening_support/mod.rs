@@ -1,4 +1,4 @@
-//! Local mock HTTP/WS servers for POLY-3746 L2 tests.
+//! Local mock HTTP/WS servers for the L2 hardening tests.
 
 use buffa::Message as BuffaMessage;
 use futures_util::{SinkExt, StreamExt};

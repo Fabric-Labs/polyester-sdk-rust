@@ -1294,8 +1294,8 @@ Package version: `0.1.0-alpha.46`. Git tag: `v0.1.0a46`.
 - MSRV is Rust 1.90 (was 1.88).
 
 ### Security
-- Close SDK01-011 through SDK01-014: Connect, realtime token exchange,
-  websocket, and chain JSON-RPC no longer silently use remote plaintext.
+- Connect, realtime token exchange, websocket, and chain JSON-RPC no longer
+  silently use remote plaintext.
 - Bump lockfile `h2` to 0.4.19 (RUSTSEC-2026-0258) and `ruint` to 1.20.0
   (RUSTSEC-2026-0220). `derivative`, `paste`, and `rkyv` remain transitive
   and unmaintained.

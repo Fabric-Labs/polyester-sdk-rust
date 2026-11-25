@@ -942,8 +942,7 @@ mod tests {
         assert!(tag_from_update_proto(&UpdateAddressBookTagResponse::default()).is_err());
     }
 
-    // POLY-9020: the Devnet account from the ticket, root Xiw8QFupu6d with
-    // sub-account 2nphEX67UQT.
+    // A Devnet account: root Xiw8QFupu6d with sub-account 2nphEX67UQT.
     const ROOT_ID: u64 = 13_235_591_962_976_289_070;
     const SUB_ID: u64 = 771_156_649_032_427_868;
 
@@ -958,7 +957,7 @@ mod tests {
         address_book_invalidation_from_proto(&msg)
     }
 
-    // POLY-9020: a sub-account's change names the sub-account and its scope type.
+    // A sub-account's change names the sub-account and its scope type.
     #[test]
     fn invalidation_keeps_the_subaccount_scope() {
         let out = invalidation(Some(AccountScopeRef {
@@ -978,7 +977,7 @@ mod tests {
         assert_eq!(out.view_revision, 1_004_932_554_200);
     }
 
-    // POLY-9020: a root change names only the root; no scope stays unset.
+    // A root change names only the root; no scope stays unset.
     #[test]
     fn invalidation_root_scope_has_no_subaccount() {
         let out = invalidation(Some(AccountScopeRef {

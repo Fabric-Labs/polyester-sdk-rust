@@ -402,11 +402,11 @@ mod tests {
         assert_eq!(PolicyAction::READ_FUNDING_FLOWS.to_i32(), 40);
     }
 
-    /// Every `PolicyAction`, the POLY-9102 account permissions included,
+    /// Every `PolicyAction`, the account permissions included,
     /// reads as its proto name and parses back to the same value. Unset
     /// entries are skipped and a value newer than this SDK keeps its number.
     #[test]
-    fn poly_9102_policy_actions_round_trip_by_name() {
+    fn policy_actions_round_trip_by_name() {
         use crate::proto::auth::v1::PolicyAction;
         use buffa::Enumeration;
 

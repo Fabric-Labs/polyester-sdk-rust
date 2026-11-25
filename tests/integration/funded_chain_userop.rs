@@ -1,4 +1,4 @@
-//! Live on-chain Funding UserOps (POLY-3569).
+//! Live on-chain Funding UserOps.
 //!
 //! Gated by `POLYESTER_TEST_CHAIN_USEROP=1` plus `POLYESTER_OWNER_PRIVATE_KEY`.
 

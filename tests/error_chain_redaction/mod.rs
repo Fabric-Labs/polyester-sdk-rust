@@ -1,4 +1,4 @@
-//! POLY-9228: no member of an error's chain prints a credential.
+//! No member of an error's chain prints a credential.
 //!
 //! An answer can quote a URL with userinfo, such as a proxy's. The SDK error
 //! copied that text, so `Display`, `Debug` and every `source()` could print
