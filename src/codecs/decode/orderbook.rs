@@ -230,6 +230,48 @@ fn snapshot_position(book: &OrderbookData) -> Result<(u64, u64)> {
 mod tests {
     use super::*;
 
+    /// A snapshot that is valid apart from one level: a negative quantity
+    /// is refused as a contract violation naming the field, with or without
+    /// a price, not as the missing quantity an omitted (0) one is.
+    #[test]
+    fn orderbook_refuses_a_negative_level_quantity() {
+        let book = |ask: PriceLevel| GetOrderBookResponse {
+            depth: DepthTier::DEPTH_50.into(),
+            book_seq: 7,
+            bids: vec![PriceLevel {
+                price_ticks: 1_000_000,
+                qty_scaled: 50,
+                ..Default::default()
+            }],
+            asks: vec![ask],
+            ..Default::default()
+        };
+        let level = |price_ticks, qty_scaled| PriceLevel {
+            price_ticks,
+            qty_scaled,
+            ..Default::default()
+        };
+        orderbook_from_proto(&book(level(1_100_000, 25)), "ETH-USDT", 50, 8).unwrap();
+        for (ask, want) in [
+            (level(1_100_000, -3), "negative quantity -3"),
+            (level(0, -4), "negative quantity -4"),
+        ] {
+            match orderbook_from_proto(&book(ask), "ETH-USDT", 50, 8) {
+                Err(Error::ResponseContract { context, message }) => {
+                    assert_eq!(
+                        (context.as_str(), message.as_str()),
+                        ("PriceLevel.qty_scaled", want)
+                    );
+                }
+                other => panic!("want Error::ResponseContract, got {other:?}"),
+            }
+        }
+        assert!(matches!(
+            orderbook_from_proto(&book(level(1_100_000, 0)), "ETH-USDT", 50, 8),
+            Err(Error::Validation(_))
+        ));
+    }
+
     #[test]
     fn orderbook_maps_levels() {
         let msg = GetOrderBookResponse {

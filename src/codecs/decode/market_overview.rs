@@ -265,6 +265,45 @@ pub fn market_overview_batch_from_proto(msg: &MarketOverviewBatch) -> Result<Mar
 mod tests {
     use super::*;
 
+    /// A negative best size is refused whether or not that side has a
+    /// price; an empty side with no size still reads as no side.
+    #[test]
+    fn market_overview_entry_refuses_a_negative_book_size_without_a_price() {
+        let row = ProtoMarketOverview {
+            symbol_id: 1,
+            best_bid_ticks: 74_800_000_000_000,
+            best_bid_qty_scaled: 12,
+            ..Default::default()
+        };
+        let entry = market_overview_entry_from_proto(&row).unwrap();
+        assert_eq!(
+            (entry.best_ask.as_ref(), entry.best_ask_qty.as_ref()),
+            (None, None)
+        );
+        for (field, msg) in [
+            (
+                "MarketOverview.best_ask_qty_scaled",
+                ProtoMarketOverview {
+                    best_ask_qty_scaled: -2,
+                    ..row.clone()
+                },
+            ),
+            (
+                "MarketOverview.best_bid_qty_scaled",
+                ProtoMarketOverview {
+                    best_bid_ticks: 0,
+                    best_bid_qty_scaled: -1,
+                    ..row.clone()
+                },
+            ),
+        ] {
+            match market_overview_entry_from_proto(&msg) {
+                Err(crate::Error::ResponseContract { context, .. }) => assert_eq!(context, field),
+                other => panic!("{field}: want Error::ResponseContract, got {other:?}"),
+            }
+        }
+    }
+
     #[test]
     fn market_overview_entry_refuses_a_negative_book_size() {
         let msg = ProtoMarketOverview {
