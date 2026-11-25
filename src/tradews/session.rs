@@ -895,6 +895,11 @@ fn answer_correlation(answer: &Answer) -> u64 {
 /// Signs and opens one connection and, with a `cancel_on_disconnect` grace,
 /// opts into cancel-on-disconnect and checks that the server confirmed it.
 async fn dial(cfg: &Config, cancel_on_disconnect: Option<Duration>) -> Result<Ws> {
+    // The connect timeout starts before signing: a wait for signing capacity
+    // spends it and ends at it, sending nothing.
+    let connect_timeout = cfg.connect_timeout();
+    let deadline = tokio::time::Instant::now().checked_add(connect_timeout);
+    let timed_out = || Error::realtime("tradews connect timed out");
     let mut request = cfg
         .url
         .as_str()
@@ -904,7 +909,14 @@ async fn dial(cfg: &Config, cancel_on_disconnect: Option<Duration>) -> Result<Ws
     if let Ok(agent) = HeaderValue::from_str(&crate::user_agent::user_agent()) {
         headers.insert(USER_AGENT, agent);
     }
-    for (name, value) in cfg.credentials.sign_websocket_upgrade(&cfg.url).await? {
+    let Some(signed) = cfg
+        .credentials
+        .sign_websocket_upgrade_before(&cfg.url, deadline)
+        .await?
+    else {
+        return Err(timed_out());
+    };
+    for (name, value) in signed {
         let name = HeaderName::from_bytes(name.as_bytes())
             .map_err(|e| Error::auth(format!("tradews signed header: {e}")))?;
         let value = HeaderValue::from_str(&value)
@@ -935,9 +947,15 @@ async fn dial(cfg: &Config, cancel_on_disconnect: Option<Duration>) -> Result<Ws
             Err(other) => Err(upgrade_error(other)),
         }
     };
-    let (mut ws, response) = tokio::time::timeout(cfg.connect_timeout(), upgrade)
+    let left = deadline.map_or(connect_timeout, |deadline| {
+        deadline.saturating_duration_since(tokio::time::Instant::now())
+    });
+    if left.is_zero() {
+        return Err(timed_out());
+    }
+    let (mut ws, response) = tokio::time::timeout(left, upgrade)
         .await
-        .map_err(|_| Error::realtime("tradews connect timed out"))??;
+        .map_err(|_| timed_out())??;
     if cancel_on_disconnect.is_some() && !protected(response.headers()) {
         let _ = ws.close(None).await;
         return Err(Error::TradeSession(TradeError::NotProtected));

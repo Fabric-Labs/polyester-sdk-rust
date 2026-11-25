@@ -116,8 +116,18 @@ pub(super) async fn signed_get(
     } else {
         timeout
     };
+    // The request's deadline starts before signing: a wait for signing
+    // capacity spends it and ends at it, sending nothing.
+    let deadline = tokio::time::Instant::now().checked_add(timeout);
+    let timed_out =
+        || Error::realtime(format!("{label}: HTTP request timed out after {timeout:?}"));
     let client = build_http_client(url, allow_insecure)?;
-    let headers = creds.sign_request_async("GET", url, b"", None).await?;
+    let Some(headers) = creds
+        .sign_request_with_recv_window_before("GET", url, b"", None, deadline)
+        .await?
+    else {
+        return Err(timed_out());
+    };
     let uri: hyper::Uri = url
         .parse()
         .map_err(|e| Error::realtime(format!("{label}: invalid url: {e}")))?;
@@ -141,8 +151,14 @@ pub(super) async fn signed_get(
     // arrive: every error from that answer carries it, one its body causes
     // (cut short, too large, or still arriving at the deadline) included.
     let mut failed_answer = None;
+    let left = deadline.map_or(timeout, |deadline| {
+        deadline.saturating_duration_since(tokio::time::Instant::now())
+    });
+    if left.is_zero() {
+        return Err(timed_out());
+    }
     // One deadline covers headers + bounded body collect (F-18).
-    let outcome = tokio::time::timeout(timeout, async {
+    let outcome = tokio::time::timeout(left, async {
         let resp = client
             .request(req)
             .await
@@ -165,11 +181,7 @@ pub(super) async fn signed_get(
         Ok::<_, Error>((status, body, answer))
     })
     .await
-    .unwrap_or_else(|_| {
-        Err(Error::realtime(format!(
-            "{label}: HTTP request timed out after {timeout:?}"
-        )))
-    })
+    .unwrap_or_else(|_| Err(timed_out()))
     .map_err(|err| match failed_answer.take() {
         Some(answer) => err.with_answer(answer),
         None => err,
