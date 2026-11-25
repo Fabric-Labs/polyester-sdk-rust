@@ -71,7 +71,7 @@ jobs:
       # Release channel routing, devnet versions and the publish workflow's
       # stable/devnet split (scripts/devnet_release.py).
       - name: Release channel tests
-        run: python3 -m unittest discover -s scripts -p 'test_devnet_release.py'
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Format
         run: cargo fmt --all -- --check
