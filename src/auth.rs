@@ -531,6 +531,32 @@ pub fn generate_ed25519_keypair() -> (String, String) {
 }
 
 #[cfg(test)]
+impl Credentials {
+    /// Takes this key's signing capacity for the next hour, as a burst of
+    /// requests would, and returns the last timestamp taken.
+    pub(crate) fn hold_signing_capacity(&self) -> u64 {
+        let now_ms = timestamp_ms_from(SystemTime::now()).unwrap();
+        let held = now_ms + MAX_SIGNING_FUTURE_SKEW_MS + 3_600_000;
+        self.timestamp_allocator
+            .last_timestamp_ms
+            .fetch_max(held, Ordering::AcqRel);
+        self.last_signing_timestamp()
+    }
+
+    /// The last signing timestamp this key's allocator took.
+    pub(crate) fn last_signing_timestamp(&self) -> u64 {
+        self.timestamp_allocator
+            .last_timestamp_ms
+            .load(Ordering::Acquire)
+    }
+
+    /// Holds the queue async signers of this key wait in.
+    pub(crate) async fn hold_signing_queue(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.timestamp_allocator.async_gate.lock().await
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

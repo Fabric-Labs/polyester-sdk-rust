@@ -619,3 +619,43 @@ mod redirect_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod signing_deadline_tests {
+    use super::*;
+    use crate::signing_deadline_tests::{GUARD, MARGIN, SEED_HEX, TIMEOUT, silent_server};
+    use std::sync::atomic::Ordering;
+    use std::time::Instant;
+
+    #[tokio::test]
+    async fn a_token_request_timeout_bounds_its_wait_for_signing_capacity() {
+        let (addr, requests) = silent_server("/v1/rt/token").await;
+        let creds = Credentials::new("ak_signing_deadline_token", SEED_HEX).unwrap();
+        let held = creds.hold_signing_capacity();
+        let started = Instant::now();
+        let url = format!("http://{addr}/v1/rt/token");
+        let err = tokio::time::timeout(
+            GUARD,
+            signed_get(&creds, &url, "realtime token", 1024, TIMEOUT, false),
+        )
+        .await
+        .expect("the request's own timeout ends it, not the ten-second cap")
+        .expect_err("capacity is held");
+        let elapsed = started.elapsed();
+
+        assert!(
+            elapsed < TIMEOUT + MARGIN,
+            "took {elapsed:?} with a {TIMEOUT:?} timeout"
+        );
+        let timed_out = Error::realtime(format!(
+            "realtime token: HTTP request timed out after {TIMEOUT:?}"
+        ));
+        assert_eq!(err.to_string(), timed_out.to_string());
+        assert_eq!(requests.load(Ordering::SeqCst), 0, "the request was sent");
+        assert_eq!(
+            creds.last_signing_timestamp(),
+            held,
+            "a timestamp was taken"
+        );
+    }
+}
