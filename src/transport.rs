@@ -413,6 +413,12 @@ pub(crate) const RATE_LIMIT_PROBLEM_TYPE: &str = "polyester.sdk.rate_limit_probl
 /// `debug`. [`crate::errors::map_connect_error`] reads it into the error.
 pub(crate) const TIMESTAMP_WINDOW_PROBLEM_TYPE: &str = "polyester.sdk.timestamp_window_problem";
 
+/// Type URL of the SDK-local Connect error detail that carries the
+/// `historyAvailableFrom` member of a REST statement-history problem, as
+/// sent, in `debug`. [`crate::errors::map_connect_error`] reads it into
+/// [`crate::Error::statement_history_available_from`].
+pub(crate) const STATEMENT_HISTORY_PROBLEM_TYPE: &str = "polyester.sdk.statement_history_problem";
+
 /// Longest body excerpt kept in a bare HTTP error message.
 const BARE_HTTP_ERROR_EXCERPT_CHARS: usize = 256;
 
@@ -630,10 +636,15 @@ fn classify_failed_response_inner(
         rate_limit: Option<serde_json::Value>,
         #[serde(rename = "timestampWindow")]
         timestamp_window: Option<serde_json::Value>,
+        #[serde(rename = "historyAvailableFrom")]
+        history_available_from: Option<serde_json::Value>,
     }
     let parsed = is_json
         .then(|| serde_json::from_slice::<Body>(body).ok())
         .flatten();
+    let history_available_from = parsed
+        .as_ref()
+        .and_then(|body| body.history_available_from.clone());
     let code = parsed
         .as_ref()
         .and_then(|body| body.code.clone())
@@ -927,7 +938,20 @@ fn classify_failed_response_inner(
             500.. => ErrorCode::Internal,
             _ => ErrorCode::FailedPrecondition,
         };
-        return Some(ConnectError::new(connect_code, message).with_http_status(status));
+        let mut err = ConnectError::new(connect_code, message).with_http_status(status);
+        // The REST code drops the enum's ERROR_CODE_ prefix.
+        if code.trim_start_matches("ERROR_CODE_")
+            == crate::errors::ledger_codes::STATEMENT_HISTORY_UNAVAILABLE
+                .trim_start_matches("ERROR_CODE_")
+            && let Some(from) = history_available_from
+        {
+            err = err.with_detail(ErrorDetail {
+                type_url: STATEMENT_HISTORY_PROBLEM_TYPE.into(),
+                value: None,
+                debug: Some(from),
+            });
+        }
+        return Some(err);
     }
     if status == StatusCode::GATEWAY_TIMEOUT {
         return Some(sdk_marked_error(

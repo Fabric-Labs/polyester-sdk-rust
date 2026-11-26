@@ -117,6 +117,7 @@ ledger.read.v1.CreateStatementExportRequest.end_time	covered	CreateStatementExpo
 ledger.read.v1.CreateStatementExportRequest.idempotency_key	covered	CreateStatementExportOptions.idempotency_key
 ledger.read.v1.CreateStatementExportRequest.start_time	covered	CreateStatementExportOptions.start_time
 ledger.read.v1.CreateStatementExportRequest.subaccount_id	covered	CreateStatementExportOptions.subaccount_id
+ledger.read.v1.CreateStatementExportRequest.type	covered	CreateStatementExportOptions.export_type
 ledger.read.v1.CreateStatementExportResponse.export	covered	StatementExport (create_export result)
 ledger.read.v1.GetBalanceHistoryResponse.bucket	covered	BalanceHistory.bucket
 ledger.read.v1.GetBalanceHistoryResponse.end_ts_sec	covered	BalanceHistory.end_ts_sec
@@ -151,6 +152,10 @@ ledger.read.v1.StatementExport.ready_at	covered	StatementExport.ready_at
 ledger.read.v1.StatementExport.start_time	covered	StatementExport.start_time
 ledger.read.v1.StatementExport.status	covered	StatementExport.status
 ledger.read.v1.StatementExport.subaccount_id	covered	StatementExport.subaccount_id
+ledger.read.v1.StatementExport.type	covered	StatementExport.export_type
+ledger.read.v1.StatementExport.history_available_from	covered	StatementExport.history_available_from
+ledger.read.v1.ErrorDetail.code	covered	Error::Api.code
+ledger.read.v1.ErrorDetail.history_available_from	covered	Error::statement_history_available_from
 orderbook.v1.GetOrderBookRequest.depth	covered	OrderbookService::get depth (sent as its DepthTier; None sends DEPTH_UNSPECIFIED, the default 50)
 orderbook.v1.GetOrderBookRequest.symbol_id	covered	OrderbookService::get symbol (resolved from the catalog)
 orderbook.v1.GetOrderBookResponse.asks	covered	OrderbookData.asks

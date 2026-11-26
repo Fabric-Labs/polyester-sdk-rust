@@ -295,6 +295,40 @@ mod tests {
         }
     }
 
+    /// The strategy fork and bot funds return permissions, the API-key
+    /// actions of `ForkStrategy` and `ReturnBotFunds`, read by name on both
+    /// policy kinds.
+    #[test]
+    fn fork_strategies_policy_action_reads_by_name() {
+        use crate::proto::auth::v1::PolicyAction;
+
+        let actions = vec![
+            PolicyAction::READ_STRATEGIES.into(),
+            PolicyAction::FORK_STRATEGIES.into(),
+            PolicyAction::RETURN_STRATEGY_BOT_FUNDS.into(),
+        ];
+        let api = api_policy_from_proto(&ApiPolicyView {
+            actions: actions.clone(),
+            ..Default::default()
+        })
+        .unwrap();
+        let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
+            actions,
+            ..Default::default()
+        })
+        .unwrap();
+        for decoded in [&api.actions, &sub.actions] {
+            assert_eq!(
+                decoded,
+                &[
+                    "READ_STRATEGIES",
+                    "FORK_STRATEGIES",
+                    "RETURN_STRATEGY_BOT_FUNDS"
+                ]
+            );
+        }
+    }
+
     /// The price-alert permissions read by name on both policy kinds and
     /// keep their numbers.
     #[test]
