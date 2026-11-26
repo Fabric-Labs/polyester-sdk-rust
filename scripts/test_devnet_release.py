@@ -257,6 +257,66 @@ class PlanTest(GitRepoCase):
         self.assertNotIn("old breaking entry", notes)
 
 
+class ReleaseNotesSizeTest(GitRepoCase):
+    """GitHub refuses a release body over 125,000 characters (HTTP 422)."""
+
+    REPOSITORY = "Fabric-Labs/polyester-sdk-example"
+
+    def oversized_entries(self) -> str:
+        # Many whole entries, together well past what a release body holds.
+        entry = "- an entry that explains one change at length, " + "word " * 60 + "\n"
+        count = dr.GITHUB_RELEASE_BODY_LIMIT // len(entry) + 50
+        return "".join(entry.replace("one change", f"change {i}") for i in range(count))
+
+    def test_oversized_unreleased_section_is_linked_not_cut(self) -> None:
+        entries = self.oversized_entries()
+        sha = self.commit(CHANGELOG.format(entries=entries), "2026-11-17T09:30:00+00:00")
+        p = dr.plan(self.repo, "go")
+        notes = dr.release_notes(self.repo, p, self.REPOSITORY)
+        self.assertLessEqual(len(notes), dr.RELEASE_NOTES_BUDGET)
+        self.assertLess(dr.RELEASE_NOTES_BUDGET, dr.GITHUB_RELEASE_BODY_LIMIT)
+        self.assertIn("`0.34.1-devnet.20261117093000`", notes)
+        self.assertIn(f"built from {sha} on main", notes)
+        self.assertIn(f"https://github.com/{self.REPOSITORY}/blob/{sha}/CHANGELOG.md", notes)
+        self.assertIn("go get example.com/sdk@v0.34.1-devnet.20261117093000", notes)
+        self.assertIn(f"The {len(p.entries)} entries under `## Unreleased`", notes)
+        # No entry is copied, so none is ever left half written.
+        self.assertNotIn("an entry that explains", notes)
+        self.assertFalse(any(dr.ENTRY.match(line) for line in notes.splitlines()))
+
+    def test_section_is_kept_whole_up_to_the_budget(self) -> None:
+        self.commit(
+            CHANGELOG.format(entries="- a change\n- another\n"), "2026-11-17T09:30:00+00:00"
+        )
+        p = dr.plan(self.repo, "go")
+        full = dr.release_notes(self.repo, p, self.REPOSITORY)
+        self.assertIn("- a change\n- another\n", full)
+        with mock.patch.object(dr, "RELEASE_NOTES_BUDGET", len(full)):
+            self.assertEqual(dr.release_notes(self.repo, p, self.REPOSITORY), full)
+        with mock.patch.object(dr, "RELEASE_NOTES_BUDGET", len(full) - 1):
+            short = dr.release_notes(self.repo, p, self.REPOSITORY)
+        self.assertNotIn("- a change", short)
+        self.assertIn(f"/blob/{p.sha}/CHANGELOG.md", short)
+
+    def test_repository_from_the_workflow_or_the_origin_remote(self) -> None:
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": "Fabric-Labs/polyester-sdk-x"}):
+            self.assertEqual(dr.github_repository(self.repo), "Fabric-Labs/polyester-sdk-x")
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": ""}):
+            with self.assertRaises(dr.ReleaseError):
+                dr.github_repository(self.repo)  # no origin remote
+            run_git(self.repo, "remote", "add", "origin", "https://example.com/o/r.git")
+            for url in (
+                "https://github.com/Fabric-Labs/polyester-sdk-y.git",
+                "git@github.com:Fabric-Labs/polyester-sdk-y.git",
+                "https://github.com/Fabric-Labs/polyester-sdk-y",
+            ):
+                run_git(self.repo, "remote", "set-url", "origin", url)
+                self.assertEqual(dr.github_repository(self.repo), "Fabric-Labs/polyester-sdk-y")
+            run_git(self.repo, "remote", "set-url", "origin", "https://example.com/o/r.git")
+            with self.assertRaises(dr.ReleaseError):
+                dr.github_repository(self.repo)
+
+
 class CliTest(GitRepoCase):
     """main() for each subcommand that needs no network, as the workflows call it."""
 
@@ -281,6 +341,46 @@ class CliTest(GitRepoCase):
         self.assertEqual(code, 0)
         self.assertIn("would run: gh release create v0.34.1-devnet.20261117093000", out)
         self.assertEqual(gh.calls, [])
+
+    def test_oversized_changelog_plans_a_short_body_and_release_takes_it(self) -> None:
+        entry = "- a long entry " + "word " * 80 + "\n"
+        entries = entry * (dr.GITHUB_RELEASE_BODY_LIMIT // len(entry) + 10)
+        sha = self.commit(CHANGELOG.format(entries=entries), "2026-11-17T09:30:00+00:00")
+        notes = self.repo / "notes.md"
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": "Fabric-Labs/polyester-sdk-z"}):
+            code, _ = self.main("plan", "--notes", str(notes))
+        self.assertEqual(code, 0)
+        body = notes.read_text(encoding="utf-8")
+        self.assertLessEqual(len(body), dr.RELEASE_NOTES_BUDGET)
+        self.assertIn(
+            f"https://github.com/Fabric-Labs/polyester-sdk-z/blob/{sha}/CHANGELOG.md", body
+        )
+        gh = FakeGh([])
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, out = self.main("release", "--notes", str(notes), "--dry-run", "true")
+        self.assertEqual(code, 0)
+        self.assertIn("would run: gh release create", out)
+
+    def test_release_refuses_a_body_github_would_refuse_before_changing_anything(self) -> None:
+        self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        notes = self.repo / "notes.md"
+        notes.write_text("x" * (dr.GITHUB_RELEASE_BODY_LIMIT + 1), encoding="utf-8")
+        calls: list[list[str]] = []
+
+        def gh(args: Sequence[str]) -> str:
+            calls.append(list(args))
+            return "[]"
+
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, _ = self.main("release", "--notes", str(notes))
+        self.assertEqual(code, 1)
+        # Not even the release list: no previous pre-release is deleted.
+        self.assertEqual(calls, [])
+        notes.write_text("x" * dr.GITHUB_RELEASE_BODY_LIMIT, encoding="utf-8")
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, _ = self.main("release", "--notes", str(notes), "--dry-run", "true")
+        self.assertEqual(code, 0)
+        self.assertEqual([c[:3] for c in calls], [["gh", "release", "list"]])
 
     def test_errors_exit_non_zero(self) -> None:
         code, _ = self.main("route", "--event", "workflow_dispatch", "--ref", "refs/heads/x")

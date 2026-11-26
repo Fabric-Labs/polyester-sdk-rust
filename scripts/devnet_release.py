@@ -71,6 +71,16 @@ RELEASE_TAG = {
     "rust": re.compile(r"^v(\d+\.\d+\.\d+)-devnet$"),
 }
 
+# GitHub refuses a release body longer than this many characters (HTTP 422,
+# "body is too long"). Notes are built to stay under RELEASE_NOTES_BUDGET, a
+# margin below it; longer Unreleased text is linked, never cut.
+GITHUB_RELEASE_BODY_LIMIT = 125_000
+RELEASE_NOTES_BUDGET = 120_000
+# owner/name of a GitHub repository, as GITHUB_REPOSITORY names it or as the
+# end of an origin URL (https://github.com/o/r.git, git@github.com:o/r.git).
+REPOSITORY = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+")
+GITHUB_REMOTE = re.compile(r"github\.com[:/]([A-Za-z0-9-]+/[A-Za-z0-9._-]+?)(?:\.git)?/?$")
+
 USER_AGENT = "polyester-sdk-release-check"
 GO_MODULE_LINE = re.compile(r"^module\s+(\S+)\s*$", re.MULTILINE)
 
@@ -276,15 +286,52 @@ def install_hint(root: Path, ecosystem: str, version: str) -> str:
     return f"cargo add {crate_name(root)}@={version}"
 
 
-def release_notes(root: Path, p: Plan) -> str:
+def github_repository(root: Path) -> str:
+    """owner/name of the repository: GITHUB_REPOSITORY in a workflow run, else
+    the GitHub origin remote of ``root``."""
+    named = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if REPOSITORY.fullmatch(named):
+        return named
+    match = GITHUB_REMOTE.search(git(root, "remote", "get-url", "origin"))
+    if match is None:
+        raise ReleaseError("cannot tell the GitHub repository: set GITHUB_REPOSITORY")
+    return match[1]
+
+
+def release_notes(root: Path, p: Plan, repository: str | None = None) -> str:
+    """The devnet pre-release body: the whole ``## Unreleased`` section when
+    the body stays within RELEASE_NOTES_BUDGET characters, else a link to
+    CHANGELOG.md at the snapshot's commit. The section is never cut, so no
+    entry is ever left half written."""
     section = "\n".join(unreleased_section((root / "CHANGELOG.md").read_text(encoding="utf-8")))
-    return (
+    head = (
         f"Devnet pre-release `{p.version}`, built from {p.sha} on main. "
         f"It is not the latest release: the default install stays on the stable "
         f"release, which tracks testnet.\n\n"
         f"```\n{install_hint(root, p.ecosystem, p.version)}\n```\n\n"
-        f"## Changes since v{p.base}\n\n{section.strip()}\n"
+        f"## Changes since v{p.base}\n\n"
     )
+    notes = f"{head}{section.strip()}\n"
+    if len(notes) <= RELEASE_NOTES_BUDGET:
+        return notes
+    changelog = (
+        f"https://github.com/{repository or github_repository(root)}/blob/{p.sha}/CHANGELOG.md"
+    )
+    return (
+        f"{head}The {len(p.entries)} entries under `## Unreleased` are longer than a "
+        f"release body holds. Read them in [CHANGELOG.md at {p.sha}]({changelog}).\n"
+    )
+
+
+def check_notes(notes: Path) -> None:
+    """Refuse a body GitHub would refuse, before any release is changed: Rust
+    and Python delete the previous pre-release before creating this one."""
+    length = len(notes.read_text(encoding="utf-8"))
+    if length > GITHUB_RELEASE_BODY_LIMIT:
+        raise ReleaseError(
+            f"{notes} has {length} characters; a GitHub release body holds at most "
+            f"{GITHUB_RELEASE_BODY_LIMIT}. Build it with the plan command."
+        )
 
 
 # --------------------------------------------------------------------------- manifests
@@ -962,6 +1009,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if result.skip:
                 print(f"release: {result.reason}; nothing to release")
                 return 0
+            check_notes(args.notes)
             stable = {
                 t for t in git(root, "tag", "--list", "v*").splitlines() if STABLE_TAG.match(t)
             }
