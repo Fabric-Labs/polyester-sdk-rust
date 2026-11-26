@@ -1980,8 +1980,10 @@ impl Error {
     }
 
     /// With `ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE`: the earliest instant
-    /// whose balances the account history holds, where a balances export's
-    /// period may start; `None` when the server did not name it.
+    /// whose balances the account history holds, to the nanosecond, where a
+    /// balances export's period may start. Read from the ConnectRPC detail's
+    /// `history_available_from` or the REST problem's `historyAvailableFrom`;
+    /// `None` when the answer names none.
     pub fn statement_history_available_from(&self) -> Option<std::time::SystemTime> {
         self.api_metadata_time(STATEMENT_HISTORY_AVAILABLE_FROM_METADATA)
     }
@@ -2380,11 +2382,36 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                 .and_then(|d| d.debug.as_ref())
                 .and_then(TimestampWindow::from_problem_json)
         });
+    // A REST statement-history problem's `historyAvailableFrom`, kept by the
+    // transport in an SDK-local detail, as the ConnectRPC detail's
+    // `history_available_from` is kept.
+    let problem_history = err
+        .details
+        .iter()
+        .find(|d| d.type_url == crate::transport::STATEMENT_HISTORY_PROBLEM_TYPE)
+        .and_then(|d| d.debug.as_ref())
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| {
+            <buffa_types::google::protobuf::Timestamp as serde::Deserialize>::deserialize(
+                serde::de::value::StrDeserializer::<serde::de::value::Error>::new(value),
+            )
+            .ok()
+        })
+        .and_then(|at| timestamp_metadata(&at));
     let mut mapped = map_connect_error_inner(err);
     if let Error::TimestampSkew { window, .. } = &mut mapped
         && window.is_none()
     {
         *window = problem_window;
+    }
+    if let Error::Api { code, metadata, .. } = &mut mapped
+        && code == ledger_codes::STATEMENT_HISTORY_UNAVAILABLE
+        && let Some(at) = problem_history
+        && !metadata
+            .iter()
+            .any(|(key, _)| key == STATEMENT_HISTORY_AVAILABLE_FROM_METADATA)
+    {
+        metadata.push((STATEMENT_HISTORY_AVAILABLE_FROM_METADATA.to_owned(), at));
     }
     let mapped = match answer {
         Some(answer) => mapped.with_answer(answer),

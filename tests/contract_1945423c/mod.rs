@@ -1396,6 +1396,55 @@ async fn statement_export_types_are_sent_as_the_contract_names_them() {
     }
 }
 
+/// The REST answer to a balances export that starts before the account
+/// history, in the contract's published problem shape, reads as the
+/// ConnectRPC refusal does: the typed code with the instant to start from,
+/// to the nanosecond. A problem without a readable instant keeps the code.
+#[tokio::test]
+async fn statement_history_problem_carries_history_available_from() {
+    use polyester::models::StatementExportType;
+
+    let problem = |member: &str| {
+        format!(
+            r#"{{"type": "https://polyester.dev/problems/statement-history-unavailable", "title": "Conflict", "status": 409,
+ "detail": "statement_history_unavailable: the period starts before the account history", "code": "STATEMENT_HISTORY_UNAVAILABLE"{member}}}"#
+        )
+        .into_bytes()
+    };
+    let start = UNIX_EPOCH + Duration::from_secs(1_793_491_200);
+    let opts = || CreateStatementExportOptions {
+        export_type: Some(StatementExportType::Balances),
+        start_time: Some(start),
+        end_time: Some(start + Duration::from_secs(30 * 86_400)),
+        idempotency_key: "balances-2026-11".into(),
+        ..Default::default()
+    };
+    for (member, want) in [
+        (
+            r#", "historyAvailableFrom": "2026-11-25T14:55:02.123456789Z""#,
+            Some(UNIX_EPOCH + Duration::new(1_795_618_502, 123_456_789)),
+        ),
+        (
+            r#", "historyAvailableFrom": "2026-11-25T16:55:02+02:00""#,
+            Some(UNIX_EPOCH + Duration::from_secs(1_795_618_502)),
+        ),
+        (r#", "historyAvailableFrom": "yesterday""#, None),
+        ("", None),
+    ] {
+        let body = problem(member);
+        let (client, _seen) = server(move |_path| HttpScript::Raw {
+            status: 409,
+            headers: vec![("content-type".into(), "application/problem+json".into())],
+            body: body.clone(),
+        })
+        .await;
+        let err = client.statements.create_export(opts()).await.unwrap_err();
+        assert!(err.is_statement_history_unavailable(), "{member}: {err:?}");
+        assert_eq!(err.statement_history_available_from(), want, "{member}");
+        assert!(!err.is_retryable(), "{member}");
+    }
+}
+
 /// Balance history reads each point's exact 18-decimal balance, and a server
 /// that still sends the removed 7-decimal field (an empty `balance`) is
 /// refused instead of read as no balances.

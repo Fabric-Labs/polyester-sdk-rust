@@ -961,6 +961,14 @@ mod tests {
                 &format!("{BALANCES_HEADER}funding,BTC,0,1,0,1,-1\r\n"),
                 "is not a count",
             ),
+            // Digits only, but past u64.
+            (
+                &format!(
+                    "{BALANCES_HEADER}funding,BTC,0,1,0,1,{}\r\n",
+                    "9".repeat(30)
+                ),
+                "is not a count",
+            ),
         ] {
             let err = parse_balances_csv(csv).unwrap_err();
             let message = err.to_string();
