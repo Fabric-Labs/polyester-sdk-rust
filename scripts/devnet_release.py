@@ -249,10 +249,15 @@ class Plan:
         }
 
 
+def changelog_at(root: Path, sha: str) -> str:
+    """CHANGELOG.md as the commit ``sha`` holds it, whatever the working tree
+    holds: the plan and the notes of a commit both read it from there."""
+    return git(root, "show", f"{sha}:CHANGELOG.md")
+
+
 def plan(root: Path, ecosystem: str, rev: str = "HEAD") -> Plan:
     sha = git(root, "rev-parse", f"{rev}^{{commit}}")
-    changelog = root / "CHANGELOG.md"
-    section = unreleased_section(changelog.read_text(encoding="utf-8"))
+    section = unreleased_section(changelog_at(root, sha))
     entries = tuple(line for line in section if ENTRY.match(line))
     if not entries:
         return Plan(ecosystem, sha, True, "CHANGELOG has no entries under ## Unreleased")
@@ -303,7 +308,7 @@ def release_notes(root: Path, p: Plan, repository: str | None = None) -> str:
     the body stays within RELEASE_NOTES_BUDGET characters, else a link to
     CHANGELOG.md at the snapshot's commit. The section is never cut, so no
     entry is ever left half written."""
-    section = "\n".join(unreleased_section((root / "CHANGELOG.md").read_text(encoding="utf-8")))
+    section = "\n".join(unreleased_section(changelog_at(root, p.sha)))
     head = (
         f"Devnet pre-release `{p.version}`, built from {p.sha} on main. "
         f"It is not the latest release: the default install stays on the stable "
@@ -323,10 +328,22 @@ def release_notes(root: Path, p: Plan, repository: str | None = None) -> str:
     )
 
 
+def write_notes(path: Path, notes: str) -> None:
+    """Write ``notes`` exactly, with no newline translation, so the file gh
+    sends is the text that was measured."""
+    path.write_text(notes, encoding="utf-8", newline="")
+
+
 def check_notes(notes: Path) -> None:
     """Refuse a body GitHub would refuse, before any release is changed: Rust
-    and Python delete the previous pre-release before creating this one."""
-    length = len(notes.read_text(encoding="utf-8"))
+    and Python delete the previous pre-release before creating this one.
+
+    gh sends the file as it is, so its characters are counted as sent: the
+    bytes decoded as UTF-8 with no newline translation (a CRLF is two)."""
+    try:
+        length = len(notes.read_bytes().decode("utf-8"))
+    except UnicodeDecodeError as error:
+        raise ReleaseError(f"{notes} is not UTF-8: {error}") from None
     if length > GITHUB_RELEASE_BODY_LIMIT:
         raise ReleaseError(
             f"{notes} has {length} characters; a GitHub release body holds at most "
@@ -969,7 +986,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = plan(root, ecosystem, args.rev)
             print(f"plan: {result.reason}", file=sys.stderr)
             if args.notes and not result.skip:
-                args.notes.write_text(release_notes(root, result), encoding="utf-8")
+                write_notes(args.notes, release_notes(root, result))
             emit(result.outputs())
             return 0
         if args.command == "stamp":
