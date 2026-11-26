@@ -17,7 +17,7 @@ import sys
 import tempfile
 import tomllib
 import unittest
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from unittest import mock
 
@@ -257,6 +257,66 @@ class PlanTest(GitRepoCase):
         self.assertNotIn("old breaking entry", notes)
 
 
+class ReleaseNotesSizeTest(GitRepoCase):
+    """GitHub refuses a release body over 125,000 characters (HTTP 422)."""
+
+    REPOSITORY = "Fabric-Labs/polyester-sdk-example"
+
+    def oversized_entries(self) -> str:
+        # Many whole entries, together well past what a release body holds.
+        entry = "- an entry that explains one change at length, " + "word " * 60 + "\n"
+        count = dr.GITHUB_RELEASE_BODY_LIMIT // len(entry) + 50
+        return "".join(entry.replace("one change", f"change {i}") for i in range(count))
+
+    def test_oversized_unreleased_section_is_linked_not_cut(self) -> None:
+        entries = self.oversized_entries()
+        sha = self.commit(CHANGELOG.format(entries=entries), "2026-11-17T09:30:00+00:00")
+        p = dr.plan(self.repo, "go")
+        notes = dr.release_notes(self.repo, p, self.REPOSITORY)
+        self.assertLessEqual(len(notes), dr.RELEASE_NOTES_BUDGET)
+        self.assertLess(dr.RELEASE_NOTES_BUDGET, dr.GITHUB_RELEASE_BODY_LIMIT)
+        self.assertIn("`0.34.1-devnet.20261117093000`", notes)
+        self.assertIn(f"built from {sha} on main", notes)
+        self.assertIn(f"https://github.com/{self.REPOSITORY}/blob/{sha}/CHANGELOG.md", notes)
+        self.assertIn("go get example.com/sdk@v0.34.1-devnet.20261117093000", notes)
+        self.assertIn(f"The {len(p.entries)} entries under `## Unreleased`", notes)
+        # No entry is copied, so none is ever left half written.
+        self.assertNotIn("an entry that explains", notes)
+        self.assertFalse(any(dr.ENTRY.match(line) for line in notes.splitlines()))
+
+    def test_section_is_kept_whole_up_to_the_budget(self) -> None:
+        self.commit(
+            CHANGELOG.format(entries="- a change\n- another\n"), "2026-11-17T09:30:00+00:00"
+        )
+        p = dr.plan(self.repo, "go")
+        full = dr.release_notes(self.repo, p, self.REPOSITORY)
+        self.assertIn("- a change\n- another\n", full)
+        with mock.patch.object(dr, "RELEASE_NOTES_BUDGET", len(full)):
+            self.assertEqual(dr.release_notes(self.repo, p, self.REPOSITORY), full)
+        with mock.patch.object(dr, "RELEASE_NOTES_BUDGET", len(full) - 1):
+            short = dr.release_notes(self.repo, p, self.REPOSITORY)
+        self.assertNotIn("- a change", short)
+        self.assertIn(f"/blob/{p.sha}/CHANGELOG.md", short)
+
+    def test_repository_from_the_workflow_or_the_origin_remote(self) -> None:
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": "Fabric-Labs/polyester-sdk-x"}):
+            self.assertEqual(dr.github_repository(self.repo), "Fabric-Labs/polyester-sdk-x")
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": ""}):
+            with self.assertRaises(dr.ReleaseError):
+                dr.github_repository(self.repo)  # no origin remote
+            run_git(self.repo, "remote", "add", "origin", "https://example.com/o/r.git")
+            for url in (
+                "https://github.com/Fabric-Labs/polyester-sdk-y.git",
+                "git@github.com:Fabric-Labs/polyester-sdk-y.git",
+                "https://github.com/Fabric-Labs/polyester-sdk-y",
+            ):
+                run_git(self.repo, "remote", "set-url", "origin", url)
+                self.assertEqual(dr.github_repository(self.repo), "Fabric-Labs/polyester-sdk-y")
+            run_git(self.repo, "remote", "set-url", "origin", "https://example.com/o/r.git")
+            with self.assertRaises(dr.ReleaseError):
+                dr.github_repository(self.repo)
+
+
 class CliTest(GitRepoCase):
     """main() for each subcommand that needs no network, as the workflows call it."""
 
@@ -281,6 +341,119 @@ class CliTest(GitRepoCase):
         self.assertEqual(code, 0)
         self.assertIn("would run: gh release create v0.34.1-devnet.20261117093000", out)
         self.assertEqual(gh.calls, [])
+
+    def test_oversized_changelog_plans_a_short_body_and_release_takes_it(self) -> None:
+        entry = "- a long entry " + "word " * 80 + "\n"
+        entries = entry * (dr.GITHUB_RELEASE_BODY_LIMIT // len(entry) + 10)
+        sha = self.commit(CHANGELOG.format(entries=entries), "2026-11-17T09:30:00+00:00")
+        notes = self.repo / "notes.md"
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": "Fabric-Labs/polyester-sdk-z"}):
+            code, _ = self.main("plan", "--notes", str(notes))
+        self.assertEqual(code, 0)
+        body = notes.read_text(encoding="utf-8")
+        self.assertLessEqual(len(body), dr.RELEASE_NOTES_BUDGET)
+        self.assertIn(
+            f"https://github.com/Fabric-Labs/polyester-sdk-z/blob/{sha}/CHANGELOG.md", body
+        )
+        gh = FakeGh([])
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, out = self.main("release", "--notes", str(notes), "--dry-run", "true")
+        self.assertEqual(code, 0)
+        self.assertIn("would run: gh release create", out)
+
+    def test_release_refuses_a_body_github_would_refuse_before_changing_anything(self) -> None:
+        self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        notes = self.repo / "notes.md"
+        notes.write_text("x" * (dr.GITHUB_RELEASE_BODY_LIMIT + 1), encoding="utf-8")
+        calls: list[list[str]] = []
+
+        def gh(args: Sequence[str]) -> str:
+            calls.append(list(args))
+            return "[]"
+
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, _ = self.main("release", "--notes", str(notes))
+        self.assertEqual(code, 1)
+        # Not even the release list: no previous pre-release is deleted.
+        self.assertEqual(calls, [])
+        notes.write_text("x" * dr.GITHUB_RELEASE_BODY_LIMIT, encoding="utf-8")
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, _ = self.main("release", "--notes", str(notes), "--dry-run", "true")
+        self.assertEqual(code, 0)
+        self.assertEqual([c[:3] for c in calls], [["gh", "release", "list"]])
+
+    def recording_gh(self) -> tuple[list[list[str]], Callable[[Sequence[str]], str]]:
+        calls: list[list[str]] = []
+
+        def gh(args: Sequence[str]) -> str:
+            calls.append(list(args))
+            return "[]"
+
+        return calls, gh
+
+    def test_release_counts_the_notes_as_gh_sends_them(self) -> None:
+        self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        notes = self.repo / "notes.md"
+        # 126,000 characters as sent, CRLF counting two; 105,000 once newlines
+        # are translated. The guard returns before any gh call, so nothing is
+        # listed or deleted.
+        notes.write_bytes(b"abcd\r\n" * 21_000)
+        self.assertGreater(len(notes.read_bytes()), dr.GITHUB_RELEASE_BODY_LIMIT)
+        calls, gh = self.recording_gh()
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, _ = self.main("release", "--notes", str(notes), "--dry-run", "true")
+            self.assertEqual(code, 1)
+            code, _ = self.main("release", "--notes", str(notes))
+            self.assertEqual(code, 1)
+        self.assertEqual(calls, [])
+        # Characters, not bytes: a body at the limit in two-byte characters
+        # passes.
+        notes.write_bytes(("\u00e9" * dr.GITHUB_RELEASE_BODY_LIMIT).encode("utf-8"))
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, _ = self.main("release", "--notes", str(notes), "--dry-run", "true")
+        self.assertEqual(code, 0)
+        # A file that is not UTF-8 is refused before any gh call too.
+        calls.clear()
+        notes.write_bytes(b"\xff\xfe not utf-8")
+        with mock.patch.object(dr, "gh_runner", gh):
+            code, _ = self.main("release", "--notes", str(notes))
+        self.assertEqual((code, calls), (1, []))
+
+    def test_plan_writes_the_measured_text_exactly(self) -> None:
+        self.commit(CHANGELOG.format(entries="- a\n- b\n"), "2026-11-17T09:30:00+00:00")
+        notes = self.repo / "notes.md"
+        code, _ = self.main("plan", "--notes", str(notes))
+        self.assertEqual(code, 0)
+        expected = dr.release_notes(self.repo, dr.plan(self.repo, "go"), "o/r")
+        self.assertEqual(notes.read_bytes(), expected.encode("utf-8"))
+        self.assertNotIn(b"\r", notes.read_bytes())
+
+    def test_plan_of_an_older_revision_reads_that_revision_s_changelog(self) -> None:
+        older = self.commit(
+            CHANGELOG.format(entries="- a small fix\n"), "2026-11-17T09:30:00+00:00"
+        )
+        entry = "- **Breaking:** a later change " + "word " * 80 + "\n"
+        newer = CHANGELOG.format(entries=entry * (dr.GITHUB_RELEASE_BODY_LIMIT // len(entry) + 10))
+        self.commit(newer, "2026-11-18T09:30:00+00:00")
+        # The working tree holds yet another text: neither revision reads it.
+        (self.repo / "CHANGELOG.md").write_text(CHANGELOG.format(entries=""), encoding="utf-8")
+        p = dr.plan(self.repo, "go", older)
+        self.assertEqual((p.sha, p.target, p.breaking), (older, "0.34.1", False))
+        self.assertEqual(p.entries, ("- a small fix",))
+        notes = dr.release_notes(self.repo, p, "o/r")
+        self.assertIn("- a small fix", notes)
+        self.assertNotIn("a later change", notes)
+        self.assertNotIn("longer than a release body holds", notes)
+        self.assertIn(f"built from {older} on main", notes)
+        head = dr.plan(self.repo, "go")
+        self.assertEqual((head.target, head.breaking), ("0.35.0", True))
+        self.assertIn("longer than a release body holds", dr.release_notes(self.repo, head, "o/r"))
+        out = self.repo / "older.md"
+        code, stdout = self.main("plan", "--rev", older, "--notes", str(out))
+        self.assertEqual(code, 0)
+        self.assertIn(f"sha={older}\n", stdout)
+        self.assertIn("version=0.34.1-devnet.20261117093000\n", stdout)
+        self.assertEqual(out.read_text(encoding="utf-8"), notes)
 
     def test_errors_exit_non_zero(self) -> None:
         code, _ = self.main("route", "--event", "workflow_dispatch", "--ref", "refs/heads/x")
