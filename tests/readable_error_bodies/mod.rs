@@ -7,6 +7,7 @@
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use base64::Engine as _;
 use buffa::Message as _;
+use polyester::codecs::scalars::format_id;
 use polyester::models::SubAccountScope;
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
 use polyester::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail, FieldViolation};
@@ -135,7 +136,7 @@ async fn call_with_headers(
     let error = if op == "read" {
         client
             .triggers
-            .get_by_id("9", SubAccountScope::Default)
+            .get_by_id(&format_id(9), SubAccountScope::Default)
             .await
             .err()
     } else {
@@ -1725,7 +1726,7 @@ async fn round4_answer_status_and_no_answer() {
     .expect("client");
     let err = client
         .triggers
-        .get_by_id("9", SubAccountScope::Default)
+        .get_by_id(&format_id(9), SubAccountScope::Default)
         .await
         .expect_err("refused connection");
     assert!(err.answer().is_none(), "{err:?}");
@@ -1855,7 +1856,7 @@ async fn scripted_call(
     let error = if op == "read" {
         client
             .triggers
-            .get_by_id("9", SubAccountScope::Default)
+            .get_by_id(&format_id(9), SubAccountScope::Default)
             .await
             .err()
     } else {
@@ -1942,7 +1943,7 @@ async fn round6_unreadable_bodies_keep_their_answer() {
     .expect("client");
     let err = client
         .triggers
-        .get_by_id("9", SubAccountScope::Default)
+        .get_by_id(&format_id(9), SubAccountScope::Default)
         .await
         .expect_err("refused connection");
     assert!(err.answer().is_none(), "{err:?}");

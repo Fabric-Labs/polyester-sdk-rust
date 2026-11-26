@@ -5,6 +5,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer, connect_proto_ok};
 use buffa::Message as _;
+use polyester::codecs::scalars::format_id;
 use polyester::models::SubAccountScope;
 use polyester::models::{ListTriggersOpts, Order, OrderKey, TriggerDetails, UserTrade};
 use polyester::proto::orders::v1::{
@@ -179,7 +180,7 @@ async fn read_all(client: &Client) -> Vec<(String, Option<u32>)> {
     let mut seen = Vec::new();
     let got = client
         .orders
-        .get(OrderKey::OrderId("9".into()), SubAccountScope::Default)
+        .get(OrderKey::OrderId(format_id(9)), SubAccountScope::Default)
         .await
         .expect("get");
     seen.extend(order_scales("get", got.order.as_ref().expect("order")));
@@ -254,7 +255,7 @@ async fn order_and_trigger_reads_carry_the_catalog_base_scale() {
 
     let order = client
         .orders
-        .get(OrderKey::OrderId("9".into()), SubAccountScope::Default)
+        .get(OrderKey::OrderId(format_id(9)), SubAccountScope::Default)
         .await
         .unwrap()
         .order

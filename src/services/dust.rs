@@ -202,7 +202,14 @@ impl DustConversionService {
         )
         .await?
         .into_owned();
-        dust_conversion_from_get_response(&resp)
+        let conversion = dust_conversion_from_get_response(&resp)?;
+        crate::codecs::decode::require_echoed_id(
+            "GetDustConversion",
+            "conversion_id",
+            &conversion.conversion_id,
+            conversion_id,
+        )?;
+        Ok(conversion)
     }
 
     /// One page of the account's conversions, newest first. `limit` 0 asks

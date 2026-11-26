@@ -128,7 +128,9 @@ impl ChangelogService {
         let resp = unary::await_public(self.client().get_post(req))
             .await?
             .into_owned();
-        changelog_post_from_proto(&resp)
+        let post = changelog_post_from_proto(&resp)?;
+        crate::codecs::decode::require_echoed_id("GetPost", "slug", &post.summary.slug, slug)?;
+        Ok(post)
     }
 
     /// One page of this environment's deployment groups, newest deployment
@@ -170,7 +172,14 @@ impl ChangelogService {
         let resp = unary::await_public(self.client().get_deployment_group(req))
             .await?
             .into_owned();
-        changelog_deployment_group_from_proto(&resp)
+        let group = changelog_deployment_group_from_proto(&resp)?;
+        crate::codecs::decode::require_echoed_id(
+            "GetDeploymentGroup",
+            "slug",
+            &group.summary.slug,
+            slug,
+        )?;
+        Ok(group)
     }
 
     /// One page of individual changes across posts.

@@ -64,7 +64,18 @@ impl ApiKeysService {
         )
         .await?
         .into_owned();
-        api_key_from_get_proto(&resp)
+        let key = api_key_from_get_proto(&resp)?;
+        // A read by ID must answer the key it asked for. The server reads the
+        // key ID with surrounding whitespace trimmed.
+        if let Some(key) = &key {
+            crate::codecs::decode::require_echoed_id(
+                "GetApiKey",
+                "key_id",
+                &key.key_id,
+                key_id.trim(),
+            )?;
+        }
+        Ok(key)
     }
 
     /// Generate a local Ed25519 keypair for API key creation (secret never sent to API).

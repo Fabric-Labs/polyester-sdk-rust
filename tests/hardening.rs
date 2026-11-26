@@ -81,6 +81,8 @@ mod profit_and_loss;
 mod public_id_strings;
 #[path = "public_reads_keyless/mod.rs"]
 mod public_reads_keyless;
+#[path = "read_by_id_echo/mod.rs"]
+mod read_by_id_echo;
 #[path = "read_model_retention/mod.rs"]
 mod read_model_retention;
 #[path = "readable_error_bodies/mod.rs"]
@@ -5233,7 +5235,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     let err = api_key_client(&http)
         .orders
         .wait_batch_replace(
-            "2",
+            &polyester::codecs::format_uint64_id(4242),
             SubAccountScope::Default,
             Some(Duration::from_millis(300)),
         )
@@ -6247,6 +6249,7 @@ async fn l2_execution_pages_pin_the_returned_generation() {
         connect_proto_ok(&GetOrderResponse {
             order: Order {
                 order_id: 9,
+                client_order_id: "reused-client-id".into(),
                 symbol_id: 1,
                 cum_qty_scaled: 100,
                 inherited_cum_qty_scaled: 40,
@@ -8103,7 +8106,10 @@ async fn l2_snapshot_refresh_retries_gateway_504() {
             async move {
                 client
                     .orders
-                    .get_batch_replace_status("4242", SubAccountScope::Default)
+                    .get_batch_replace_status(
+                        &polyester::codecs::format_uint64_id(4242),
+                        SubAccountScope::Default,
+                    )
                     .await
             }
             .boxed()
@@ -8340,7 +8346,7 @@ async fn l2_retry_contract_read_recovery() {
                     client
                         .orders
                         .wait_batch_replace(
-                            "4242",
+                            &polyester::codecs::format_uint64_id(4242),
                             SubAccountScope::Default,
                             Some(Duration::from_secs(2)),
                         )
@@ -8357,7 +8363,10 @@ async fn l2_retry_contract_read_recovery() {
                             async move {
                                 client
                                     .orders
-                                    .get_batch_replace_status("4242", SubAccountScope::Default)
+                                    .get_batch_replace_status(
+                                        &polyester::codecs::format_uint64_id(4242),
+                                        SubAccountScope::Default,
+                                    )
                                     .await
                             }
                             .boxed()

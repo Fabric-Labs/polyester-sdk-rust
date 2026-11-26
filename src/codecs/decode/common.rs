@@ -29,6 +29,24 @@ pub(crate) fn require_str_id(operation: &str, field: &str, id: &str) -> crate::e
     Ok(())
 }
 
+/// Refuse a read by ID whose reply names another object than the one
+/// requested: it breaks the response contract, however well formed the
+/// reply is. `requested` is the ID as the request sent it.
+pub(crate) fn require_echoed_id(
+    operation: &str,
+    field: &str,
+    replied: &str,
+    requested: &str,
+) -> crate::errors::Result<()> {
+    if replied != requested {
+        return Err(crate::errors::Error::response_contract(
+            operation,
+            format!("reply names {field} {replied:?}, not the requested {requested:?}"),
+        ));
+    }
+    Ok(())
+}
+
 /// A `GetZippedAssetSupplyGroup` answer as [`ApiData`], refused with
 /// `Error::ResponseContract` without its group ID.
 pub fn zipped_asset_supply_group_from_proto(

@@ -6,6 +6,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer};
 use buffa::Message as _;
+use polyester::codecs::scalars::format_id;
 use polyester::models::SubAccountScope;
 use polyester::models::{
     CreateOrderType, CreateSide, CreateTriggerParams, CreateTriggerType, ListTriggersOpts,
@@ -246,7 +247,7 @@ async fn trigger_reads_report_the_twap_and_trailing_caps() {
         let got = s
             .client
             .triggers
-            .get_by_id("3", SubAccountScope::Default)
+            .get_by_id(&format_id(3), SubAccountScope::Default)
             .await
             .expect("get")
             .expect("trigger");
@@ -282,7 +283,7 @@ async fn trigger_reads_and_stream_name_the_pair() {
             let got = s
                 .client
                 .triggers
-                .get_by_id("3", SubAccountScope::Default)
+                .get_by_id(&format_id(3), SubAccountScope::Default)
                 .await
                 .unwrap()
                 .unwrap();

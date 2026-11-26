@@ -167,7 +167,14 @@ impl StatementsService {
         })
         .await?
         .into_owned();
-        statement_export_from_get_response(&resp)
+        let export = statement_export_from_get_response(&resp)?;
+        crate::codecs::decode::require_echoed_id(
+            "GetStatementExport",
+            "export_id",
+            &export.export_id,
+            export_id,
+        )?;
+        Ok(export)
     }
 
     /// A URL that downloads a `ready` export's file without credentials, for
@@ -224,7 +231,14 @@ impl StatementsService {
         )
         .await?
         .into_owned();
-        statement_export_from_cancel_response(&resp)
+        let export = statement_export_from_cancel_response(&resp)?;
+        crate::codecs::decode::require_echoed_id(
+            "CancelStatementExport",
+            "export_id",
+            &export.export_id,
+            export_id,
+        )?;
+        Ok(export)
     }
 
     /// One page of an account's statement exports, newest first, with the
