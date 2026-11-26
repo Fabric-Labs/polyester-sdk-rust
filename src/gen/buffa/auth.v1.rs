@@ -336,6 +336,16 @@ pub enum PolicyAction {
     /// orders. Stopping only reduces what a bot does: it never deploys a bot,
     /// changes its money rules or moves funds. Main-account permission.
     STOP_STRATEGIES = 50i32,
+    /// Allow forking public community strategies: copying a listing's
+    /// published version into a new strategy of the main account. It never
+    /// deploys, publishes or runs a bot, and moves no funds. Main-account
+    /// permission.
+    FORK_STRATEGIES = 51i32,
+    /// Allow returning a stopped bot's available balances to the main account
+    /// (strategies.v1 ReturnBotFunds). The main account is the only
+    /// destination: it never moves funds anywhere else, and never takes what
+    /// an open order's hold reserves. Main-account permission.
+    RETURN_STRATEGY_BOT_FUNDS = 52i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -479,6 +489,12 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::STOP_STRATEGIES`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const StopStrategies: Self = Self::STOP_STRATEGIES;
+    ///Idiomatic alias for [`Self::FORK_STRATEGIES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ForkStrategies: Self = Self::FORK_STRATEGIES;
+    ///Idiomatic alias for [`Self::RETURN_STRATEGY_BOT_FUNDS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnStrategyBotFunds: Self = Self::RETURN_STRATEGY_BOT_FUNDS;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -621,6 +637,8 @@ impl ::buffa::Enumeration for PolicyAction {
             48i32 => ::core::option::Option::Some(Self::PROPOSE_STRATEGY_DEPLOY),
             49i32 => ::core::option::Option::Some(Self::READ_PNL),
             50i32 => ::core::option::Option::Some(Self::STOP_STRATEGIES),
+            51i32 => ::core::option::Option::Some(Self::FORK_STRATEGIES),
+            52i32 => ::core::option::Option::Some(Self::RETURN_STRATEGY_BOT_FUNDS),
             _ => ::core::option::Option::None,
         }
     }
@@ -676,6 +694,8 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::PROPOSE_STRATEGY_DEPLOY => "PROPOSE_STRATEGY_DEPLOY",
             Self::READ_PNL => "READ_PNL",
             Self::STOP_STRATEGIES => "STOP_STRATEGIES",
+            Self::FORK_STRATEGIES => "FORK_STRATEGIES",
+            Self::RETURN_STRATEGY_BOT_FUNDS => "RETURN_STRATEGY_BOT_FUNDS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -773,6 +793,10 @@ impl ::buffa::Enumeration for PolicyAction {
             }
             "READ_PNL" => ::core::option::Option::Some(Self::READ_PNL),
             "STOP_STRATEGIES" => ::core::option::Option::Some(Self::STOP_STRATEGIES),
+            "FORK_STRATEGIES" => ::core::option::Option::Some(Self::FORK_STRATEGIES),
+            "RETURN_STRATEGY_BOT_FUNDS" => {
+                ::core::option::Option::Some(Self::RETURN_STRATEGY_BOT_FUNDS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -825,6 +849,8 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::PROPOSE_STRATEGY_DEPLOY,
             Self::READ_PNL,
             Self::STOP_STRATEGIES,
+            Self::FORK_STRATEGIES,
+            Self::RETURN_STRATEGY_BOT_FUNDS,
         ]
     }
 }
@@ -22711,6 +22737,19 @@ pub struct Subaccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub idempotency_key: ::buffa::alloc::string::String,
+    /// True once a strategy bot has held this sub-account; never cleared, also
+    /// after the bot's access ends or the sub-account's policy is cleared. Use it
+    /// to keep bot sub-accounts out of funding-source choices. Real-time updates
+    /// carry it too.
+    ///
+    /// Field 18: `strategy_bot`
+    #[serde(
+        rename = "strategyBot",
+        alias = "strategy_bot",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub strategy_bot: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -22738,6 +22777,7 @@ impl ::core::fmt::Debug for Subaccount {
             .field("revision", &self.revision)
             .field("removed", &self.removed)
             .field("idempotency_key", &self.idempotency_key)
+            .field("strategy_bot", &self.strategy_bot)
             .finish()
     }
 }
@@ -22850,6 +22890,9 @@ impl ::buffa::Message for Subaccount {
                 += 2u32
                     + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
         }
+        if self.strategy_bot {
+            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -22921,6 +22964,9 @@ impl ::buffa::Message for Subaccount {
         }
         if !self.idempotency_key.is_empty() {
             ::buffa::types::put_string_field(17u32, &self.idempotency_key, buf);
+        }
+        if self.strategy_bot {
+            ::buffa::types::put_bool_field(18u32, self.strategy_bot, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -23065,6 +23111,13 @@ impl ::buffa::Message for Subaccount {
                 )?;
                 ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.strategy_bot = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -23090,6 +23143,7 @@ impl ::buffa::Message for Subaccount {
         self.revision = 0u64;
         self.removed = false;
         self.idempotency_key.clear();
+        self.strategy_bot = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -49436,8 +49490,10 @@ pub enum AuthErrorCode {
     /// EndStrategyBotAccess ends the bot's access, no other call changes the
     /// bot's key or its policy, or the sub-account's policy, keys, members or
     /// invites, or enables the sub-account again. Disabling the sub-account,
-    /// renaming it and removing its members stay available. HTTP 412,
-    /// AUTH_STRATEGY_BOT_MANAGED.
+    /// renaming it and removing its members stay available. After the bot's
+    /// access ends, its sub-account keeps its trading-only policy: no call
+    /// attaches another policy to it or edits the one it holds, and its policy
+    /// can only be cleared. HTTP 412, AUTH_STRATEGY_BOT_MANAGED.
     AUTH_STRATEGY_BOT_MANAGED = 74i32,
     /// The sub-account cannot be given to a strategy bot: it is disabled,
     /// already a bot's or a QuickSwap broker vault, or has a policy, an API key
@@ -93682,6 +93738,13 @@ pub mod __buffa {
             ///
             /// Field 17: `idempotency_key`
             pub idempotency_key: &'a str,
+            /// True once a strategy bot has held this sub-account; never cleared, also
+            /// after the bot's access ends or the sub-account's policy is cleared. Use it
+            /// to keep bot sub-accounts out of funding-source choices. Real-time updates
+            /// carry it too.
+            ///
+            /// Field 18: `strategy_bot`
+            pub strategy_bot: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountView<'a> {
@@ -93864,6 +93927,13 @@ pub mod __buffa {
                         )?;
                         view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.strategy_bot = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -93913,6 +93983,7 @@ pub mod __buffa {
                     revision: self.revision,
                     removed: self.removed,
                     idempotency_key: self.idempotency_key.to_string(),
+                    strategy_bot: self.strategy_bot,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -94010,6 +94081,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.idempotency_key)
                                 as u32;
                 }
+                if self.strategy_bot {
+                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -94094,6 +94168,9 @@ pub mod __buffa {
                 }
                 if !self.idempotency_key.is_empty() {
                     ::buffa::types::put_string_field(17u32, &self.idempotency_key, buf);
+                }
+                if self.strategy_bot {
+                    ::buffa::types::put_bool_field(18u32, self.strategy_bot, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -94202,6 +94279,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
                     __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                if self.strategy_bot {
+                    __map.serialize_entry("strategyBot", &self.strategy_bot)?;
                 }
                 __map.end()
             }
@@ -94441,6 +94521,16 @@ pub mod __buffa {
             #[must_use]
             pub fn idempotency_key(&self) -> &'_ str {
                 self.0.reborrow().idempotency_key
+            }
+            /// True once a strategy bot has held this sub-account; never cleared, also
+            /// after the bot's access ends or the sub-account's policy is cleared. Use it
+            /// to keep bot sub-accounts out of funding-source choices. Real-time updates
+            /// carry it too.
+            ///
+            /// Field 18: `strategy_bot`
+            #[must_use]
+            pub fn strategy_bot(&self) -> bool {
+                self.0.reborrow().strategy_bot
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubaccountView<'static>>>

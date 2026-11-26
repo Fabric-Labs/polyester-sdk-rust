@@ -560,6 +560,10 @@ pub enum ErrorCode {
     ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE = 17i32,
     /// The statement export was canceled and has no file.
     ERROR_CODE_STATEMENT_EXPORT_CANCELED = 18i32,
+    /// A balances statement's period starts before the earliest instant whose
+    /// balances the account history holds; ErrorDetail.history_available_from
+    /// is that instant.
+    ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE = 19i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -619,6 +623,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const StatementExportCanceled: Self = Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StatementHistoryUnavailable: Self = Self::ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -755,6 +762,11 @@ impl ::buffa::Enumeration for ErrorCode {
             18i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED)
             }
+            19i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -797,6 +809,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED => {
                 "ERROR_CODE_STATEMENT_EXPORT_CANCELED"
+            }
+            Self::ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE => {
+                "ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE"
             }
         }
     }
@@ -865,6 +880,11 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_STATEMENT_EXPORT_CANCELED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED)
             }
+            "ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -889,6 +909,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_STATEMENT_EXPORT_FAILED,
             Self::ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE,
             Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED,
+            Self::ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
         ]
     }
 }
@@ -6852,13 +6873,29 @@ pub struct ErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ErrorCode>,
+    /// Earliest instant whose balances the account history holds. Set only
+    /// with ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE; REST sends it as the
+    /// problem's `historyAvailableFrom` member.
+    ///
+    /// Field 2: `history_available_from`
+    #[serde(
+        rename = "historyAvailableFrom",
+        alias = "history_available_from",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub history_available_from: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ErrorDetail {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ErrorDetail").field("code", &self.code).finish()
+        f.debug_struct("ErrorDetail")
+            .field("code", &self.code)
+            .field("history_available_from", &self.history_available_from)
+            .finish()
     }
 }
 impl ErrorDetail {
@@ -6882,7 +6919,7 @@ impl ::buffa::Message for ErrorDetail {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -6892,12 +6929,20 @@ impl ::buffa::Message for ErrorDetail {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if self.history_available_from.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.history_available_from.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -6907,6 +6952,10 @@ impl ::buffa::Message for ErrorDetail {
             if val != 0 {
                 ::buffa::types::put_int32_field(1u32, val, buf);
             }
+        }
+        if self.history_available_from.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.history_available_from.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6928,6 +6977,17 @@ impl ::buffa::Message for ErrorDetail {
                 )?;
                 self.code = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.history_available_from.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6937,6 +6997,7 @@ impl ::buffa::Message for ErrorDetail {
     }
     fn clear(&mut self) {
         self.code = ::buffa::EnumValue::from(0);
+        self.history_available_from = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6969,6 +7030,175 @@ pub const __ERROR_DETAIL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     from_json: ::buffa::type_registry::any_from_json::<ErrorDetail>,
     is_wkt: false,
 };
+/// StatementExportType is the kind of file a statement export produces.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum StatementExportType {
+    /// Never returned; refused in a request.
+    STATEMENT_EXPORT_TYPE_UNSPECIFIED = 0i32,
+    /// Account statement: one row per entry, account bucket and asset, with the
+    /// entry's net amount, the fees paid and the balance after it.
+    ACCOUNT_STATEMENT = 1i32,
+    /// Ledger: one row per ledger movement, each transfer leg on its own, with
+    /// its transfer reason, side, counterparty and the balance after it.
+    LEDGER = 2i32,
+    /// Balances: one row per account bucket and asset, with its balance at the
+    /// start and at the end of the period and the period's credits and debits.
+    /// Its period must start inside the account history; see
+    /// StatementExport.history_available_from.
+    BALANCES = 3i32,
+}
+impl StatementExportType {
+    ///Idiomatic alias for [`Self::STATEMENT_EXPORT_TYPE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StatementExportTypeUnspecified: Self = Self::STATEMENT_EXPORT_TYPE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ACCOUNT_STATEMENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountStatement: Self = Self::ACCOUNT_STATEMENT;
+    ///Idiomatic alias for [`Self::LEDGER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Ledger: Self = Self::LEDGER;
+    ///Idiomatic alias for [`Self::BALANCES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Balances: Self = Self::BALANCES;
+}
+impl ::core::default::Default for StatementExportType {
+    fn default() -> Self {
+        Self::STATEMENT_EXPORT_TYPE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for StatementExportType {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for StatementExportType {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = StatementExportType;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(StatementExportType)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<StatementExportType, E> {
+                <StatementExportType as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<StatementExportType, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <StatementExportType as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<StatementExportType, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <StatementExportType as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<StatementExportType, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for StatementExportType {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for StatementExportType {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::STATEMENT_EXPORT_TYPE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ACCOUNT_STATEMENT),
+            2i32 => ::core::option::Option::Some(Self::LEDGER),
+            3i32 => ::core::option::Option::Some(Self::BALANCES),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::STATEMENT_EXPORT_TYPE_UNSPECIFIED => {
+                "STATEMENT_EXPORT_TYPE_UNSPECIFIED"
+            }
+            Self::ACCOUNT_STATEMENT => "ACCOUNT_STATEMENT",
+            Self::LEDGER => "LEDGER",
+            Self::BALANCES => "BALANCES",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "STATEMENT_EXPORT_TYPE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::STATEMENT_EXPORT_TYPE_UNSPECIFIED)
+            }
+            "ACCOUNT_STATEMENT" => ::core::option::Option::Some(Self::ACCOUNT_STATEMENT),
+            "LEDGER" => ::core::option::Option::Some(Self::LEDGER),
+            "BALANCES" => ::core::option::Option::Some(Self::BALANCES),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::STATEMENT_EXPORT_TYPE_UNSPECIFIED,
+            Self::ACCOUNT_STATEMENT,
+            Self::LEDGER,
+            Self::BALANCES,
+        ]
+    }
+}
 /// StatementExportStatus is where a statement export is.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -7194,6 +7424,11 @@ pub enum StatementExportFailureReason {
     STATEMENT_EXPORT_FAILURE_REASON_TOO_LARGE = 1i32,
     /// The file could not be produced in time. Create a new export.
     STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE = 2i32,
+    /// A BALANCES export's period starts before the earliest instant whose
+    /// balances the account history holds, which moved later after the export
+    /// was created. history_available_from is that instant: create a new
+    /// export that starts at or after it.
+    STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE = 3i32,
 }
 impl StatementExportFailureReason {
     ///Idiomatic alias for [`Self::STATEMENT_EXPORT_FAILURE_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -7205,6 +7440,9 @@ impl StatementExportFailureReason {
     ///Idiomatic alias for [`Self::STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Unavailable: Self = Self::STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const HistoryUnavailable: Self = Self::STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE;
 }
 impl ::core::default::Default for StatementExportFailureReason {
     fn default() -> Self {
@@ -7320,6 +7558,11 @@ impl ::buffa::Enumeration for StatementExportFailureReason {
                     Self::STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE,
                 )
             }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -7336,6 +7579,9 @@ impl ::buffa::Enumeration for StatementExportFailureReason {
             }
             Self::STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE => {
                 "STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE"
+            }
+            Self::STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE => {
+                "STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE"
             }
         }
     }
@@ -7356,6 +7602,11 @@ impl ::buffa::Enumeration for StatementExportFailureReason {
                     Self::STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE,
                 )
             }
+            "STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -7364,20 +7615,24 @@ impl ::buffa::Enumeration for StatementExportFailureReason {
             Self::STATEMENT_EXPORT_FAILURE_REASON_UNSPECIFIED,
             Self::STATEMENT_EXPORT_FAILURE_REASON_TOO_LARGE,
             Self::STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE,
+            Self::STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
         ]
     }
 }
-/// StatementExport is a whole-period account statement produced in the
-/// background as one CSV file.
+/// StatementExport is a whole-period account statement, ledger or balances
+/// file produced in the background as one CSV file.
 ///
 /// The file is RFC 4180 CSV in UTF-8 with CRLF line endings: the header row,
-/// then every row of the period up to complete_through, oldest first. A period
-/// without movements yields the header row alone. Each row is the effect of
-/// one entry on one account bucket in one asset. An entry is one ledger
-/// operation, such as a trade with its fees, a deposit, a withdrawal step or an
-/// internal transfer.
+/// then the rows of the period up to complete_through. ACCOUNT_STATEMENT and
+/// LEDGER rows come oldest first, and a period without movements yields the
+/// header row alone. Every type reads the same ledger movements of the
+/// account; type sets the file's rows and columns.
 ///
-/// Columns, in order:
+/// An ACCOUNT_STATEMENT row is the effect of one entry on one account bucket
+/// in one asset. An entry is one ledger operation, such as a trade with its
+/// fees, a deposit, a withdrawal step or an internal transfer.
+///
+/// ACCOUNT_STATEMENT columns, in order:
 /// - `time`: entry time, RFC 3339 in UTC with microseconds, for example
 ///   `2026-11-12T19:52:07.734123Z`.
 /// - `entry_id`: entry identifier, an unsigned 128-bit integer as a decimal
@@ -7404,7 +7659,64 @@ impl ::buffa::Enumeration for StatementExportFailureReason {
 ///   match ID for trades; empty when unavailable.
 /// - `flow_id`: public lifecycle flow ID when the entry belongs to a chain
 ///   lifecycle flow, such as a deposit, a withdrawal or an internal transfer,
-///   as LedgerReadService.ListTransfers returns it; empty otherwise.
+///   linked before the export was created; empty otherwise. A flow linked
+///   later, which LedgerReadService.ListTransfers then shows, is not in the
+///   file: a new export shows it.
+///
+/// A LEDGER row is one ledger movement: one transfer leg on the account,
+/// as LedgerReadService.ListTransfers returns it. A trade's settlement is
+/// several rows, such as its base and quote legs and each fee.
+///
+/// LEDGER columns, in order:
+/// - `time`: transfer time, RFC 3339 in UTC with microseconds.
+/// - `transfer_id`: transfer identifier, an unsigned 128-bit integer as a
+///   decimal string, as LedgerReadService.ListTransfers returns it. With
+///   `account` and `side` it identifies the row.
+/// - `account`: account bucket, `funding` or `trading`.
+/// - `asset`: asset symbol.
+/// - `type`: transfer reason, such as `trade_base`, `trade_quote`,
+///   `maker_fee`, `taker_fee`, `rebate`, `deposit`, `withdraw`,
+///   `internal_transfer` or `funding_to_trading`.
+/// - `side`: `debit` when the movement takes from the account bucket,
+///   `credit` when it adds to it.
+/// - `amount`: signed balance change in whole units of the asset: negative
+///   for a debit, positive for a credit.
+/// - `counterparty`: kind of the transfer's other side: `funding_account`,
+///   `trading_account`, `external_address`, `private_counterparty`,
+///   `fee_account` or `system_account`; empty when unknown.
+/// - `balance`: account bucket balance in the asset after the movement, in
+///   whole units of the asset. For consecutive rows of the same bucket and
+///   asset, each balance equals the previous balance plus `amount`.
+/// - `link_id`: correlation ID shared by related transfer legs, the trade's
+///   match ID for trades; empty when unavailable.
+/// - `flow_id`: public lifecycle flow ID when the transfer belongs to a chain
+///   lifecycle flow linked before the export was created; empty otherwise,
+///   as for `flow_id` of an account statement.
+///
+/// A BALANCES row is one account bucket in one asset over the period: its
+/// balance at start_time, the period's ledger movements on it, and its
+/// balance at complete_through. Rows come sorted by `account`, then `asset`.
+/// A bucket and asset with a zero balance at both ends and no movement has no
+/// row, so an account without any yields the header row alone. The period
+/// must start at or after the earliest instant whose balances the account
+/// history holds: an earlier start is refused when the export is created
+/// (CreateStatementExport) and fails the export if that instant moves later
+/// before the file is produced.
+///
+/// BALANCES columns, in order:
+/// - `account`: account bucket, `funding` or `trading`.
+/// - `asset`: asset symbol.
+/// - `opening_balance`: balance of the bucket in the asset at start_time.
+/// - `credits`: total the period's movements added to the bucket, the sum of
+///   the LEDGER file's credit rows of that bucket and asset; `0` when none.
+/// - `debits`: total the period's movements took from the bucket, the sum of
+///   the LEDGER file's debit rows of that bucket and asset, as a positive
+///   amount; `0` when none.
+/// - `closing_balance`: balance of the bucket in the asset at
+///   complete_through. Every row reconciles: `closing_balance` equals
+///   `opening_balance` plus `credits` minus `debits`.
+/// - `movements`: number of the period's ledger movements on the bucket in
+///   the asset.
 ///
 /// Amounts are exact decimal strings with up to 18 fractional digits and no
 /// trailing zeros.
@@ -7416,7 +7728,8 @@ impl ::buffa::Enumeration for StatementExportFailureReason {
 /// - An authenticated `GET /v1/statements/exports/{exportId}/file` returns the
 ///   file as `text/csv` and supports HTTP `Range` requests.
 ///
-/// Both save the file as `statement-<exportId>.csv`. Before the file is READY
+/// Both save the file as `account-statement-<exportId>.csv`,
+/// `ledger-<exportId>.csv` or `balances-<exportId>.csv`, by type. Before the file is READY
 /// both answer FAILED_PRECONDITION with STATEMENT_EXPORT_NOT_READY, REST
 /// `409 Conflict`; a FAILED export answers STATEMENT_EXPORT_FAILED, REST `409`;
 /// an EXPIRED export, or a file already deleted, answers
@@ -7577,6 +7890,28 @@ pub struct StatementExport {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub failure_reason: ::buffa::EnumValue<StatementExportFailureReason>,
+    /// Kind of file the export produces, as requested.
+    ///
+    /// Field 15: `type`
+    #[serde(
+        rename = "type",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub r#type: ::buffa::EnumValue<StatementExportType>,
+    /// Earliest instant whose balances the account history holds, which a
+    /// BALANCES export's period must start at or after. Set only when
+    /// failure_reason is STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE.
+    ///
+    /// Field 16: `history_available_from`
+    #[serde(
+        rename = "historyAvailableFrom",
+        alias = "history_available_from",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub history_available_from: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7598,6 +7933,8 @@ impl ::core::fmt::Debug for StatementExport {
             .field("ready_at", &self.ready_at)
             .field("expires_at", &self.expires_at)
             .field("failure_reason", &self.failure_reason)
+            .field("type", &self.r#type)
+            .field("history_available_from", &self.history_available_from)
             .finish()
     }
 }
@@ -7715,6 +8052,20 @@ impl ::buffa::Message for StatementExport {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        {
+            let val = self.r#type.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.history_available_from.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.history_available_from.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7778,6 +8129,16 @@ impl ::buffa::Message for StatementExport {
             if val != 0 {
                 ::buffa::types::put_int32_field(14u32, val, buf);
             }
+        }
+        {
+            let val = self.r#type.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(15u32, val, buf);
+            }
+        }
+        if self.history_available_from.is_set() {
+            ::buffa::types::put_len_delimited_header(16u32, __cache.consume_next(), buf);
+            self.history_available_from.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7920,6 +8281,26 @@ impl ::buffa::Message for StatementExport {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.r#type = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.history_available_from.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7942,6 +8323,8 @@ impl ::buffa::Message for StatementExport {
         self.ready_at = ::buffa::MessageField::none();
         self.expires_at = ::buffa::MessageField::none();
         self.failure_reason = ::buffa::EnumValue::from(0);
+        self.r#type = ::buffa::EnumValue::from(0);
+        self.history_available_from = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7974,9 +8357,9 @@ pub const __STATEMENT_EXPORT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     from_json: ::buffa::type_registry::any_from_json::<StatementExport>,
     is_wkt: false,
 };
-/// CreateStatementExportRequest asks for a whole-period statement file of one
-/// account. The period is at most 366 days long; a longer or empty period is
-/// INVALID_ARGUMENT.
+/// CreateStatementExportRequest asks for a whole-period account statement,
+/// ledger or balances file of one account. The period is at most 366 days long; a longer or empty
+/// period is INVALID_ARGUMENT.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -8038,6 +8421,17 @@ pub struct CreateStatementExportRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub idempotency_key: ::buffa::alloc::string::String,
+    /// Kind of file to produce; required. Every type has the same period,
+    /// asset filter, limits and lifecycle; a BALANCES period must also start
+    /// inside the account history.
+    ///
+    /// Field 6: `type`
+    #[serde(
+        rename = "type",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub r#type: ::buffa::EnumValue<StatementExportType>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8050,6 +8444,7 @@ impl ::core::fmt::Debug for CreateStatementExportRequest {
             .field("end_time", &self.end_time)
             .field("asset_id", &self.asset_id)
             .field("idempotency_key", &self.idempotency_key)
+            .field("type", &self.r#type)
             .finish()
     }
 }
@@ -8114,6 +8509,12 @@ impl ::buffa::Message for CreateStatementExportRequest {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
         }
+        {
+            let val = self.r#type.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8140,6 +8541,12 @@ impl ::buffa::Message for CreateStatementExportRequest {
         }
         if !self.idempotency_key.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.idempotency_key, buf);
+        }
+        {
+            let val = self.r#type.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(6u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8199,6 +8606,15 @@ impl ::buffa::Message for CreateStatementExportRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.r#type = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8212,6 +8628,7 @@ impl ::buffa::Message for CreateStatementExportRequest {
         self.end_time = ::buffa::MessageField::none();
         self.asset_id = 0u32;
         self.idempotency_key.clear();
+        self.r#type = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8804,7 +9221,9 @@ pub struct GetStatementExportDownloadUrlResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Name the download saves the file as, `statement-<exportId>.csv`.
+    /// Name the download saves the file as, `account-statement-<exportId>.csv`,
+    /// `ledger-<exportId>.csv` or `balances-<exportId>.csv`, by the export's
+    /// type.
     ///
     /// Field 3: `filename`
     #[serde(
@@ -20141,6 +20560,14 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// Earliest instant whose balances the account history holds. Set only
+            /// with ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE; REST sends it as the
+            /// problem's `historyAvailableFrom` member.
+            ///
+            /// Field 2: `history_available_from`
+            pub history_available_from: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -20183,6 +20610,31 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.history_available_from.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.history_available_from = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -20213,6 +20665,15 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ErrorDetail {
                     code: self.code,
+                    history_available_from: match self.history_available_from.as_option()
+                    {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -20223,7 +20684,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ErrorDetailView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -20233,13 +20694,21 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if self.history_available_from.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.history_available_from.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -20249,6 +20718,14 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(1u32, val, buf);
                     }
+                }
+                if self.history_available_from.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.history_available_from.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -20273,6 +20750,14 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.code) {
                     __map.serialize_entry("code", &self.code)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .history_available_from
+                        .as_option()
+                    {
+                        __map.serialize_entry("historyAvailableFrom", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -20375,6 +20860,19 @@ pub mod __buffa {
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
                 self.0.reborrow().code
             }
+            /// Earliest instant whose balances the account history holds. Set only
+            /// with ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE; REST sends it as the
+            /// problem's `historyAvailableFrom` member.
+            ///
+            /// Field 2: `history_available_from`
+            #[must_use]
+            pub fn history_available_from(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().history_available_from
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
         for ErrorDetailOwnedView {
@@ -20406,17 +20904,20 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// StatementExport is a whole-period account statement produced in the
-        /// background as one CSV file.
+        /// StatementExport is a whole-period account statement, ledger or balances
+        /// file produced in the background as one CSV file.
         ///
         /// The file is RFC 4180 CSV in UTF-8 with CRLF line endings: the header row,
-        /// then every row of the period up to complete_through, oldest first. A period
-        /// without movements yields the header row alone. Each row is the effect of
-        /// one entry on one account bucket in one asset. An entry is one ledger
-        /// operation, such as a trade with its fees, a deposit, a withdrawal step or an
-        /// internal transfer.
+        /// then the rows of the period up to complete_through. ACCOUNT_STATEMENT and
+        /// LEDGER rows come oldest first, and a period without movements yields the
+        /// header row alone. Every type reads the same ledger movements of the
+        /// account; type sets the file's rows and columns.
         ///
-        /// Columns, in order:
+        /// An ACCOUNT_STATEMENT row is the effect of one entry on one account bucket
+        /// in one asset. An entry is one ledger operation, such as a trade with its
+        /// fees, a deposit, a withdrawal step or an internal transfer.
+        ///
+        /// ACCOUNT_STATEMENT columns, in order:
         /// - `time`: entry time, RFC 3339 in UTC with microseconds, for example
         ///   `2026-11-12T19:52:07.734123Z`.
         /// - `entry_id`: entry identifier, an unsigned 128-bit integer as a decimal
@@ -20443,7 +20944,64 @@ pub mod __buffa {
         ///   match ID for trades; empty when unavailable.
         /// - `flow_id`: public lifecycle flow ID when the entry belongs to a chain
         ///   lifecycle flow, such as a deposit, a withdrawal or an internal transfer,
-        ///   as LedgerReadService.ListTransfers returns it; empty otherwise.
+        ///   linked before the export was created; empty otherwise. A flow linked
+        ///   later, which LedgerReadService.ListTransfers then shows, is not in the
+        ///   file: a new export shows it.
+        ///
+        /// A LEDGER row is one ledger movement: one transfer leg on the account,
+        /// as LedgerReadService.ListTransfers returns it. A trade's settlement is
+        /// several rows, such as its base and quote legs and each fee.
+        ///
+        /// LEDGER columns, in order:
+        /// - `time`: transfer time, RFC 3339 in UTC with microseconds.
+        /// - `transfer_id`: transfer identifier, an unsigned 128-bit integer as a
+        ///   decimal string, as LedgerReadService.ListTransfers returns it. With
+        ///   `account` and `side` it identifies the row.
+        /// - `account`: account bucket, `funding` or `trading`.
+        /// - `asset`: asset symbol.
+        /// - `type`: transfer reason, such as `trade_base`, `trade_quote`,
+        ///   `maker_fee`, `taker_fee`, `rebate`, `deposit`, `withdraw`,
+        ///   `internal_transfer` or `funding_to_trading`.
+        /// - `side`: `debit` when the movement takes from the account bucket,
+        ///   `credit` when it adds to it.
+        /// - `amount`: signed balance change in whole units of the asset: negative
+        ///   for a debit, positive for a credit.
+        /// - `counterparty`: kind of the transfer's other side: `funding_account`,
+        ///   `trading_account`, `external_address`, `private_counterparty`,
+        ///   `fee_account` or `system_account`; empty when unknown.
+        /// - `balance`: account bucket balance in the asset after the movement, in
+        ///   whole units of the asset. For consecutive rows of the same bucket and
+        ///   asset, each balance equals the previous balance plus `amount`.
+        /// - `link_id`: correlation ID shared by related transfer legs, the trade's
+        ///   match ID for trades; empty when unavailable.
+        /// - `flow_id`: public lifecycle flow ID when the transfer belongs to a chain
+        ///   lifecycle flow linked before the export was created; empty otherwise,
+        ///   as for `flow_id` of an account statement.
+        ///
+        /// A BALANCES row is one account bucket in one asset over the period: its
+        /// balance at start_time, the period's ledger movements on it, and its
+        /// balance at complete_through. Rows come sorted by `account`, then `asset`.
+        /// A bucket and asset with a zero balance at both ends and no movement has no
+        /// row, so an account without any yields the header row alone. The period
+        /// must start at or after the earliest instant whose balances the account
+        /// history holds: an earlier start is refused when the export is created
+        /// (CreateStatementExport) and fails the export if that instant moves later
+        /// before the file is produced.
+        ///
+        /// BALANCES columns, in order:
+        /// - `account`: account bucket, `funding` or `trading`.
+        /// - `asset`: asset symbol.
+        /// - `opening_balance`: balance of the bucket in the asset at start_time.
+        /// - `credits`: total the period's movements added to the bucket, the sum of
+        ///   the LEDGER file's credit rows of that bucket and asset; `0` when none.
+        /// - `debits`: total the period's movements took from the bucket, the sum of
+        ///   the LEDGER file's debit rows of that bucket and asset, as a positive
+        ///   amount; `0` when none.
+        /// - `closing_balance`: balance of the bucket in the asset at
+        ///   complete_through. Every row reconciles: `closing_balance` equals
+        ///   `opening_balance` plus `credits` minus `debits`.
+        /// - `movements`: number of the period's ledger movements on the bucket in
+        ///   the asset.
         ///
         /// Amounts are exact decimal strings with up to 18 fractional digits and no
         /// trailing zeros.
@@ -20455,7 +21013,8 @@ pub mod __buffa {
         /// - An authenticated `GET /v1/statements/exports/{exportId}/file` returns the
         ///   file as `text/csv` and supports HTTP `Range` requests.
         ///
-        /// Both save the file as `statement-<exportId>.csv`. Before the file is READY
+        /// Both save the file as `account-statement-<exportId>.csv`,
+        /// `ledger-<exportId>.csv` or `balances-<exportId>.csv`, by type. Before the file is READY
         /// both answer FAILED_PRECONDITION with STATEMENT_EXPORT_NOT_READY, REST
         /// `409 Conflict`; a FAILED export answers STATEMENT_EXPORT_FAILED, REST `409`;
         /// an EXPIRED export, or a file already deleted, answers
@@ -20550,6 +21109,18 @@ pub mod __buffa {
             /// Field 14: `failure_reason`
             pub failure_reason: ::buffa::EnumValue<
                 super::super::StatementExportFailureReason,
+            >,
+            /// Kind of file the export produces, as requested.
+            ///
+            /// Field 15: `type`
+            pub r#type: ::buffa::EnumValue<super::super::StatementExportType>,
+            /// Earliest instant whose balances the account history holds, which a
+            /// BALANCES export's period must start at or after. Set only when
+            /// failure_reason is STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE.
+            ///
+            /// Field 16: `history_available_from`
+            pub history_available_from: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -20796,6 +21367,40 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.r#type = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.history_available_from.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.history_available_from = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -20881,6 +21486,16 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     failure_reason: self.failure_reason,
+                    r#type: self.r#type,
+                    history_available_from: match self.history_available_from.as_option()
+                    {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -20980,6 +21595,20 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                {
+                    let val = self.r#type.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.history_available_from.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.history_available_from.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -21068,6 +21697,20 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(14u32, val, buf);
                     }
+                }
+                {
+                    let val = self.r#type.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(15u32, val, buf);
+                    }
+                }
+                if self.history_available_from.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        16u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.history_available_from.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -21179,6 +21822,17 @@ pub mod __buffa {
                     &self.failure_reason,
                 ) {
                     __map.serialize_entry("failureReason", &self.failure_reason)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.r#type) {
+                    __map.serialize_entry("type", &self.r#type)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .history_available_from
+                        .as_option()
+                    {
+                        __map.serialize_entry("historyAvailableFrom", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -21399,6 +22053,28 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::StatementExportFailureReason> {
                 self.0.reborrow().failure_reason
             }
+            /// Kind of file the export produces, as requested.
+            ///
+            /// Field 15: `type`
+            #[must_use]
+            pub fn r#type(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::StatementExportType> {
+                self.0.reborrow().r#type
+            }
+            /// Earliest instant whose balances the account history holds, which a
+            /// BALANCES export's period must start at or after. Set only when
+            /// failure_reason is STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE.
+            ///
+            /// Field 16: `history_available_from`
+            #[must_use]
+            pub fn history_available_from(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().history_available_from
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<StatementExportView<'static>>>
         for StatementExportOwnedView {
@@ -21430,9 +22106,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateStatementExportRequest asks for a whole-period statement file of one
-        /// account. The period is at most 366 days long; a longer or empty period is
-        /// INVALID_ARGUMENT.
+        /// CreateStatementExportRequest asks for a whole-period account statement,
+        /// ledger or balances file of one account. The period is at most 366 days long; a longer or empty
+        /// period is INVALID_ARGUMENT.
         #[derive(Clone, Debug, Default)]
         pub struct CreateStatementExportRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -21468,6 +22144,12 @@ pub mod __buffa {
             ///
             /// Field 5: `idempotency_key`
             pub idempotency_key: &'a str,
+            /// Kind of file to produce; required. Every type has the same period,
+            /// asset filter, limits and lifecycle; a BALANCES period must also start
+            /// inside the account history.
+            ///
+            /// Field 6: `type`
+            pub r#type: ::buffa::EnumValue<super::super::StatementExportType>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateStatementExportRequestView<'a> {
@@ -21574,6 +22256,15 @@ pub mod __buffa {
                         )?;
                         view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.r#type = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -21622,6 +22313,7 @@ pub mod __buffa {
                     },
                     asset_id: self.asset_id,
                     idempotency_key: self.idempotency_key.to_string(),
+                    r#type: self.r#type,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -21666,6 +22358,12 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.idempotency_key)
                                 as u32;
                 }
+                {
+                    let val = self.r#type.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -21701,6 +22399,12 @@ pub mod __buffa {
                 }
                 if !self.idempotency_key.is_empty() {
                     ::buffa::types::put_string_field(5u32, &self.idempotency_key, buf);
+                }
+                {
+                    let val = self.r#type.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(6u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -21753,6 +22457,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
                     __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.r#type) {
+                    __map.serialize_entry("type", &self.r#type)?;
                 }
                 __map.end()
             }
@@ -21905,6 +22612,17 @@ pub mod __buffa {
             #[must_use]
             pub fn idempotency_key(&self) -> &'_ str {
                 self.0.reborrow().idempotency_key
+            }
+            /// Kind of file to produce; required. Every type has the same period,
+            /// asset filter, limits and lifecycle; a BALANCES period must also start
+            /// inside the account history.
+            ///
+            /// Field 6: `type`
+            #[must_use]
+            pub fn r#type(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::StatementExportType> {
+                self.0.reborrow().r#type
             }
         }
         impl ::core::convert::From<
@@ -23167,7 +23885,9 @@ pub mod __buffa {
             pub expires_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Name the download saves the file as, `statement-<exportId>.csv`.
+            /// Name the download saves the file as, `account-statement-<exportId>.csv`,
+            /// `ledger-<exportId>.csv` or `balances-<exportId>.csv`, by the export's
+            /// type.
             ///
             /// Field 3: `filename`
             pub filename: &'a str,
@@ -23498,7 +24218,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().expires_at
             }
-            /// Name the download saves the file as, `statement-<exportId>.csv`.
+            /// Name the download saves the file as, `account-statement-<exportId>.csv`,
+            /// `ledger-<exportId>.csv` or `balances-<exportId>.csv`, by the export's
+            /// type.
             ///
             /// Field 3: `filename`
             #[must_use]

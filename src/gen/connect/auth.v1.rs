@@ -549,6 +549,8 @@ pub trait PolicyService: Send + Sync + 'static {
         >,
     > + Send;
     /// Create a new sub-account policy template (optionally attach to a sub-account).
+    /// A sub-account a strategy bot holds or held keeps the bot's trading-only
+    /// policy: FailedPrecondition with AUTH_STRATEGY_BOT_MANAGED.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -578,6 +580,8 @@ pub trait PolicyService: Send + Sync + 'static {
     /// of the main account's own sub-accounts without a session. The result can
     /// never allow a money-out action, and it can never lock, unlock or change a
     /// locked policy: PermissionDenied with AUTH_ADMIN_KEY_FORBIDDEN_TARGET.
+    /// A sub-account a strategy bot holds or held keeps the bot's trading-only
+    /// policy: FailedPrecondition with AUTH_STRATEGY_BOT_MANAGED.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -630,6 +634,10 @@ pub trait PolicyService: Send + Sync + 'static {
     /// session. It can never attach or apply a policy that allows a money-out
     /// action, replace a locked policy, or reach a sub-account shared with the
     /// main account: PermissionDenied with AUTH_ADMIN_KEY_FORBIDDEN_TARGET.
+    /// A sub-account a strategy bot holds or held keeps the bot's trading-only
+    /// policy: attaching or applying another is FailedPrecondition with
+    /// AUTH_STRATEGY_BOT_MANAGED. Once the bot's access has ended, its policy
+    /// can be cleared.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2945,8 +2953,9 @@ pub trait ApiKeyService: Send + Sync + 'static {
     /// sub-account to the account's own management. The revoked key is no
     /// longer a STRATEGY_BOT key, and the sub-account is released whatever state
     /// the key is in: a disabled sub-account stays disabled, and the account
-    /// manages it like any other. The sub-account keeps its policy until the
-    /// account changes it. The operation stays ended:
+    /// manages it like any other, except its policy: the sub-account keeps the
+    /// bot's trading-only policy, which the account can only clear
+    /// (AUTH_STRATEGY_BOT_MANAGED), and never widen. The operation stays ended:
     /// SetStrategyBotAccess under it afterwards, even a delayed original
     /// request, returns AlreadyExists with AUTH_STRATEGY_BOT_OPERATION_CONFLICT.
     /// Ending an operation that set no access, or one already ended, succeeds

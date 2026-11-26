@@ -39,6 +39,12 @@ pub struct SubAccount {
     pub owner_username: String,
     pub owner_avatar_url: String,
     pub owner_root_smart_account_address: String,
+    /// True once a strategy bot has held the sub-account. Never cleared,
+    /// also after the bot's access ends or its policy is cleared, so it does
+    /// not say which policy the sub-account has now (read
+    /// `subaccount_policy_id`). Leave such a sub-account out of the funding
+    /// sources offered for a new bot: a deploy funded from it is refused.
+    pub strategy_bot: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

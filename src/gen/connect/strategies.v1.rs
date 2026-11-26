@@ -230,6 +230,22 @@ pub type OwnedListBotLogsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListBotLogsResponseView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::ListBotLogsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ReturnBotFundsRequestView<'static>>`.
+pub type OwnedReturnBotFundsRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ReturnBotFundsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ReturnBotFundsResponseView<'static>>`.
+pub type OwnedReturnBotFundsResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ReturnBotFundsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetBotFundsReturnRequestView<'static>>`.
+pub type OwnedGetBotFundsReturnRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetBotFundsReturnResponseView<'static>>`.
+pub type OwnedGetBotFundsReturnResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<StopBotRequestView<'static>>`.
 pub type OwnedStopBotRequestView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::StopBotRequestView<'static>,
@@ -269,6 +285,26 @@ pub type OwnedListCommunityStrategiesResponseView = ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesResponseView<
         'static,
     >,
+>;
+///Shorthand for `OwnedView<ReportCommunityStrategyRequestView<'static>>`.
+pub type OwnedReportCommunityStrategyRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ReportCommunityStrategyResponseView<'static>>`.
+pub type OwnedReportCommunityStrategyResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ForkStrategyRequestView<'static>>`.
+pub type OwnedForkStrategyRequestView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ForkStrategyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ForkStrategyResponseView<'static>>`.
+pub type OwnedForkStrategyResponseView = ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ForkStrategyResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<GetCommunityStrategyRequestView<'static>>`.
 pub type OwnedGetCommunityStrategyRequestView = ::buffa::view::OwnedView<
@@ -834,6 +870,46 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ReturnBotFundsResponse>
+for crate::proto::strategies::v1::__buffa::view::ReturnBotFundsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ReturnBotFundsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ReturnBotFundsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::GetBotFundsReturnResponse>
+for crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::GetBotFundsReturnResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::strategies::v1::StopBotResponse>
 for crate::proto::strategies::v1::__buffa::view::StopBotResponseView<'_> {
     fn encode(
@@ -920,6 +996,54 @@ for ::buffa::view::OwnedView<
     crate::proto::strategies::v1::__buffa::view::ListCommunityStrategiesResponseView<
         'static,
     >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::ReportCommunityStrategyResponse,
+>
+for crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::strategies::v1::ReportCommunityStrategyResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ForkStrategyResponse>
+for crate::proto::strategies::v1::__buffa::view::ForkStrategyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::strategies::v1::ForkStrategyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::strategies::v1::__buffa::view::ForkStrategyResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -1195,6 +1319,24 @@ pub const STRATEGIES_SERVICE_LIST_BOT_LOGS_SPEC: ::connectrpc::Spec = ::connectr
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ReturnBotFunds` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_RETURN_BOT_FUNDS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/ReturnBotFunds",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBotFundsReturn` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_GET_BOT_FUNDS_RETURN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/GetBotFundsReturn",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `StopBot` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -1231,6 +1373,24 @@ pub const STRATEGIES_SERVICE_LIST_COMMUNITY_STRATEGIES_SPEC: ::connectrpc::Spec 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ReportCommunityStrategy` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_REPORT_COMMUNITY_STRATEGY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/ReportCommunityStrategy",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ForkStrategy` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STRATEGIES_SERVICE_FORK_STRATEGY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/strategies.v1.StrategiesService/ForkStrategy",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetCommunityStrategy` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -1242,29 +1402,35 @@ pub const STRATEGIES_SERVICE_GET_COMMUNITY_STRATEGY_SPEC: ::connectrpc::Spec = :
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// StrategiesService writes, tests and proposes the caller's trading bots and
 /// reads them. Bots belong to the caller's main account, and each runs on its
-/// own subaccount, created when the user deploys it. No call moves money,
-/// creates a subaccount or deploys a bot: deploying takes the user's MFA and
-/// wallet signature on the deploy page ProposeDeploy links. StopBot stops a
-/// bot, which only ever reduces what it does.
+/// own subaccount, created when the user deploys it. No call creates a
+/// subaccount or deploys a bot: deploying takes the user's MFA and wallet
+/// signature on the deploy page ProposeDeploy links. StopBot stops a bot,
+/// which only ever reduces what it does. The one call that moves money,
+/// ReturnBotFunds, moves a stopped bot's available balances only to its
+/// owner's own main account.
 /// Requests name no account, except the funding subaccount of ProposeDeploy:
 /// every call acts for the caller's main account, and StopBot also for a
 /// member of a bot's subaccount whose role may stop it. An
 /// API key must be scoped to the main account, and its policy must grant the
 /// call's permission: READ_STRATEGIES for reads, DRAFT_STRATEGIES to create,
 /// save, rename and delete strategies and test versions, PROPOSE_STRATEGY_DEPLOY to
-/// propose deploys, STOP_STRATEGIES to stop bots. An API key scoped to a subaccount is refused
+/// propose deploys, STOP_STRATEGIES to stop bots, FORK_STRATEGIES to fork community
+/// listings, RETURN_STRATEGY_BOT_FUNDS to return a stopped bot's funds. An API
+/// key scoped to a subaccount is refused
 /// (PERMISSION_DENIED, AUTH_API_KEY_ACCESS_DENIED) even when its policy grants
 /// the permission. GetStrategyReference, ListStrategyTemplates,
 /// ListCommunityStrategies and GetCommunityStrategy need no credentials.
-/// PublishStrategyVersion and UnpublishStrategy take the user's own session:
-/// publishing makes a strategy's code public, so only the user does it, on
-/// the website. A session a connected app holds on the user's behalf makes
+/// PublishStrategyVersion, UnpublishStrategy and ReportCommunityStrategy take
+/// the user's own session: publishing makes a strategy's code public, and a
+/// report is the user's own, so only the user does them, on the website. A session a connected app holds on the user's behalf makes
 /// the reads with the account:read scope, and creates, saves, renames and
 /// deletes strategies, tests versions, proposes deploys and stops bots with
 /// strategies:manage; a call outside the session's scopes refuses it
 /// (PERMISSION_DENIED, AUTH_SESSION_KIND_NOT_ALLOWED). No connected app
-/// deploys a bot: deploying takes the user's MFA and wallet signature.
-/// Every call is safe to retry.
+/// deploys a bot, forks a community listing or returns a bot's funds:
+/// deploying takes the user's MFA and wallet signature, forking starts on the
+/// website or with an API key, and a return is the owner's own. Every call is
+/// safe to retry.
 ///
 /// # Implementing handlers
 ///
@@ -1585,7 +1751,7 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// hasn't stopped, whether deployed from one of its proposals or running
     /// one of its revisions' versions, while a deploy proposal of it has
     /// neither expired, failed nor been deployed, and while its community
-    /// listing is public. Deleting never stops a bot. Proposals of the strategy
+    /// listing is public or held by moderation. Deleting never stops a bot. Proposals of the strategy
     /// stay, and show no strategy once it is deleted. Its unpublished listing
     /// stays unpublished, with the versions it published. A version only the
     /// strategy's revisions kept then expires like any other.
@@ -1593,7 +1759,8 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// - INVALID_ARGUMENT: malformed request.
     /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
     /// an unknown or already deleted one.
-    /// - FAILED_PRECONDITION: STRATEGY_IN_USE.
+    /// - FAILED_PRECONDITION: STRATEGY_IN_USE; LISTING_HELD while moderation
+    /// holds the strategy's listing.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
     /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
     /// does not grant DRAFT_STRATEGIES or the key is scoped to a subaccount.
@@ -1761,8 +1928,12 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// records the results. Each market's trading rules (tick, step, minimum
     /// quantity and minimum notional) are the exchange's when the version first
     /// runs, unless an example's `observe.markets` says otherwise, and the
-    /// record keeps them: a version always gets the same result, and a new
+    /// record keeps them: a version's recorded results stay the same, and a new
     /// version runs on the rules current then.
+    /// One exception: when a call takes longer than allowed or the runtime fails
+    /// on a run, its results are returned but not recorded, and the affected
+    /// example's error says to run the examples again. The next call runs them
+    /// again and counts toward the per-minute limit.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request.
     /// - NOT_FOUND: VERSION_NOT_FOUND.
@@ -1953,8 +2124,8 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// - NOT_FOUND: STRATEGY_NOT_FOUND, for another account's strategy as for
     /// an unknown one; REVISION_NOT_FOUND; or FUNDING_SUBACCOUNT_NOT_FOUND.
     /// - FAILED_PRECONDITION: VERSION_INVALID, SCENARIOS_FAILING,
-    /// BACKTEST_MISSING, MARKET_NOT_ALLOWED, INSUFFICIENT_FUNDS or
-    /// BOT_CAP_REACHED.
+    /// BACKTEST_MISSING, MARKET_NOT_ALLOWED, INSUFFICIENT_FUNDS,
+    /// FUNDING_SOURCE_IS_BOT or BOT_CAP_REACHED.
     /// - RESOURCE_EXHAUSTED: INDICATOR_SETTINGS_LIMIT_REACHED.
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original proposal stands.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
@@ -2264,6 +2435,88 @@ pub trait StrategiesService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// ReturnBotFunds returns every spendable balance of a stopped bot's
+    /// subaccount to the caller's main account, its owner's: the only
+    /// destination, so it needs no MFA. Only the bot's owner calls it, on its own
+    /// session or a root-scoped API key whose policy grants
+    /// RETURN_STRATEGY_BOT_FUNDS; an invited member of any role is refused as if
+    /// the bot didn't exist. It never takes what an open order's hold reserves:
+    /// while the orders a KEEP_ORDERS stop kept stay open, the return stays
+    /// RETURN_PROCESSING, naming what they hold (held), and returns it as they
+    /// fill or end. The return completes on its own; GetBotFundsReturn reads it.
+    /// An open return blocks nothing: the bot's subaccount can't be given to
+    /// another bot while anything stays on it, whatever the return.
+    /// Errors:
+    /// - FAILED_PRECONDITION: BOT_NOT_STOPPED while the bot may still trade
+    /// (deploying, running, paused, stopping). If the bot reads STOPPED but an
+    /// API-key call gets BOT_NOT_STOPPED because the bot's access is still
+    /// live, its owner must first call ReturnBotFunds from their own
+    /// interactive session to end that access; retrying with the API key alone
+    /// cannot. Afterwards a root-scoped API key with RETURN_STRATEGY_BOT_FUNDS
+    /// can return the funds; retry a recorded return with the same idempotency
+    /// key. NOTHING_TO_RETURN when the
+    /// subaccount has no available balance, or the return under the key ended
+    /// with nothing moved.
+    /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT when the key names another bot's
+    /// return.
+    /// - NOT_FOUND: BOT_NOT_FOUND when the caller has no such bot.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant RETURN_STRATEGY_BOT_FUNDS or the key is scoped to a
+    /// subaccount; AUTH_SESSION_KIND_NOT_ALLOWED for a connected app's session.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE when the return can't be decided yet;
+    /// retry with the same key.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn return_bot_funds<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::ReturnBotFundsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::ReturnBotFundsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetBotFundsReturn reads one of the caller's returns of a stopped bot's
+    /// funds, by the return ID ReturnBotFunds answered.
+    /// Errors:
+    /// - NOT_FOUND: the caller has no such return.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant READ_STRATEGIES or the key is scoped to a subaccount.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_bot_funds_return<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::GetBotFundsReturnRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::GetBotFundsReturnResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// StopBot stops a bot: it makes no new decisions. KEEP_ORDERS hands its
     /// open orders, protective stop-losses included, to its subaccount: they
     /// stay in the book as the subaccount's own orders, which the bot no longer
@@ -2338,7 +2591,8 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// - FAILED_PRECONDITION: VERSION_INVALID; SCENARIOS_FAILING;
     /// WINDOW_HAS_NO_DATA when the default window holds no market data;
     /// USERNAME_REQUIRED; LISTING_CAP_REACHED, listing_cap gives the cap;
-    /// PUBLISH_LIMIT_REACHED, retry_after says when the day resets.
+    /// PUBLISH_LIMIT_REACHED, retry_after says when the day resets;
+    /// LISTING_HELD while moderation holds the listing.
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original publish stands.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
     /// - PERMISSION_DENIED: AUTH_SESSION_KIND_NOT_ALLOWED for an API key or a
@@ -2369,11 +2623,13 @@ pub trait StrategiesService: Send + Sync + 'static {
     /// UnpublishStrategy unpublishes one of the caller's community listings: it
     /// leaves the list, and GetCommunityStrategy answers LISTING_NOT_FOUND. The
     /// author's next publish makes it public again. Copies other users already
-    /// made stay theirs. Unpublishing an unpublished listing changes nothing.
+    /// made stay theirs. Unpublishing an unpublished listing changes nothing; a
+    /// listing moderation holds can't be unpublished until it is released.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request.
     /// - NOT_FOUND: LISTING_NOT_FOUND, for another account's listing as for an
     /// unknown one.
+    /// - FAILED_PRECONDITION: LISTING_HELD while moderation holds the listing.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
     /// - PERMISSION_DENIED: AUTH_SESSION_KIND_NOT_ALLOWED for an API key or a
     /// session a connected app holds on the user's behalf.
@@ -2425,6 +2681,88 @@ pub trait StrategiesService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::strategies::v1::ListCommunityStrategiesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ReportCommunityStrategy reports a public community listing to
+    /// moderation: what is wrong with the version the reader saw, from a fixed
+    /// list of reasons, with a note. One report per reader, listing and
+    /// version, even after the version is published again: reporting it again
+    /// answers the first report and doesn't count toward the day's reports. A
+    /// reader makes at most 20 reports per UTC day. A report changes nothing of the listing by
+    /// itself; moderation reviews it.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request, or a reason of OTHER without a
+    /// note.
+    /// - NOT_FOUND: LISTING_NOT_FOUND, for an unpublished listing as for an
+    /// unknown one; VERSION_NOT_FOUND when the listing never published the
+    /// version.
+    /// - FAILED_PRECONDITION: CANNOT_REPORT_OWN_LISTING; REPORT_LIMIT_REACHED,
+    /// retry_after says when the day resets.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
+    /// - PERMISSION_DENIED: AUTH_SESSION_KIND_NOT_ALLOWED for an API key or a
+    /// session a connected app holds on the user's behalf.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn report_community_strategy<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::ReportCommunityStrategyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::ReportCommunityStrategyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ForkStrategy copies a public community listing's published version into
+    /// a new strategy of the caller, as its revision 1, and records the
+    /// listing as its origin. The copy is the caller's own: its behaviour
+    /// examples and backtests are the caller's to run, and nothing the
+    /// listing's author does later changes it. Forking one's own listing makes
+    /// a copy as a duplicate does, and isn't counted as a fork. An account has
+    /// at most 100 strategies.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: LISTING_NOT_FOUND, for an unpublished listing as for an
+    /// unknown one.
+    /// - FAILED_PRECONDITION: STRATEGY_CAP_REACHED; strategy_cap gives the cap.
+    /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original strategy stands.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
+    /// - PERMISSION_DENIED: AUTH_API_KEY_ACCESS_DENIED when the API key's policy
+    /// does not grant FORK_STRATEGIES or the key is scoped to a subaccount;
+    /// AUTH_SESSION_KIND_NOT_ALLOWED for a session a connected app holds on
+    /// the user's behalf.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn fork_strategy<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::strategies::v1::ForkStrategyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::strategies::v1::ForkStrategyResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -3275,6 +3613,64 @@ impl<S: StrategiesService> StrategiesServiceExt for S {
             .with_spec(STRATEGIES_SERVICE_LIST_BOT_LOGS_SPEC)
             .route_view(
                 STRATEGIES_SERVICE_SERVICE_NAME,
+                "ReturnBotFunds",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::ReturnBotFundsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::ReturnBotFundsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.return_bot_funds(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::ReturnBotFundsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_RETURN_BOT_FUNDS_SPEC)
+            .route_view_idempotent(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "GetBotFundsReturn",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::GetBotFundsReturnRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_bot_funds_return(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::GetBotFundsReturnResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_GET_BOT_FUNDS_RETURN_SPEC)
+            .route_view(
+                STRATEGIES_SERVICE_SERVICE_NAME,
                 "StopBot",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -3389,6 +3785,64 @@ impl<S: StrategiesService> StrategiesServiceExt for S {
                 },
             )
             .with_spec(STRATEGIES_SERVICE_LIST_COMMUNITY_STRATEGIES_SPEC)
+            .route_view(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ReportCommunityStrategy",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::ReportCommunityStrategyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.report_community_strategy(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::ReportCommunityStrategyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_REPORT_COMMUNITY_STRATEGY_SPEC)
+            .route_view(
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ForkStrategy",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::strategies::v1::__buffa::view::ForkStrategyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::strategies::v1::ForkStrategyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.fork_strategy(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::strategies::v1::ForkStrategyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STRATEGIES_SERVICE_FORK_STRATEGY_SPEC)
             .route_view_idempotent(
                 STRATEGIES_SERVICE_SERVICE_NAME,
                 "GetCommunityStrategy",
@@ -3634,6 +4088,18 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         .with_spec(STRATEGIES_SERVICE_LIST_BOT_LOGS_SPEC),
                 )
             }
+            "ReturnBotFunds" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STRATEGIES_SERVICE_RETURN_BOT_FUNDS_SPEC),
+                )
+            }
+            "GetBotFundsReturn" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(STRATEGIES_SERVICE_GET_BOT_FUNDS_RETURN_SPEC),
+                )
+            }
             "StopBot" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -3656,6 +4122,18 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
                         .with_spec(STRATEGIES_SERVICE_LIST_COMMUNITY_STRATEGIES_SPEC),
+                )
+            }
+            "ReportCommunityStrategy" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STRATEGIES_SERVICE_REPORT_COMMUNITY_STRATEGY_SPEC),
+                )
+            }
+            "ForkStrategy" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STRATEGIES_SERVICE_FORK_STRATEGY_SPEC),
                 )
             }
             "GetCommunityStrategy" => {
@@ -4242,6 +4720,48 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         >(format)
                 })
             }
+            "ReturnBotFunds" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::ReturnBotFundsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::ReturnBotFundsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::ReturnBotFundsRequest,
+                    >::from_parts(&req, &body);
+                    svc.return_bot_funds(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::ReturnBotFundsResponse,
+                        >(format)
+                })
+            }
+            "GetBotFundsReturn" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::GetBotFundsReturnRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::GetBotFundsReturnRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_bot_funds_return(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::GetBotFundsReturnResponse,
+                        >(format)
+                })
+            }
             "StopBot" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -4321,6 +4841,48 @@ impl<T: StrategiesService> ::connectrpc::Dispatcher for StrategiesServiceServer<
                         .await?
                         .encode::<
                             crate::proto::strategies::v1::ListCommunityStrategiesResponse,
+                        >(format)
+                })
+            }
+            "ReportCommunityStrategy" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::ReportCommunityStrategyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::ReportCommunityStrategyRequest,
+                    >::from_parts(&req, &body);
+                    svc.report_community_strategy(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::ReportCommunityStrategyResponse,
+                        >(format)
+                })
+            }
+            "ForkStrategy" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::strategies::v1::ForkStrategyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::strategies::v1::__buffa::view::ForkStrategyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::strategies::v1::ForkStrategyRequest,
+                    >::from_parts(&req, &body);
+                    svc.fork_strategy(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::strategies::v1::ForkStrategyResponse,
                         >(format)
                 })
             }
@@ -5655,6 +6217,96 @@ where
             )
             .await
     }
+    /// Call the ReturnBotFunds RPC. Sends a request to /strategies.v1.StrategiesService/ReturnBotFunds.
+    pub async fn return_bot_funds(
+        &self,
+        request: crate::proto::strategies::v1::ReturnBotFundsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ReturnBotFundsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.return_bot_funds_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReturnBotFunds RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn return_bot_funds_with_options(
+        &self,
+        request: crate::proto::strategies::v1::ReturnBotFundsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ReturnBotFundsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ReturnBotFunds",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetBotFundsReturn RPC. Sends a request to /strategies.v1.StrategiesService/GetBotFundsReturn.
+    pub async fn get_bot_funds_return(
+        &self,
+        request: crate::proto::strategies::v1::GetBotFundsReturnRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_bot_funds_return_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetBotFundsReturn RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_bot_funds_return_with_options(
+        &self,
+        request: crate::proto::strategies::v1::GetBotFundsReturnRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::GetBotFundsReturnResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "GetBotFundsReturn",
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the StopBot RPC. Sends a request to /strategies.v1.StrategiesService/StopBot.
     pub async fn stop_bot(
         &self,
@@ -5823,6 +6475,96 @@ where
                 &self.config,
                 STRATEGIES_SERVICE_SERVICE_NAME,
                 "ListCommunityStrategies",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ReportCommunityStrategy RPC. Sends a request to /strategies.v1.StrategiesService/ReportCommunityStrategy.
+    pub async fn report_community_strategy(
+        &self,
+        request: crate::proto::strategies::v1::ReportCommunityStrategyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.report_community_strategy_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReportCommunityStrategy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn report_community_strategy_with_options(
+        &self,
+        request: crate::proto::strategies::v1::ReportCommunityStrategyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ReportCommunityStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ReportCommunityStrategy",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ForkStrategy RPC. Sends a request to /strategies.v1.StrategiesService/ForkStrategy.
+    pub async fn fork_strategy(
+        &self,
+        request: crate::proto::strategies::v1::ForkStrategyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ForkStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.fork_strategy_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ForkStrategy RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn fork_strategy_with_options(
+        &self,
+        request: crate::proto::strategies::v1::ForkStrategyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::strategies::v1::__buffa::view::ForkStrategyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STRATEGIES_SERVICE_SERVICE_NAME,
+                "ForkStrategy",
                 request,
                 options,
             )

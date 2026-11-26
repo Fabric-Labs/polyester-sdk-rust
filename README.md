@@ -1999,13 +1999,24 @@ order it arrives rather than by revision.
 
 ## Account statements
 
-`client.statements` produces an account's balance movements for a period as
-one CSV file in the background (`ledger.read.v1.StatementExportService`), for
+`client.statements` produces an account's balance movements for a period as one
+CSV file in the background (`ledger.read.v1.StatementExportService`), for
 reconciliation and tax reporting: one account (the main account or one
 sub-account), optionally one asset, for a period of at most 366 days. It is
 signed like the other ledger reads: `subaccount_id` is a `SubAccountScope`, and
 `SubAccountScope::Default` takes the configured default sub-account.
-`start_time` (inclusive) and `end_time` (exclusive) are required.
+`export_type` (`StatementExportType::AccountStatement`, one row per entry with
+its fees, `StatementExportType::Ledger`, one row per transfer leg, or
+`StatementExportType::Balances`, one row per account bucket and asset with its
+opening and closing balance), `start_time` (inclusive) and `end_time`
+(exclusive) are required: a create without one is refused before sending.
+`export_type` has no default, and the export's `export_type` echoes it
+(`UNKNOWN(<n>)` for a type newer than this SDK). A balances period must start
+inside the account history: an earlier start is refused
+(`Error::is_statement_history_unavailable`), and
+`Error::statement_history_available_from` says where to start instead; if the
+history moves later before the file is produced, the export ends `failed` with
+`failure_reason` `history_unavailable` and `history_available_from` set.
 
 `create_export` is idempotent per `idempotency_key`; `get_export` and
 `list_exports` report its status (`queued`, `processing`, `ready`, `failed`,
@@ -2023,12 +2034,14 @@ with more than 4,000,000 movements fails with `failure_reason` `too_large`.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::StatementExportType;
 use polyester::services::CreateStatementExportOptions;
 use std::time::{Duration, UNIX_EPOCH};
 
 let export = client
     .statements
     .create_export(CreateStatementExportOptions {
+        export_type: Some(StatementExportType::AccountStatement), // or Ledger, Balances
         start_time: Some(UNIX_EPOCH + Duration::from_secs(1_767_225_600)),
         end_time: Some(UNIX_EPOCH + Duration::from_secs(1_798_761_600)),
         idempotency_key: "statement-2026".into(),
@@ -2045,15 +2058,26 @@ if current.status == "ready" {
 # }
 ```
 
-The file is RFC 4180 CSV, UTF-8, with CRLF line endings.
-`codecs::decode::parse_statement_csv` reads its columns by header name, so
-columns a later release appends are ignored, and keeps every amount an exact
-decimal string. The columns are `time`, `entry_id`, `type` (`kind` on a row),
-`account` (`funding` or `trading`), `asset`, `amount`, `fee`, `balance`,
-`link_id` and `flow_id`, the lifecycle flow of a deposit, withdrawal or
-internal transfer (empty for other entries). The statement covers movements
-from `start_time` up to `complete_through`, exclusive; when that is before
-`end_time`, request the rest later.
+The file is RFC 4180 CSV, UTF-8, with CRLF line endings, saved as
+`account-statement-<export_id>.csv`, `ledger-<export_id>.csv` or
+`balances-<export_id>.csv` by type. `codecs::decode::parse_statement_csv` reads
+an account statement, `codecs::decode::parse_ledger_csv` a ledger and
+`codecs::decode::parse_balances_csv` balances. All three read the columns by
+header name, so columns a later release appends are ignored, and keep every
+amount an exact decimal string. An account statement's columns are `time`,
+`entry_id`, `type` (`kind` on a row), `account` (`funding` or `trading`),
+`asset`, `amount`, `fee`, `balance`, `link_id` and `flow_id`. A ledger's
+(`LedgerRow`) are `time`, `transfer_id`, `account`, `asset`, `type` (`kind`, the
+transfer reason), `side` (`debit` or `credit`), a signed `amount`,
+`counterparty`, `balance`, `link_id` and `flow_id`. A balances row's
+(`BalancesRow`) are `account`, `asset`, `opening_balance`, `credits`, `debits`,
+`closing_balance` and `movements`, and `closing_balance` is `opening_balance`
+plus `credits` minus `debits`. `flow_id` is the lifecycle flow of a deposit,
+withdrawal or internal transfer linked before the export was created (empty for
+other entries); a flow linked later shows in the transfer history and in a new
+export. The statement covers movements from `start_time` up to
+`complete_through`, exclusive; when that is before `end_time`, request the rest
+later.
 
 ## Errors, retries, and withdrawal identity
 

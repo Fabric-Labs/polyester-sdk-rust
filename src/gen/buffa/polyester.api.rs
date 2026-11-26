@@ -176,6 +176,10 @@ pub enum AuthenticationMethod {
     /// A broker API key, sent as a bearer token. A broker's members create it
     /// in the QuickSwap broker API; it is not an account API key.
     BROKER_API_KEY = 3i32,
+    /// A signed API key request from an admin API key of the main account,
+    /// signed as any API key request is. Any other API key is refused with
+    /// PermissionDenied and AUTH_ADMIN_KEY_REQUIRED.
+    ADMIN_API_KEY = 4i32,
 }
 impl AuthenticationMethod {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -190,6 +194,9 @@ impl AuthenticationMethod {
     ///Idiomatic alias for [`Self::BROKER_API_KEY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const BrokerApiKey: Self = Self::BROKER_API_KEY;
+    ///Idiomatic alias for [`Self::ADMIN_API_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AdminApiKey: Self = Self::ADMIN_API_KEY;
 }
 impl ::core::default::Default for AuthenticationMethod {
     fn default() -> Self {
@@ -292,6 +299,7 @@ impl ::buffa::Enumeration for AuthenticationMethod {
             1i32 => ::core::option::Option::Some(Self::SESSION_TOKEN),
             2i32 => ::core::option::Option::Some(Self::API_KEY),
             3i32 => ::core::option::Option::Some(Self::BROKER_API_KEY),
+            4i32 => ::core::option::Option::Some(Self::ADMIN_API_KEY),
             _ => ::core::option::Option::None,
         }
     }
@@ -304,6 +312,7 @@ impl ::buffa::Enumeration for AuthenticationMethod {
             Self::SESSION_TOKEN => "SESSION_TOKEN",
             Self::API_KEY => "API_KEY",
             Self::BROKER_API_KEY => "BROKER_API_KEY",
+            Self::ADMIN_API_KEY => "ADMIN_API_KEY",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -312,6 +321,7 @@ impl ::buffa::Enumeration for AuthenticationMethod {
             "SESSION_TOKEN" => ::core::option::Option::Some(Self::SESSION_TOKEN),
             "API_KEY" => ::core::option::Option::Some(Self::API_KEY),
             "BROKER_API_KEY" => ::core::option::Option::Some(Self::BROKER_API_KEY),
+            "ADMIN_API_KEY" => ::core::option::Option::Some(Self::ADMIN_API_KEY),
             _ => ::core::option::Option::None,
         }
     }
@@ -321,6 +331,7 @@ impl ::buffa::Enumeration for AuthenticationMethod {
             Self::SESSION_TOKEN,
             Self::API_KEY,
             Self::BROKER_API_KEY,
+            Self::ADMIN_API_KEY,
         ]
     }
 }
