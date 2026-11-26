@@ -1445,6 +1445,63 @@ async fn statement_history_problem_carries_history_available_from() {
     }
 }
 
+/// `historyAvailableFrom` is an optional problem extension: a member of any
+/// other JSON type never breaks the code mapping, for the history code or any
+/// other, and only a valid RFC 3339 string names an instant.
+#[tokio::test]
+async fn statement_problem_with_a_non_string_history_member_keeps_its_code() {
+    use polyester::models::StatementExportType;
+
+    let start = UNIX_EPOCH + Duration::from_secs(1_793_491_200);
+    for member in [
+        "1795618502",
+        r#"{"seconds": 1795618502}"#,
+        "null",
+        r#"["2026-11-25T14:55:02Z"]"#,
+        "true",
+    ] {
+        for code in ["STATEMENT_HISTORY_UNAVAILABLE", "IDEMPOTENCY_KEY_REUSED"] {
+            let body = format!(
+                r#"{{"type": "https://polyester.dev/problems/x", "title": "Conflict", "status": 409,
+ "detail": "refused", "code": "{code}", "historyAvailableFrom": {member}}}"#
+            )
+            .into_bytes();
+            let (client, _seen) = server(move |_path| HttpScript::Raw {
+                status: 409,
+                headers: vec![("content-type".into(), "application/problem+json".into())],
+                body: body.clone(),
+            })
+            .await;
+            let err = client
+                .statements
+                .create_export(CreateStatementExportOptions {
+                    export_type: Some(StatementExportType::Balances),
+                    start_time: Some(start),
+                    end_time: Some(start + Duration::from_secs(86_400)),
+                    idempotency_key: "k".into(),
+                    ..Default::default()
+                })
+                .await
+                .unwrap_err();
+            let want = format!("ERROR_CODE_{code}");
+            assert!(
+                matches!(&err, Error::Api { code, .. } if *code == want),
+                "{code} with {member}: {err:?}"
+            );
+            assert_eq!(
+                err.is_statement_history_unavailable(),
+                code == "STATEMENT_HISTORY_UNAVAILABLE",
+                "{code} with {member}"
+            );
+            assert_eq!(
+                err.statement_history_available_from(),
+                None,
+                "{code} with {member}"
+            );
+        }
+    }
+}
+
 /// Balance history reads each point's exact 18-decimal balance, and a server
 /// that still sends the removed 7-decimal field (an empty `balance`) is
 /// refused instead of read as no balances.
