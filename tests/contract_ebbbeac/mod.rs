@@ -57,7 +57,7 @@ async fn statement_export_server() -> (MockHttpServer, SeenExports) {
                         ..Default::default()
                     }
                     .into(),
-                    filename: format!("statement-{}.csv", req.export_id),
+                    filename: format!("account-statement-{}.csv", req.export_id),
                     ..Default::default()
                 })
             }
@@ -107,7 +107,7 @@ async fn statement_export_download_url_and_cancel_are_signed() {
         .await
         .unwrap();
     assert_eq!(url.url, FILE_URL);
-    assert_eq!(url.filename, format!("statement-{id}.csv"));
+    assert_eq!(url.filename, format!("account-statement-{id}.csv"));
     assert_eq!(url.expires_at.seconds, 1_763_337_660);
     let rendered = format!("{url:?}");
     assert!(!rendered.contains("fake-signature-marker"), "{rendered}");

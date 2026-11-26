@@ -89,6 +89,7 @@ pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
         owner_username: msg.owner_username.clone(),
         owner_avatar_url: msg.owner_avatar_url.clone(),
         owner_root_smart_account_address: msg.owner_root_smart_account_address.clone(),
+        strategy_bot: msg.strategy_bot,
     }
 }
 
@@ -981,6 +982,7 @@ mod tests {
             subaccount_policy_id: 5,
             require_member_mfa: true,
             smart_account_salt_nonce: Some(0),
+            strategy_bot: true,
             ..Default::default()
         });
         assert_eq!(subaccount.subaccount_policy_id, Some(format_uint64_id(5)));
@@ -991,6 +993,7 @@ mod tests {
         assert_eq!(subaccount.owner_username, "alice");
         assert_eq!(subaccount.owner_avatar_url, "https://example.com/o.png");
         assert_eq!(subaccount.owner_root_smart_account_address, "0xdddd");
+        assert!(subaccount.strategy_bot);
 
         let bare = subaccount_from_proto(&Subaccount {
             id: 3,
@@ -998,6 +1001,7 @@ mod tests {
         });
         assert_eq!(bare.subaccount_policy_id, None);
         assert_eq!(bare.smart_account_salt_nonce, None);
+        assert!(!bare.strategy_bot);
     }
 }
 
