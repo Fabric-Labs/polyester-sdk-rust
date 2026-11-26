@@ -2691,8 +2691,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
         >,
     > + Send;
     /// ListPayouts lists the payout runs of the broker's vaults.
-    /// Newest first, filtered by vault, status and scheduled slot. Every broker
-    /// role and the broker's API keys can read, without step-up.
+    /// Newest first, filtered by vault, status and scheduled slot, each run
+    /// with its payout steps and its conversions into the rule's payout asset.
+    /// Every broker role and the broker's API keys can read, without step-up.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND, or VAULT_NOT_FOUND for a vault that is
     /// not the broker's.
@@ -2753,7 +2754,8 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
     /// ListUpcomingPayouts previews the next payout run of each vault.
     /// The preview uses the vault's balances now: when the run starts, whether
     /// it would pay, and per asset what it would pay, what would stay and why,
-    /// and the expected network fee. Every broker role and the broker's API keys
+    /// the expected network fee and, on a rule with a payout asset, the quote
+    /// of each conversion into it. Every broker role and the broker's API keys
     /// can read, without step-up.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
@@ -2784,8 +2786,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
     > + Send;
     /// ListVaultPayoutRules reads the payout rule of each of the broker's vaults.
     /// Each vault also lists the assets it holds or was credited in that its
-    /// rule pays no destination for. Every broker role and the broker's API keys
-    /// can read, without step-up; only Owner and Finance members change rules.
+    /// rule pays no destination for, and the payout asset its rule converts
+    /// them into, if any. Every broker role and the broker's API keys can read,
+    /// without step-up; only Owner and Finance members change rules.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
     /// - INVALID_ARGUMENT: a page_token from another broker or vault filter, or

@@ -1526,7 +1526,8 @@ pub const STATEMENT_EXPORT_SERVICE_LIST_STATEMENT_EXPORTS_SPEC: ::connectrpc::Sp
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// StatementExportService is the account statement API. A statement covers
 /// one account, optionally one asset, for a period of at most 366 days, and is
-/// produced in the background as one CSV file: create an export, poll it with
+/// produced in the background as one CSV file, an account statement, a ledger
+/// or the account's balances: create an export, poll it with
 /// GetStatementExport until it is READY, then download its file (see
 /// StatementExport). API keys need the READ_STATEMENTS policy action. A root
 /// account has at most 5 exports QUEUED or PROCESSING at a time, one account
@@ -1586,9 +1587,15 @@ pub trait StatementExportService: Send + Sync + 'static {
     /// Create a statement export, or return the existing one for the same
     /// idempotency key.
     /// Errors:
-    /// - INVALID_ARGUMENT: the period, asset or idempotency key is invalid.
+    /// - INVALID_ARGUMENT: the period, asset, type or idempotency key is
+    /// invalid.
     /// - FAILED_PRECONDITION (IDEMPOTENCY_KEY_REUSED): the key was used for a
     /// request with other fields.
+    /// - FAILED_PRECONDITION (STATEMENT_HISTORY_UNAVAILABLE): a BALANCES
+    /// period starts before the earliest instant whose balances the account
+    /// history holds. The error detail's history_available_from is that
+    /// instant; REST answers `409` with it as `historyAvailableFrom`. Create
+    /// the export again with a start at or after it.
     /// - RESOURCE_EXHAUSTED (STATEMENT_EXPORT_LIMIT_REACHED): the root account
     /// has 5 exports QUEUED or PROCESSING.
     /// - PERMISSION_DENIED, NOT_FOUND: the account cannot be read.

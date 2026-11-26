@@ -74,7 +74,8 @@ pub enum ErrorCode {
     /// stop a bot. Not returned until the limit is enforced.
     INDICATOR_SETTINGS_LIMIT_REACHED = 19i32,
     /// The idempotency key was already used with a different request. The
-    /// original backtest, proposal, stop, strategy or saved draft stands.
+    /// original backtest, proposal, stop, strategy, saved draft or funds return
+    /// stands.
     IDEMPOTENCY_CONFLICT = 20i32,
     /// A required service is temporarily unavailable; retry the same request.
     /// Every call of this API is safe to retry.
@@ -139,6 +140,31 @@ pub enum ErrorCode {
     /// The caller published as many times as allowed in the current UTC day.
     /// retry_after says when the day resets (00:00 UTC).
     PUBLISH_LIMIT_REACHED = 40i32,
+    /// The listing is held by moderation: it can't be published or unpublished,
+    /// nor its strategy deleted, until it is released. The author's strategy
+    /// shows the hold's reason.
+    LISTING_HELD = 41i32,
+    /// The caller is the listing's author, who can't report it.
+    CANNOT_REPORT_OWN_LISTING = 42i32,
+    /// The caller reported as many listings as allowed in the current UTC day.
+    /// retry_after says when the day resets (00:00 UTC).
+    REPORT_LIMIT_REACHED = 43i32,
+    /// The funding subaccount is, or was, a strategy bot's subaccount. A bot's
+    /// funds never fund another bot: fund a deploy from the main account or a
+    /// subaccount no bot has held. field_path names funding_subaccount_id.
+    FUNDING_SOURCE_IS_BOT = 44i32,
+    /// The bot may still trade, so its funds can't be returned yet: it is
+    /// deploying, running, paused or stopping, or its stop isn't complete.
+    /// Retry once the bot reads STOPPED. If the bot reads STOPPED but an API-key
+    /// call still gets BOT_NOT_STOPPED because the bot's access is still live,
+    /// its owner must first call ReturnBotFunds from their own interactive
+    /// session to end that access; retrying with the API key alone cannot.
+    /// Afterwards a root-scoped API key with RETURN_STRATEGY_BOT_FUNDS can return
+    /// the funds. Retry a recorded return with the same idempotency key.
+    BOT_NOT_STOPPED = 45i32,
+    /// The bot's subaccount has no available balance to return, or the return
+    /// under the idempotency key ended with nothing moved.
+    NOTHING_TO_RETURN = 46i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -261,6 +287,24 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::PUBLISH_LIMIT_REACHED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const PublishLimitReached: Self = Self::PUBLISH_LIMIT_REACHED;
+    ///Idiomatic alias for [`Self::LISTING_HELD`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ListingHeld: Self = Self::LISTING_HELD;
+    ///Idiomatic alias for [`Self::CANNOT_REPORT_OWN_LISTING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CannotReportOwnListing: Self = Self::CANNOT_REPORT_OWN_LISTING;
+    ///Idiomatic alias for [`Self::REPORT_LIMIT_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReportLimitReached: Self = Self::REPORT_LIMIT_REACHED;
+    ///Idiomatic alias for [`Self::FUNDING_SOURCE_IS_BOT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FundingSourceIsBot: Self = Self::FUNDING_SOURCE_IS_BOT;
+    ///Idiomatic alias for [`Self::BOT_NOT_STOPPED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BotNotStopped: Self = Self::BOT_NOT_STOPPED;
+    ///Idiomatic alias for [`Self::NOTHING_TO_RETURN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NothingToReturn: Self = Self::NOTHING_TO_RETURN;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -398,6 +442,12 @@ impl ::buffa::Enumeration for ErrorCode {
             38i32 => ::core::option::Option::Some(Self::LISTING_CAP_REACHED),
             39i32 => ::core::option::Option::Some(Self::USERNAME_REQUIRED),
             40i32 => ::core::option::Option::Some(Self::PUBLISH_LIMIT_REACHED),
+            41i32 => ::core::option::Option::Some(Self::LISTING_HELD),
+            42i32 => ::core::option::Option::Some(Self::CANNOT_REPORT_OWN_LISTING),
+            43i32 => ::core::option::Option::Some(Self::REPORT_LIMIT_REACHED),
+            44i32 => ::core::option::Option::Some(Self::FUNDING_SOURCE_IS_BOT),
+            45i32 => ::core::option::Option::Some(Self::BOT_NOT_STOPPED),
+            46i32 => ::core::option::Option::Some(Self::NOTHING_TO_RETURN),
             _ => ::core::option::Option::None,
         }
     }
@@ -448,6 +498,12 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::LISTING_CAP_REACHED => "LISTING_CAP_REACHED",
             Self::USERNAME_REQUIRED => "USERNAME_REQUIRED",
             Self::PUBLISH_LIMIT_REACHED => "PUBLISH_LIMIT_REACHED",
+            Self::LISTING_HELD => "LISTING_HELD",
+            Self::CANNOT_REPORT_OWN_LISTING => "CANNOT_REPORT_OWN_LISTING",
+            Self::REPORT_LIMIT_REACHED => "REPORT_LIMIT_REACHED",
+            Self::FUNDING_SOURCE_IS_BOT => "FUNDING_SOURCE_IS_BOT",
+            Self::BOT_NOT_STOPPED => "BOT_NOT_STOPPED",
+            Self::NOTHING_TO_RETURN => "NOTHING_TO_RETURN",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -540,6 +596,18 @@ impl ::buffa::Enumeration for ErrorCode {
             "PUBLISH_LIMIT_REACHED" => {
                 ::core::option::Option::Some(Self::PUBLISH_LIMIT_REACHED)
             }
+            "LISTING_HELD" => ::core::option::Option::Some(Self::LISTING_HELD),
+            "CANNOT_REPORT_OWN_LISTING" => {
+                ::core::option::Option::Some(Self::CANNOT_REPORT_OWN_LISTING)
+            }
+            "REPORT_LIMIT_REACHED" => {
+                ::core::option::Option::Some(Self::REPORT_LIMIT_REACHED)
+            }
+            "FUNDING_SOURCE_IS_BOT" => {
+                ::core::option::Option::Some(Self::FUNDING_SOURCE_IS_BOT)
+            }
+            "BOT_NOT_STOPPED" => ::core::option::Option::Some(Self::BOT_NOT_STOPPED),
+            "NOTHING_TO_RETURN" => ::core::option::Option::Some(Self::NOTHING_TO_RETURN),
             _ => ::core::option::Option::None,
         }
     }
@@ -585,6 +653,12 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::LISTING_CAP_REACHED,
             Self::USERNAME_REQUIRED,
             Self::PUBLISH_LIMIT_REACHED,
+            Self::LISTING_HELD,
+            Self::CANNOT_REPORT_OWN_LISTING,
+            Self::REPORT_LIMIT_REACHED,
+            Self::FUNDING_SOURCE_IS_BOT,
+            Self::BOT_NOT_STOPPED,
+            Self::NOTHING_TO_RETURN,
         ]
     }
 }
@@ -1261,6 +1335,181 @@ impl ::buffa::Enumeration for StopMode {
         &[Self::STOP_UNSPECIFIED, Self::KEEP_ORDERS, Self::CANCEL_ORDERS]
     }
 }
+/// BotFundsReturnStatus is how a return of a stopped bot's funds to its
+/// owner's main account stands.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum BotFundsReturnStatus {
+    /// Status was not specified.
+    BOT_FUNDS_RETURN_STATUS_UNSPECIFIED = 0i32,
+    /// The return is under way: it completes on its own, and GetBotFundsReturn
+    /// reads it. It stays under way while anything stays on the bot's
+    /// subaccount, such as what its open orders hold (held), and returns it as
+    /// it becomes spendable: the orders a KEEP_ORDERS stop kept can stay open
+    /// for days.
+    RETURN_PROCESSING = 1i32,
+    /// Nothing spendable or held stays on the bot's subaccount, and every asset
+    /// in assets is credited to the owner's main account.
+    RETURN_COMPLETED = 2i32,
+    /// The return ended with nothing moved: by the time it could move, nothing
+    /// was left on the bot's subaccount to return.
+    RETURN_NOTHING_MOVED = 3i32,
+}
+impl BotFundsReturnStatus {
+    ///Idiomatic alias for [`Self::BOT_FUNDS_RETURN_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BotFundsReturnStatusUnspecified: Self = Self::BOT_FUNDS_RETURN_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::RETURN_PROCESSING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnProcessing: Self = Self::RETURN_PROCESSING;
+    ///Idiomatic alias for [`Self::RETURN_COMPLETED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnCompleted: Self = Self::RETURN_COMPLETED;
+    ///Idiomatic alias for [`Self::RETURN_NOTHING_MOVED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnNothingMoved: Self = Self::RETURN_NOTHING_MOVED;
+}
+impl ::core::default::Default for BotFundsReturnStatus {
+    fn default() -> Self {
+        Self::BOT_FUNDS_RETURN_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for BotFundsReturnStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BotFundsReturnStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = BotFundsReturnStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(BotFundsReturnStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<BotFundsReturnStatus, E> {
+                <BotFundsReturnStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<BotFundsReturnStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BotFundsReturnStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<BotFundsReturnStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BotFundsReturnStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<BotFundsReturnStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BotFundsReturnStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for BotFundsReturnStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(Self::BOT_FUNDS_RETURN_STATUS_UNSPECIFIED)
+            }
+            1i32 => ::core::option::Option::Some(Self::RETURN_PROCESSING),
+            2i32 => ::core::option::Option::Some(Self::RETURN_COMPLETED),
+            3i32 => ::core::option::Option::Some(Self::RETURN_NOTHING_MOVED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BOT_FUNDS_RETURN_STATUS_UNSPECIFIED => {
+                "BOT_FUNDS_RETURN_STATUS_UNSPECIFIED"
+            }
+            Self::RETURN_PROCESSING => "RETURN_PROCESSING",
+            Self::RETURN_COMPLETED => "RETURN_COMPLETED",
+            Self::RETURN_NOTHING_MOVED => "RETURN_NOTHING_MOVED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BOT_FUNDS_RETURN_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::BOT_FUNDS_RETURN_STATUS_UNSPECIFIED)
+            }
+            "RETURN_PROCESSING" => ::core::option::Option::Some(Self::RETURN_PROCESSING),
+            "RETURN_COMPLETED" => ::core::option::Option::Some(Self::RETURN_COMPLETED),
+            "RETURN_NOTHING_MOVED" => {
+                ::core::option::Option::Some(Self::RETURN_NOTHING_MOVED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BOT_FUNDS_RETURN_STATUS_UNSPECIFIED,
+            Self::RETURN_PROCESSING,
+            Self::RETURN_COMPLETED,
+            Self::RETURN_NOTHING_MOVED,
+        ]
+    }
+}
 /// StrategyTag is a community strategy's type, from a fixed list. Markets are
 /// never tags: a listing's markets come from its version.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -1452,6 +1701,187 @@ impl ::buffa::Enumeration for StrategyTag {
             Self::MARKET_MAKING,
             Self::ARBITRAGE,
             Self::SIGNALS,
+        ]
+    }
+}
+/// ReportReason is why a reader reports a community listing.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ReportReason {
+    /// Not set. Never returned, and refused in a request.
+    REPORT_REASON_UNSPECIFIED = 0i32,
+    /// Its results or description mislead about what the strategy does.
+    MISLEADING_RESULTS = 1i32,
+    /// Its code could harm whoever runs it.
+    HARMFUL_CODE = 2i32,
+    /// It is spam.
+    SPAM = 3i32,
+    /// It copies someone else's strategy without crediting it.
+    COPIED_WITHOUT_CREDIT = 4i32,
+    /// Another reason, which note explains.
+    OTHER = 5i32,
+}
+impl ReportReason {
+    ///Idiomatic alias for [`Self::REPORT_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReportReasonUnspecified: Self = Self::REPORT_REASON_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::MISLEADING_RESULTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MisleadingResults: Self = Self::MISLEADING_RESULTS;
+    ///Idiomatic alias for [`Self::HARMFUL_CODE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const HarmfulCode: Self = Self::HARMFUL_CODE;
+    ///Idiomatic alias for [`Self::SPAM`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Spam: Self = Self::SPAM;
+    ///Idiomatic alias for [`Self::COPIED_WITHOUT_CREDIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CopiedWithoutCredit: Self = Self::COPIED_WITHOUT_CREDIT;
+    ///Idiomatic alias for [`Self::OTHER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Other: Self = Self::OTHER;
+}
+impl ::core::default::Default for ReportReason {
+    fn default() -> Self {
+        Self::REPORT_REASON_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ReportReason {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ReportReason {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ReportReason;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(ReportReason)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ReportReason, E> {
+                <ReportReason as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ReportReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ReportReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ReportReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ReportReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ReportReason, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ReportReason {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ReportReason {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::REPORT_REASON_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::MISLEADING_RESULTS),
+            2i32 => ::core::option::Option::Some(Self::HARMFUL_CODE),
+            3i32 => ::core::option::Option::Some(Self::SPAM),
+            4i32 => ::core::option::Option::Some(Self::COPIED_WITHOUT_CREDIT),
+            5i32 => ::core::option::Option::Some(Self::OTHER),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::REPORT_REASON_UNSPECIFIED => "REPORT_REASON_UNSPECIFIED",
+            Self::MISLEADING_RESULTS => "MISLEADING_RESULTS",
+            Self::HARMFUL_CODE => "HARMFUL_CODE",
+            Self::SPAM => "SPAM",
+            Self::COPIED_WITHOUT_CREDIT => "COPIED_WITHOUT_CREDIT",
+            Self::OTHER => "OTHER",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "REPORT_REASON_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::REPORT_REASON_UNSPECIFIED)
+            }
+            "MISLEADING_RESULTS" => {
+                ::core::option::Option::Some(Self::MISLEADING_RESULTS)
+            }
+            "HARMFUL_CODE" => ::core::option::Option::Some(Self::HARMFUL_CODE),
+            "SPAM" => ::core::option::Option::Some(Self::SPAM),
+            "COPIED_WITHOUT_CREDIT" => {
+                ::core::option::Option::Some(Self::COPIED_WITHOUT_CREDIT)
+            }
+            "OTHER" => ::core::option::Option::Some(Self::OTHER),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::REPORT_REASON_UNSPECIFIED,
+            Self::MISLEADING_RESULTS,
+            Self::HARMFUL_CODE,
+            Self::SPAM,
+            Self::COPIED_WITHOUT_CREDIT,
+            Self::OTHER,
         ]
     }
 }
@@ -2171,8 +2601,8 @@ pub struct ErrorDetail {
     )]
     pub field_path: ::buffa::alloc::string::String,
     /// When the same request may succeed. Set only with
-    /// SCENARIO_RUN_LIMIT_REACHED, PUBLISH_LIMIT_REACHED, and with
-    /// BACKTEST_LIMIT_REACHED for the daily limit.
+    /// SCENARIO_RUN_LIMIT_REACHED, PUBLISH_LIMIT_REACHED, REPORT_LIMIT_REACHED,
+    /// and with BACKTEST_LIMIT_REACHED for the daily limit.
     ///
     /// Field 3: `retry_after`
     #[serde(
@@ -6709,7 +7139,9 @@ pub struct ScenarioResult {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub logs: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
-    /// The handler's error, when it failed. Empty otherwise.
+    /// Why the example failed: the handler's error, or that a call took longer
+    /// than allowed or the runtime failed on this run, which running the
+    /// examples again retries. Empty otherwise.
     ///
     /// Field 6: `error`
     #[serde(
@@ -11906,8 +12338,9 @@ pub struct ExplainStrategyResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub scenarios: ::buffa::alloc::vec::Vec<ScenarioSummary>,
-    /// The latest backtest. Omitted when there is none; backtest_absent_reason
-    /// then says why.
+    /// The latest eligible completed backtest with the default settings: the
+    /// caller's own, finished and within retention. Omitted when there is none;
+    /// backtest_absent_reason then says why.
     ///
     /// Field 5: `backtest`
     #[serde(
@@ -11926,8 +12359,8 @@ pub struct ExplainStrategyResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub backtest_absent_reason: ::buffa::alloc::string::String,
-    /// What to weigh before deploying, for example "never backtested" or "trades
-    /// a thin market".
+    /// What to weigh before deploying, for example "no completed backtest
+    /// available" or "trades a thin market".
     ///
     /// Field 7: `warnings`
     #[serde(
@@ -12921,7 +13354,9 @@ pub struct ProposeDeployRequest {
     pub idempotency_key: ::buffa::alloc::string::String,
     /// The subaccount that funds the bot. Zero means the main account. It must
     /// be an active subaccount of the caller's main account; any other,
-    /// including a disabled one, is FUNDING_SUBACCOUNT_NOT_FOUND.
+    /// including a disabled one, is FUNDING_SUBACCOUNT_NOT_FOUND. A subaccount
+    /// that is or was a strategy bot's is FUNDING_SOURCE_IS_BOT, even with no
+    /// funding.
     ///
     /// Field 6: `funding_subaccount_id`
     #[serde(
@@ -15598,6 +16033,30 @@ pub struct Bot {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub activity: ::buffa::alloc::vec::Vec<BotActivityHour>,
+    /// Public ID of the strategy the bot was deployed from, as its deploy
+    /// proposal recorded it. Zero when the run has no linked strategy, for
+    /// example once the strategy is deleted.
+    ///
+    /// Field 17: `strategy_id`
+    #[serde(
+        rename = "strategyId",
+        alias = "strategy_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub strategy_id: u64,
+    /// The strategy's revision whose version the bot runs, the number
+    /// ListStrategyRevisions shows, as its deploy proposal recorded it. Zero
+    /// when the run has no linked strategy, for example once the strategy is
+    /// deleted.
+    ///
+    /// Field 18: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -15620,6 +16079,8 @@ impl ::core::fmt::Debug for Bot {
             .field("running_since", &self.running_since)
             .field("pause_reason", &self.pause_reason)
             .field("activity", &self.activity)
+            .field("strategy_id", &self.strategy_id)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -15725,6 +16186,12 @@ impl ::buffa::Message for Bot {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.strategy_id != 0u64 {
+            size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.revision != 0u64 {
+            size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -15790,6 +16257,12 @@ impl ::buffa::Message for Bot {
         for v in &self.activity {
             ::buffa::types::put_len_delimited_header(16u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        if self.strategy_id != 0u64 {
+            ::buffa::types::put_fixed64_field(17u32, self.strategy_id, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(18u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -15931,6 +16404,20 @@ impl ::buffa::Message for Bot {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.activity.push(elem);
             }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.strategy_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -15954,6 +16441,8 @@ impl ::buffa::Message for Bot {
         self.running_since = ::buffa::MessageField::none();
         self.pause_reason = ::buffa::EnumValue::from(0);
         self.activity.clear();
+        self.strategy_id = 0u64;
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -18173,6 +18662,892 @@ pub const __STOP_BOT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     from_json: ::buffa::type_registry::any_from_json::<StopBotResponse>,
     is_wkt: false,
 };
+/// BotFundsReturn is one return of a stopped bot's available balances to its
+/// owner's main account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BotFundsReturn {
+    /// Public return ID: GetBotFundsReturn reads the return by it.
+    ///
+    /// Field 1: `return_id`
+    #[serde(
+        rename = "returnId",
+        alias = "return_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub return_id: u64,
+    /// Public bot ID of the bot whose funds it returns.
+    ///
+    /// Field 2: `bot_id`
+    #[serde(
+        rename = "botId",
+        alias = "bot_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub bot_id: u64,
+    /// How the return stands.
+    ///
+    /// Field 3: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<BotFundsReturnStatus>,
+    /// The amounts moved so far from the bot's subaccount to the main account,
+    /// one per asset, confirmed only: an amount the return is still moving
+    /// counts once the move is confirmed. It grows while RETURN_PROCESSING, as
+    /// more becomes spendable; empty for RETURN_NOTHING_MOVED.
+    ///
+    /// Field 4: `assets`
+    #[serde(
+        rename = "assets",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub assets: ::buffa::alloc::vec::Vec<Money>,
+    /// When the return was requested.
+    ///
+    /// Field 5: `requested_at`
+    #[serde(
+        rename = "requestedAt",
+        alias = "requested_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub requested_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// When it completed or ended with nothing moved; unset while processing.
+    ///
+    /// Field 6: `finished_at`
+    #[serde(
+        rename = "finishedAt",
+        alias = "finished_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub finished_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// What still stays on the bot's subaccount, one per asset, as the return
+    /// last read it: what its open orders' holds reserve. The return takes
+    /// it once released, as the orders fill or end. Empty once the return
+    /// finished.
+    ///
+    /// Field 7: `held`
+    #[serde(
+        rename = "held",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub held: ::buffa::alloc::vec::Vec<Money>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BotFundsReturn {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BotFundsReturn")
+            .field("return_id", &self.return_id)
+            .field("bot_id", &self.bot_id)
+            .field("status", &self.status)
+            .field("assets", &self.assets)
+            .field("requested_at", &self.requested_at)
+            .field("finished_at", &self.finished_at)
+            .field("held", &self.held)
+            .finish()
+    }
+}
+impl BotFundsReturn {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.BotFundsReturn";
+}
+::buffa::impl_default_instance!(BotFundsReturn);
+impl ::buffa::MessageName for BotFundsReturn {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "BotFundsReturn";
+    const FULL_NAME: &'static str = "strategies.v1.BotFundsReturn";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.BotFundsReturn";
+}
+impl ::buffa::Message for BotFundsReturn {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.return_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.bot_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        for v in &self.assets {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.requested_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.requested_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.finished_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.finished_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.held {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.return_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.return_id, buf);
+        }
+        if self.bot_id != 0u64 {
+            ::buffa::types::put_fixed64_field(2u32, self.bot_id, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        for v in &self.assets {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.requested_at.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.requested_at.write_to(__cache, buf);
+        }
+        if self.finished_at.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.finished_at.write_to(__cache, buf);
+        }
+        for v in &self.held {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.return_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.bot_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.assets.push(elem);
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.requested_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.finished_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.held.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.return_id = 0u64;
+        self.bot_id = 0u64;
+        self.status = ::buffa::EnumValue::from(0);
+        self.assets.clear();
+        self.requested_at = ::buffa::MessageField::none();
+        self.finished_at = ::buffa::MessageField::none();
+        self.held.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BotFundsReturn {
+    const PROTO_FQN: &'static str = "strategies.v1.BotFundsReturn";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BotFundsReturn {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BOT_FUNDS_RETURN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.BotFundsReturn",
+    to_json: ::buffa::type_registry::any_to_json::<BotFundsReturn>,
+    from_json: ::buffa::type_registry::any_from_json::<BotFundsReturn>,
+    is_wkt: false,
+};
+/// ReturnBotFundsRequest returns one stopped bot's funds to the caller's main
+/// account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ReturnBotFundsRequest {
+    /// Public bot ID. The bot must belong to the caller's main account.
+    ///
+    /// Field 1: `bot_id`
+    #[serde(
+        rename = "botId",
+        alias = "bot_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub bot_id: u64,
+    /// Client-chosen key, unique per caller, that makes the call idempotent: the
+    /// same key and bot return the same return, as it stands now, and never
+    /// start a second one; the same key for another bot is
+    /// IDEMPOTENCY_CONFLICT. Required.
+    ///
+    /// Field 2: `idempotency_key`
+    #[serde(
+        rename = "idempotencyKey",
+        alias = "idempotency_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub idempotency_key: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ReturnBotFundsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ReturnBotFundsRequest")
+            .field("bot_id", &self.bot_id)
+            .field("idempotency_key", &self.idempotency_key)
+            .finish()
+    }
+}
+impl ReturnBotFundsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReturnBotFundsRequest";
+}
+::buffa::impl_default_instance!(ReturnBotFundsRequest);
+impl ::buffa::MessageName for ReturnBotFundsRequest {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "ReturnBotFundsRequest";
+    const FULL_NAME: &'static str = "strategies.v1.ReturnBotFundsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReturnBotFundsRequest";
+}
+impl ::buffa::Message for ReturnBotFundsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.bot_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.idempotency_key.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.bot_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.bot_id, buf);
+        }
+        if !self.idempotency_key.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.bot_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bot_id = 0u64;
+        self.idempotency_key.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ReturnBotFundsRequest {
+    const PROTO_FQN: &'static str = "strategies.v1.ReturnBotFundsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ReturnBotFundsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RETURN_BOT_FUNDS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.ReturnBotFundsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ReturnBotFundsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ReturnBotFundsRequest>,
+    is_wkt: false,
+};
+/// ReturnBotFundsResponse is the return the call started or joined.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ReturnBotFundsResponse {
+    /// The return. It reads RETURN_PROCESSING while anything stays on the bot's
+    /// subaccount, then RETURN_COMPLETED.
+    ///
+    /// Field 1: `funds_return`
+    #[serde(
+        rename = "fundsReturn",
+        alias = "funds_return",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub funds_return: ::buffa::MessageField<BotFundsReturn>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ReturnBotFundsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ReturnBotFundsResponse")
+            .field("funds_return", &self.funds_return)
+            .finish()
+    }
+}
+impl ReturnBotFundsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReturnBotFundsResponse";
+}
+::buffa::impl_default_instance!(ReturnBotFundsResponse);
+impl ::buffa::MessageName for ReturnBotFundsResponse {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "ReturnBotFundsResponse";
+    const FULL_NAME: &'static str = "strategies.v1.ReturnBotFundsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReturnBotFundsResponse";
+}
+impl ::buffa::Message for ReturnBotFundsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.funds_return.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.funds_return.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.funds_return.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.funds_return.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.funds_return.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.funds_return = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ReturnBotFundsResponse {
+    const PROTO_FQN: &'static str = "strategies.v1.ReturnBotFundsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ReturnBotFundsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RETURN_BOT_FUNDS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.ReturnBotFundsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ReturnBotFundsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ReturnBotFundsResponse>,
+    is_wkt: false,
+};
+/// GetBotFundsReturnRequest reads one return of the caller's.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetBotFundsReturnRequest {
+    /// Public return ID, as ReturnBotFunds answered it.
+    ///
+    /// Field 1: `return_id`
+    #[serde(
+        rename = "returnId",
+        alias = "return_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub return_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetBotFundsReturnRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetBotFundsReturnRequest")
+            .field("return_id", &self.return_id)
+            .finish()
+    }
+}
+impl GetBotFundsReturnRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.GetBotFundsReturnRequest";
+}
+::buffa::impl_default_instance!(GetBotFundsReturnRequest);
+impl ::buffa::MessageName for GetBotFundsReturnRequest {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "GetBotFundsReturnRequest";
+    const FULL_NAME: &'static str = "strategies.v1.GetBotFundsReturnRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.GetBotFundsReturnRequest";
+}
+impl ::buffa::Message for GetBotFundsReturnRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.return_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.return_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.return_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.return_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.return_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetBotFundsReturnRequest {
+    const PROTO_FQN: &'static str = "strategies.v1.GetBotFundsReturnRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetBotFundsReturnRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_BOT_FUNDS_RETURN_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.GetBotFundsReturnRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetBotFundsReturnRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetBotFundsReturnRequest>,
+    is_wkt: false,
+};
+/// GetBotFundsReturnResponse is the return as it stands.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetBotFundsReturnResponse {
+    /// The return.
+    ///
+    /// Field 1: `funds_return`
+    #[serde(
+        rename = "fundsReturn",
+        alias = "funds_return",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub funds_return: ::buffa::MessageField<BotFundsReturn>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetBotFundsReturnResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetBotFundsReturnResponse")
+            .field("funds_return", &self.funds_return)
+            .finish()
+    }
+}
+impl GetBotFundsReturnResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.GetBotFundsReturnResponse";
+}
+::buffa::impl_default_instance!(GetBotFundsReturnResponse);
+impl ::buffa::MessageName for GetBotFundsReturnResponse {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "GetBotFundsReturnResponse";
+    const FULL_NAME: &'static str = "strategies.v1.GetBotFundsReturnResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.GetBotFundsReturnResponse";
+}
+impl ::buffa::Message for GetBotFundsReturnResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.funds_return.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.funds_return.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.funds_return.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.funds_return.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.funds_return.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.funds_return = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetBotFundsReturnResponse {
+    const PROTO_FQN: &'static str = "strategies.v1.GetBotFundsReturnResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetBotFundsReturnResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_BOT_FUNDS_RETURN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.GetBotFundsReturnResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetBotFundsReturnResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetBotFundsReturnResponse>,
+    is_wkt: false,
+};
 /// GetBotResponse is a bot with its money rules, settings and recent
 /// decisions. The bot's subaccount is read like any other, by its
 /// subaccount_id: its balances with LedgerReadService.GetBalances, its open
@@ -18679,6 +20054,30 @@ pub struct BotVersion {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub stopped_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Public ID of the strategy the run was deployed from, as its deploy
+    /// proposal recorded it. Zero when the run has no linked strategy, for
+    /// example once the strategy is deleted.
+    ///
+    /// Field 6: `strategy_id`
+    #[serde(
+        rename = "strategyId",
+        alias = "strategy_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub strategy_id: u64,
+    /// The strategy's revision whose version the run ran, the number
+    /// ListStrategyRevisions shows, as its deploy proposal recorded it. Zero
+    /// when the run has no linked strategy, for example once the strategy is
+    /// deleted.
+    ///
+    /// Field 7: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -18691,6 +20090,8 @@ impl ::core::fmt::Debug for BotVersion {
             .field("runtime_version", &self.runtime_version)
             .field("started_at", &self.started_at)
             .field("stopped_at", &self.stopped_at)
+            .field("strategy_id", &self.strategy_id)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -18746,6 +20147,12 @@ impl ::buffa::Message for BotVersion {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.strategy_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.revision != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -18772,6 +20179,12 @@ impl ::buffa::Message for BotVersion {
         if self.stopped_at.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.stopped_at.write_to(__cache, buf);
+        }
+        if self.strategy_id != 0u64 {
+            ::buffa::types::put_fixed64_field(6u32, self.strategy_id, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(7u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -18829,6 +20242,20 @@ impl ::buffa::Message for BotVersion {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.strategy_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -18842,6 +20269,8 @@ impl ::buffa::Message for BotVersion {
         self.runtime_version.clear();
         self.started_at = ::buffa::MessageField::none();
         self.stopped_at = ::buffa::MessageField::none();
+        self.strategy_id = 0u64;
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -21071,6 +22500,16 @@ pub struct StrategyListing {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub published_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Why moderation holds the listing. Set only when state is HELD.
+    ///
+    /// Field 5: `hold_reason`
+    #[serde(
+        rename = "holdReason",
+        alias = "hold_reason",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub hold_reason: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -21082,6 +22521,7 @@ impl ::core::fmt::Debug for StrategyListing {
             .field("state", &self.state)
             .field("version_id", &self.version_id)
             .field("published_at", &self.published_at)
+            .field("hold_reason", &self.hold_reason)
             .finish()
     }
 }
@@ -21130,6 +22570,9 @@ impl ::buffa::Message for StrategyListing {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if !self.hold_reason.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.hold_reason) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -21155,6 +22598,9 @@ impl ::buffa::Message for StrategyListing {
         if self.published_at.is_set() {
             ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
             self.published_at.write_to(__cache, buf);
+        }
+        if !self.hold_reason.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.hold_reason, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -21203,6 +22649,13 @@ impl ::buffa::Message for StrategyListing {
                     ctx,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.hold_reason, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -21215,6 +22668,7 @@ impl ::buffa::Message for StrategyListing {
         self.state = ::buffa::EnumValue::from(0);
         self.version_id.clear();
         self.published_at = ::buffa::MessageField::none();
+        self.hold_reason.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -21262,6 +22716,11 @@ pub mod strategy_listing {
         /// answers LISTING_NOT_FOUND. The author's next publish makes it public
         /// again.
         HIDDEN = 2i32,
+        /// Held by moderation: out of the list, and GetCommunityStrategy answers
+        /// LISTING_NOT_FOUND. hold_reason says why. Only moderation releases it;
+        /// until then publishing and unpublishing it, and deleting its strategy,
+        /// are LISTING_HELD. No bot, copy or deployment changes.
+        HELD = 3i32,
     }
     impl State {
         ///Idiomatic alias for [`Self::LISTING_STATE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -21273,6 +22732,9 @@ pub mod strategy_listing {
         ///Idiomatic alias for [`Self::HIDDEN`]; `Debug` prints the variant name.
         #[allow(non_upper_case_globals)]
         pub const Hidden: Self = Self::HIDDEN;
+        ///Idiomatic alias for [`Self::HELD`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Held: Self = Self::HELD;
     }
     impl ::core::default::Default for State {
         fn default() -> Self {
@@ -21371,6 +22833,7 @@ pub mod strategy_listing {
                 0i32 => ::core::option::Option::Some(Self::LISTING_STATE_UNSPECIFIED),
                 1i32 => ::core::option::Option::Some(Self::PUBLIC),
                 2i32 => ::core::option::Option::Some(Self::HIDDEN),
+                3i32 => ::core::option::Option::Some(Self::HELD),
                 _ => ::core::option::Option::None,
             }
         }
@@ -21382,6 +22845,7 @@ pub mod strategy_listing {
                 Self::LISTING_STATE_UNSPECIFIED => "LISTING_STATE_UNSPECIFIED",
                 Self::PUBLIC => "PUBLIC",
                 Self::HIDDEN => "HIDDEN",
+                Self::HELD => "HELD",
             }
         }
         fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -21391,11 +22855,12 @@ pub mod strategy_listing {
                 }
                 "PUBLIC" => ::core::option::Option::Some(Self::PUBLIC),
                 "HIDDEN" => ::core::option::Option::Some(Self::HIDDEN),
+                "HELD" => ::core::option::Option::Some(Self::HELD),
                 _ => ::core::option::Option::None,
             }
         }
         fn values() -> &'static [Self] {
-            &[Self::LISTING_STATE_UNSPECIFIED, Self::PUBLIC, Self::HIDDEN]
+            &[Self::LISTING_STATE_UNSPECIFIED, Self::PUBLIC, Self::HIDDEN, Self::HELD]
         }
     }
 }
@@ -21614,6 +23079,14 @@ impl ::buffa::Message for StrategyOrigin {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::strategy_origin::Source::Fork(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -21634,6 +23107,14 @@ impl ::buffa::Message for StrategyOrigin {
                 __buffa::oneof::strategy_origin::Source::Duplicate(x) => {
                     ::buffa::types::put_len_delimited_header(
                         2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::strategy_origin::Source::Fork(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -21680,6 +23161,26 @@ impl ::buffa::Message for StrategyOrigin {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.source = ::core::option::Option::Some(
                         __buffa::oneof::strategy_origin::Source::Duplicate(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::strategy_origin::Source::Fork(ref mut existing),
+                ) = self.source
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.source = ::core::option::Option::Some(
+                        __buffa::oneof::strategy_origin::Source::Fork(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -21774,6 +23275,30 @@ impl<'de> serde::Deserialize<'de> for StrategyOrigin {
                                 );
                             }
                         }
+                        "fork" => {
+                            let v: ::core::option::Option<StrategyForkOrigin> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            StrategyForkOrigin,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_source.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'source'",
+                                        ),
+                                    );
+                                }
+                                __oneof_source = Some(
+                                    __buffa::oneof::strategy_origin::Source::Fork(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
                         _ => {
                             map.next_value::<serde::de::IgnoredAny>()?;
                         }
@@ -21815,6 +23340,215 @@ pub mod strategy_origin {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::strategy_origin::Source as SourceView;
 }
+/// StrategyForkOrigin is the community listing a strategy was forked from.
+/// The strategy shows it was forked even once the listing is no longer
+/// public; it then names the listing no more.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct StrategyForkOrigin {
+    /// Public listing ID, while the listing is public. Zero once it isn't.
+    ///
+    /// Field 1: `listing_id`
+    #[serde(
+        rename = "listingId",
+        alias = "listing_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub listing_id: u64,
+    /// The listing's title, while it is public. Empty otherwise.
+    ///
+    /// Field 2: `title`
+    #[serde(
+        rename = "title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub title: ::buffa::alloc::string::String,
+    /// The listing author's current username, while it is public. Empty
+    /// otherwise.
+    ///
+    /// Field 3: `author_username`
+    #[serde(
+        rename = "authorUsername",
+        alias = "author_username",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub author_username: ::buffa::alloc::string::String,
+    /// The published version copied, which is the strategy's revision 1.
+    ///
+    /// Field 4: `source_version_id`
+    #[serde(
+        rename = "sourceVersionId",
+        alias = "source_version_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub source_version_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for StrategyForkOrigin {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("StrategyForkOrigin")
+            .field("listing_id", &self.listing_id)
+            .field("title", &self.title)
+            .field("author_username", &self.author_username)
+            .field("source_version_id", &self.source_version_id)
+            .finish()
+    }
+}
+impl StrategyForkOrigin {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.StrategyForkOrigin";
+}
+::buffa::impl_default_instance!(StrategyForkOrigin);
+impl ::buffa::MessageName for StrategyForkOrigin {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "StrategyForkOrigin";
+    const FULL_NAME: &'static str = "strategies.v1.StrategyForkOrigin";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.StrategyForkOrigin";
+}
+impl ::buffa::Message for StrategyForkOrigin {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.listing_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.title.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+        }
+        if !self.author_username.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.author_username) as u32;
+        }
+        if !self.source_version_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.source_version_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.listing_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+        }
+        if !self.title.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.title, buf);
+        }
+        if !self.author_username.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.author_username, buf);
+        }
+        if !self.source_version_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.source_version_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.listing_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.title, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.author_username, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.source_version_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.listing_id = 0u64;
+        self.title.clear();
+        self.author_username.clear();
+        self.source_version_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for StrategyForkOrigin {
+    const PROTO_FQN: &'static str = "strategies.v1.StrategyForkOrigin";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for StrategyForkOrigin {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __STRATEGY_FORK_ORIGIN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.StrategyForkOrigin",
+    to_json: ::buffa::type_registry::any_to_json::<StrategyForkOrigin>,
+    from_json: ::buffa::type_registry::any_from_json::<StrategyForkOrigin>,
+    is_wkt: false,
+};
 /// StrategyDuplicateOrigin is the version of the caller's a strategy was
 /// copied from. A copy depends on the version only, never on a strategy
 /// that saved it.
@@ -27996,6 +29730,16 @@ pub struct CommunityStrategySummary {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub published_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// How many accounts forked the listing. An account that forked it more
+    /// than once counts once, and its author's own copies never count.
+    ///
+    /// Field 8: `forks`
+    #[serde(
+        rename = "forks",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub forks: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -28010,6 +29754,7 @@ impl ::core::fmt::Debug for CommunityStrategySummary {
             .field("author_username", &self.author_username)
             .field("backtest", &self.backtest)
             .field("published_at", &self.published_at)
+            .field("forks", &self.forks)
             .finish()
     }
 }
@@ -28077,6 +29822,9 @@ impl ::buffa::Message for CommunityStrategySummary {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.forks != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.forks) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -28117,6 +29865,9 @@ impl ::buffa::Message for CommunityStrategySummary {
         if self.published_at.is_set() {
             ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
             self.published_at.write_to(__cache, buf);
+        }
+        if self.forks != 0u32 {
+            ::buffa::types::put_uint32_field(8u32, self.forks, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -28219,6 +29970,13 @@ impl ::buffa::Message for CommunityStrategySummary {
                     ctx,
                 )?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.forks = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -28234,6 +29992,7 @@ impl ::buffa::Message for CommunityStrategySummary {
         self.author_username.clear();
         self.backtest = ::buffa::MessageField::none();
         self.published_at = ::buffa::MessageField::none();
+        self.forks = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -28264,6 +30023,189 @@ pub const __COMMUNITY_STRATEGY_SUMMARY_JSON_ANY: ::buffa::type_registry::JsonAny
     type_url: "type.googleapis.com/strategies.v1.CommunityStrategySummary",
     to_json: ::buffa::type_registry::any_to_json::<CommunityStrategySummary>,
     from_json: ::buffa::type_registry::any_from_json::<CommunityStrategySummary>,
+    is_wkt: false,
+};
+/// CommunityForkSource is the community listing a listed strategy was
+/// forked from. It never shows more of the source than the source's own
+/// listing does.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CommunityForkSource {
+    /// Public listing ID of the source, while it is public. Zero once it
+    /// isn't: the strategy is then shown as forked from a community strategy.
+    ///
+    /// Field 1: `listing_id`
+    #[serde(
+        rename = "listingId",
+        alias = "listing_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub listing_id: u64,
+    /// The source listing's title, while it is public. Empty otherwise.
+    ///
+    /// Field 2: `title`
+    #[serde(
+        rename = "title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub title: ::buffa::alloc::string::String,
+    /// The source author's current username, while the source is public.
+    /// Empty otherwise.
+    ///
+    /// Field 3: `author_username`
+    #[serde(
+        rename = "authorUsername",
+        alias = "author_username",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub author_username: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CommunityForkSource {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CommunityForkSource")
+            .field("listing_id", &self.listing_id)
+            .field("title", &self.title)
+            .field("author_username", &self.author_username)
+            .finish()
+    }
+}
+impl CommunityForkSource {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.CommunityForkSource";
+}
+::buffa::impl_default_instance!(CommunityForkSource);
+impl ::buffa::MessageName for CommunityForkSource {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "CommunityForkSource";
+    const FULL_NAME: &'static str = "strategies.v1.CommunityForkSource";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.CommunityForkSource";
+}
+impl ::buffa::Message for CommunityForkSource {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.listing_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.title.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+        }
+        if !self.author_username.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.author_username) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.listing_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+        }
+        if !self.title.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.title, buf);
+        }
+        if !self.author_username.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.author_username, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.listing_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.title, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.author_username, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.listing_id = 0u64;
+        self.title.clear();
+        self.author_username.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CommunityForkSource {
+    const PROTO_FQN: &'static str = "strategies.v1.CommunityForkSource";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CommunityForkSource {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __COMMUNITY_FORK_SOURCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.CommunityForkSource",
+    to_json: ::buffa::type_registry::any_to_json::<CommunityForkSource>,
+    from_json: ::buffa::type_registry::any_from_json::<CommunityForkSource>,
     is_wkt: false,
 };
 /// CommunityStrategy is one public community listing with its published
@@ -28412,6 +30354,27 @@ pub struct CommunityStrategy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub backtest: ::buffa::MessageField<CommunityBacktest>,
+    /// How many accounts forked the listing. An account that forked it more
+    /// than once counts once, and its author's own copies never count.
+    ///
+    /// Field 16: `forks`
+    #[serde(
+        rename = "forks",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub forks: u32,
+    /// The listing the strategy was forked from. Unset when it wasn't forked.
+    /// The platform sets it from the strategy's origin at each publish; its
+    /// author can't remove or change it.
+    ///
+    /// Field 17: `forked_from`
+    #[serde(
+        rename = "forkedFrom",
+        alias = "forked_from",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub forked_from: ::buffa::MessageField<CommunityForkSource>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -28434,6 +30397,8 @@ impl ::core::fmt::Debug for CommunityStrategy {
             .field("money_card", &self.money_card)
             .field("flow", &self.flow)
             .field("backtest", &self.backtest)
+            .field("forks", &self.forks)
+            .field("forked_from", &self.forked_from)
             .finish()
     }
 }
@@ -28547,6 +30512,17 @@ impl ::buffa::Message for CommunityStrategy {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.forks != 0u32 {
+            size += 2u32 + ::buffa::types::uint32_encoded_len(self.forks) as u32;
+        }
+        if self.forked_from.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.forked_from.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -28615,6 +30591,13 @@ impl ::buffa::Message for CommunityStrategy {
         if self.backtest.is_set() {
             ::buffa::types::put_len_delimited_header(15u32, __cache.consume_next(), buf);
             self.backtest.write_to(__cache, buf);
+        }
+        if self.forks != 0u32 {
+            ::buffa::types::put_uint32_field(16u32, self.forks, buf);
+        }
+        if self.forked_from.is_set() {
+            ::buffa::types::put_len_delimited_header(17u32, __cache.consume_next(), buf);
+            self.forked_from.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -28787,6 +30770,24 @@ impl ::buffa::Message for CommunityStrategy {
                     ctx,
                 )?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.forks = ::buffa::types::decode_uint32(buf)?;
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.forked_from.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -28810,6 +30811,8 @@ impl ::buffa::Message for CommunityStrategy {
         self.money_card = ::buffa::MessageField::none();
         self.flow = ::buffa::MessageField::none();
         self.backtest = ::buffa::MessageField::none();
+        self.forks = 0u32;
+        self.forked_from = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -29955,6 +31958,710 @@ pub const __LIST_COMMUNITY_STRATEGIES_RESPONSE_JSON_ANY: ::buffa::type_registry:
     type_url: "type.googleapis.com/strategies.v1.ListCommunityStrategiesResponse",
     to_json: ::buffa::type_registry::any_to_json::<ListCommunityStrategiesResponse>,
     from_json: ::buffa::type_registry::any_from_json::<ListCommunityStrategiesResponse>,
+    is_wkt: false,
+};
+/// ForkStrategyRequest copies one public community listing's published
+/// version into a new strategy of the caller.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ForkStrategyRequest {
+    /// Public listing ID.
+    ///
+    /// Field 1: `listing_id`
+    #[serde(
+        rename = "listingId",
+        alias = "listing_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub listing_id: u64,
+    /// Name of the new strategy.
+    ///
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Client-chosen key, unique per caller, that makes the call idempotent: the
+    /// same key and request return the strategy the first call created, as it
+    /// stands now, and never fork again; another request with the same key, a
+    /// CreateStrategy's or a SaveDraftVersion's included, is
+    /// IDEMPOTENCY_CONFLICT. Required.
+    ///
+    /// Field 3: `idempotency_key`
+    #[serde(
+        rename = "idempotencyKey",
+        alias = "idempotency_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub idempotency_key: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ForkStrategyRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ForkStrategyRequest")
+            .field("listing_id", &self.listing_id)
+            .field("name", &self.name)
+            .field("idempotency_key", &self.idempotency_key)
+            .finish()
+    }
+}
+impl ForkStrategyRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ForkStrategyRequest";
+}
+::buffa::impl_default_instance!(ForkStrategyRequest);
+impl ::buffa::MessageName for ForkStrategyRequest {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "ForkStrategyRequest";
+    const FULL_NAME: &'static str = "strategies.v1.ForkStrategyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ForkStrategyRequest";
+}
+impl ::buffa::Message for ForkStrategyRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.listing_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.name.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
+        }
+        if !self.idempotency_key.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.listing_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        if !self.idempotency_key.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.idempotency_key, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.listing_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.listing_id = 0u64;
+        self.name.clear();
+        self.idempotency_key.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ForkStrategyRequest {
+    const PROTO_FQN: &'static str = "strategies.v1.ForkStrategyRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ForkStrategyRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __FORK_STRATEGY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.ForkStrategyRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ForkStrategyRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ForkStrategyRequest>,
+    is_wkt: false,
+};
+/// ForkStrategyResponse is the new strategy.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ForkStrategyResponse {
+    /// The strategy, as it stands now: the published version is its revision
+    /// 1, and its origin names the listing.
+    ///
+    /// Field 1: `strategy`
+    #[serde(
+        rename = "strategy",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub strategy: ::buffa::MessageField<Strategy>,
+    /// The check result of revision 1's version, as the listing published it.
+    ///
+    /// Field 2: `version`
+    #[serde(
+        rename = "version",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub version: ::buffa::MessageField<VersionValidation>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ForkStrategyResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ForkStrategyResponse")
+            .field("strategy", &self.strategy)
+            .field("version", &self.version)
+            .finish()
+    }
+}
+impl ForkStrategyResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ForkStrategyResponse";
+}
+::buffa::impl_default_instance!(ForkStrategyResponse);
+impl ::buffa::MessageName for ForkStrategyResponse {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "ForkStrategyResponse";
+    const FULL_NAME: &'static str = "strategies.v1.ForkStrategyResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ForkStrategyResponse";
+}
+impl ::buffa::Message for ForkStrategyResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.strategy.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.strategy.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.version.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.version.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.strategy.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.strategy.write_to(__cache, buf);
+        }
+        if self.version.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.version.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.strategy.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.version.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.strategy = ::buffa::MessageField::none();
+        self.version = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ForkStrategyResponse {
+    const PROTO_FQN: &'static str = "strategies.v1.ForkStrategyResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ForkStrategyResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __FORK_STRATEGY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.ForkStrategyResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ForkStrategyResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ForkStrategyResponse>,
+    is_wkt: false,
+};
+/// ReportCommunityStrategyRequest reports one public community listing to
+/// moderation.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ReportCommunityStrategyRequest {
+    /// Public listing ID.
+    ///
+    /// Field 1: `listing_id`
+    #[serde(
+        rename = "listingId",
+        alias = "listing_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub listing_id: u64,
+    /// The version the reader saw, as GetCommunityStrategy returned it: the
+    /// report is about that version, whatever the listing shows later.
+    ///
+    /// Field 2: `version_id`
+    #[serde(
+        rename = "versionId",
+        alias = "version_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub version_id: ::buffa::alloc::string::String,
+    /// Why it is reported.
+    ///
+    /// Field 3: `reason`
+    #[serde(
+        rename = "reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub reason: ::buffa::EnumValue<ReportReason>,
+    /// What the reader adds. At most 500 characters; required when reason is
+    /// OTHER.
+    ///
+    /// Field 4: `note`
+    #[serde(
+        rename = "note",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub note: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ReportCommunityStrategyRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ReportCommunityStrategyRequest")
+            .field("listing_id", &self.listing_id)
+            .field("version_id", &self.version_id)
+            .field("reason", &self.reason)
+            .field("note", &self.note)
+            .finish()
+    }
+}
+impl ReportCommunityStrategyRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReportCommunityStrategyRequest";
+}
+::buffa::impl_default_instance!(ReportCommunityStrategyRequest);
+impl ::buffa::MessageName for ReportCommunityStrategyRequest {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "ReportCommunityStrategyRequest";
+    const FULL_NAME: &'static str = "strategies.v1.ReportCommunityStrategyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReportCommunityStrategyRequest";
+}
+impl ::buffa::Message for ReportCommunityStrategyRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.listing_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.version_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.version_id) as u32;
+        }
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.note.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.note) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.listing_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+        }
+        if !self.version_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.version_id, buf);
+        }
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if !self.note.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.note, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.listing_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.version_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.note, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.listing_id = 0u64;
+        self.version_id.clear();
+        self.reason = ::buffa::EnumValue::from(0);
+        self.note.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ReportCommunityStrategyRequest {
+    const PROTO_FQN: &'static str = "strategies.v1.ReportCommunityStrategyRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ReportCommunityStrategyRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REPORT_COMMUNITY_STRATEGY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.ReportCommunityStrategyRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ReportCommunityStrategyRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ReportCommunityStrategyRequest>,
+    is_wkt: false,
+};
+/// ReportCommunityStrategyResponse confirms the report.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ReportCommunityStrategyResponse {
+    /// When the report was recorded. A repeat of the caller's report of the
+    /// same version answers the first report's time.
+    ///
+    /// Field 1: `reported_at`
+    #[serde(
+        rename = "reportedAt",
+        alias = "reported_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub reported_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ReportCommunityStrategyResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ReportCommunityStrategyResponse")
+            .field("reported_at", &self.reported_at)
+            .finish()
+    }
+}
+impl ReportCommunityStrategyResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReportCommunityStrategyResponse";
+}
+::buffa::impl_default_instance!(ReportCommunityStrategyResponse);
+impl ::buffa::MessageName for ReportCommunityStrategyResponse {
+    const PACKAGE: &'static str = "strategies.v1";
+    const NAME: &'static str = "ReportCommunityStrategyResponse";
+    const FULL_NAME: &'static str = "strategies.v1.ReportCommunityStrategyResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReportCommunityStrategyResponse";
+}
+impl ::buffa::Message for ReportCommunityStrategyResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.reported_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.reported_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.reported_at.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.reported_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.reported_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.reported_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ReportCommunityStrategyResponse {
+    const PROTO_FQN: &'static str = "strategies.v1.ReportCommunityStrategyResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ReportCommunityStrategyResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REPORT_COMMUNITY_STRATEGY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/strategies.v1.ReportCommunityStrategyResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ReportCommunityStrategyResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ReportCommunityStrategyResponse>,
     is_wkt: false,
 };
 /// GetCommunityStrategyRequest reads one public community listing.
@@ -31587,8 +34294,8 @@ pub mod __buffa {
             /// Field 2: `field_path`
             pub field_path: &'a str,
             /// When the same request may succeed. Set only with
-            /// SCENARIO_RUN_LIMIT_REACHED, PUBLISH_LIMIT_REACHED, and with
-            /// BACKTEST_LIMIT_REACHED for the daily limit.
+            /// SCENARIO_RUN_LIMIT_REACHED, PUBLISH_LIMIT_REACHED, REPORT_LIMIT_REACHED,
+            /// and with BACKTEST_LIMIT_REACHED for the daily limit.
             ///
             /// Field 3: `retry_after`
             pub retry_after: ::buffa::MessageFieldView<
@@ -32397,8 +35104,8 @@ pub mod __buffa {
                 self.0.reborrow().field_path
             }
             /// When the same request may succeed. Set only with
-            /// SCENARIO_RUN_LIMIT_REACHED, PUBLISH_LIMIT_REACHED, and with
-            /// BACKTEST_LIMIT_REACHED for the daily limit.
+            /// SCENARIO_RUN_LIMIT_REACHED, PUBLISH_LIMIT_REACHED, REPORT_LIMIT_REACHED,
+            /// and with BACKTEST_LIMIT_REACHED for the daily limit.
             ///
             /// Field 3: `retry_after`
             #[must_use]
@@ -40196,7 +42903,9 @@ pub mod __buffa {
             ///
             /// Field 5: `logs`
             pub logs: ::buffa::RepeatedView<'a, &'a str>,
-            /// The handler's error, when it failed. Empty otherwise.
+            /// Why the example failed: the handler's error, or that a call took longer
+            /// than allowed or the runtime failed on this run, which running the
+            /// examples again retries. Empty otherwise.
             ///
             /// Field 6: `error`
             pub error: &'a str,
@@ -40597,7 +43306,9 @@ pub mod __buffa {
             pub fn logs(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
                 &self.0.reborrow().logs
             }
-            /// The handler's error, when it failed. Empty otherwise.
+            /// Why the example failed: the handler's error, or that a call took longer
+            /// than allowed or the runtime failed on this run, which running the
+            /// examples again retries. Empty otherwise.
             ///
             /// Field 6: `error`
             #[must_use]
@@ -49363,8 +52074,9 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::ScenarioSummaryView<'a>,
             >,
-            /// The latest backtest. Omitted when there is none; backtest_absent_reason
-            /// then says why.
+            /// The latest eligible completed backtest with the default settings: the
+            /// caller's own, finished and within retention. Omitted when there is none;
+            /// backtest_absent_reason then says why.
             ///
             /// Field 5: `backtest`
             pub backtest: ::buffa::MessageFieldView<
@@ -49375,8 +52087,8 @@ pub mod __buffa {
             ///
             /// Field 6: `backtest_absent_reason`
             pub backtest_absent_reason: &'a str,
-            /// What to weigh before deploying, for example "never backtested" or "trades
-            /// a thin market".
+            /// What to weigh before deploying, for example "no completed backtest
+            /// available" or "trades a thin market".
             ///
             /// Field 7: `warnings`
             pub warnings: ::buffa::RepeatedView<'a, &'a str>,
@@ -49914,8 +52626,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().scenarios
             }
-            /// The latest backtest. Omitted when there is none; backtest_absent_reason
-            /// then says why.
+            /// The latest eligible completed backtest with the default settings: the
+            /// caller's own, finished and within retention. Omitted when there is none;
+            /// backtest_absent_reason then says why.
             ///
             /// Field 5: `backtest`
             #[must_use]
@@ -49934,8 +52647,8 @@ pub mod __buffa {
             pub fn backtest_absent_reason(&self) -> &'_ str {
                 self.0.reborrow().backtest_absent_reason
             }
-            /// What to weigh before deploying, for example "never backtested" or "trades
-            /// a thin market".
+            /// What to weigh before deploying, for example "no completed backtest
+            /// available" or "trades a thin market".
             ///
             /// Field 7: `warnings`
             #[must_use]
@@ -51173,7 +53886,9 @@ pub mod __buffa {
             pub idempotency_key: &'a str,
             /// The subaccount that funds the bot. Zero means the main account. It must
             /// be an active subaccount of the caller's main account; any other,
-            /// including a disabled one, is FUNDING_SUBACCOUNT_NOT_FOUND.
+            /// including a disabled one, is FUNDING_SUBACCOUNT_NOT_FOUND. A subaccount
+            /// that is or was a strategy bot's is FUNDING_SOURCE_IS_BOT, even with no
+            /// funding.
             ///
             /// Field 6: `funding_subaccount_id`
             pub funding_subaccount_id: u64,
@@ -51630,7 +54345,9 @@ pub mod __buffa {
             }
             /// The subaccount that funds the bot. Zero means the main account. It must
             /// be an active subaccount of the caller's main account; any other,
-            /// including a disabled one, is FUNDING_SUBACCOUNT_NOT_FOUND.
+            /// including a disabled one, is FUNDING_SUBACCOUNT_NOT_FOUND. A subaccount
+            /// that is or was a strategy bot's is FUNDING_SOURCE_IS_BOT, even with no
+            /// funding.
             ///
             /// Field 6: `funding_subaccount_id`
             #[must_use]
@@ -55656,6 +58373,19 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::BotActivityHourView<'a>,
             >,
+            /// Public ID of the strategy the bot was deployed from, as its deploy
+            /// proposal recorded it. Zero when the run has no linked strategy, for
+            /// example once the strategy is deleted.
+            ///
+            /// Field 17: `strategy_id`
+            pub strategy_id: u64,
+            /// The strategy's revision whose version the bot runs, the number
+            /// ListStrategyRevisions shows, as its deploy proposal recorded it. Zero
+            /// when the run has no linked strategy, for example once the strategy is
+            /// deleted.
+            ///
+            /// Field 18: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BotView<'a> {
@@ -55856,6 +58586,20 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.strategy_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     11u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -55948,6 +58692,8 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    strategy_id: self.strategy_id,
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -56050,6 +58796,14 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.strategy_id != 0u64 {
+                    size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -56136,6 +58890,12 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if self.strategy_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(17u32, self.strategy_id, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(18u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -56229,6 +58989,20 @@ pub mod __buffa {
                 }
                 if !self.activity.is_empty() {
                     __map.serialize_entry("activity", &*self.activity)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.strategy_id) {
+                    __map
+                        .serialize_entry(
+                            "strategyId",
+                            &::buffa::json_helpers::ProtoJson(&self.strategy_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -56460,6 +59234,25 @@ pub mod __buffa {
                 super::super::__buffa::view::BotActivityHourView<'_>,
             > {
                 &self.0.reborrow().activity
+            }
+            /// Public ID of the strategy the bot was deployed from, as its deploy
+            /// proposal recorded it. Zero when the run has no linked strategy, for
+            /// example once the strategy is deleted.
+            ///
+            /// Field 17: `strategy_id`
+            #[must_use]
+            pub fn strategy_id(&self) -> u64 {
+                self.0.reborrow().strategy_id
+            }
+            /// The strategy's revision whose version the bot runs, the number
+            /// ListStrategyRevisions shows, as its deploy proposal recorded it. Zero
+            /// when the run has no linked strategy, for example once the strategy is
+            /// deleted.
+            ///
+            /// Field 18: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<BotView<'static>>>
@@ -60033,6 +62826,1849 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// BotFundsReturn is one return of a stopped bot's available balances to its
+        /// owner's main account.
+        #[derive(Clone, Debug, Default)]
+        pub struct BotFundsReturnView<'a> {
+            /// Public return ID: GetBotFundsReturn reads the return by it.
+            ///
+            /// Field 1: `return_id`
+            pub return_id: u64,
+            /// Public bot ID of the bot whose funds it returns.
+            ///
+            /// Field 2: `bot_id`
+            pub bot_id: u64,
+            /// How the return stands.
+            ///
+            /// Field 3: `status`
+            pub status: ::buffa::EnumValue<super::super::BotFundsReturnStatus>,
+            /// The amounts moved so far from the bot's subaccount to the main account,
+            /// one per asset, confirmed only: an amount the return is still moving
+            /// counts once the move is confirmed. It grows while RETURN_PROCESSING, as
+            /// more becomes spendable; empty for RETURN_NOTHING_MOVED.
+            ///
+            /// Field 4: `assets`
+            pub assets: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::MoneyView<'a>,
+            >,
+            /// When the return was requested.
+            ///
+            /// Field 5: `requested_at`
+            pub requested_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// When it completed or ended with nothing moved; unset while processing.
+            ///
+            /// Field 6: `finished_at`
+            pub finished_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// What still stays on the bot's subaccount, one per asset, as the return
+            /// last read it: what its open orders' holds reserve. The return takes
+            /// it once released, as the orders fill or end. Empty once the return
+            /// finished.
+            ///
+            /// Field 7: `held`
+            pub held: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::MoneyView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BotFundsReturnView<'a> {
+            type Owned = super::super::BotFundsReturn;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.return_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.bot_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.requested_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.requested_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.finished_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.finished_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.assets
+                            .push(
+                                <super::super::__buffa::view::MoneyView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.held
+                            .push(
+                                <super::super::__buffa::view::MoneyView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BotFundsReturn,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BotFundsReturn,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BotFundsReturn {
+                    return_id: self.return_id,
+                    bot_id: self.bot_id,
+                    status: self.status,
+                    assets: self
+                        .assets
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    requested_at: match self.requested_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    finished_at: match self.finished_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    held: self
+                        .held
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BotFundsReturnView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.return_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.bot_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                for v in &self.assets {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.requested_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.requested_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.finished_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.finished_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.held {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.return_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.return_id, buf);
+                }
+                if self.bot_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(2u32, self.bot_id, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                for v in &self.assets {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.requested_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.requested_at.write_to(__cache, buf);
+                }
+                if self.finished_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.finished_at.write_to(__cache, buf);
+                }
+                for v in &self.held {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BotFundsReturnView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.return_id) {
+                    __map
+                        .serialize_entry(
+                            "returnId",
+                            &::buffa::json_helpers::ProtoJson(&self.return_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.bot_id) {
+                    __map
+                        .serialize_entry(
+                            "botId",
+                            &::buffa::json_helpers::ProtoJson(&self.bot_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if !self.assets.is_empty() {
+                    __map.serialize_entry("assets", &*self.assets)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .requested_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("requestedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .finished_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("finishedAt", __v)?;
+                    }
+                }
+                if !self.held.is_empty() {
+                    __map.serialize_entry("held", &*self.held)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BotFundsReturnView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "BotFundsReturn";
+            const FULL_NAME: &'static str = "strategies.v1.BotFundsReturn";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.BotFundsReturn";
+        }
+        ::buffa::impl_default_view_instance!(BotFundsReturnView);
+        ::buffa::impl_view_reborrow!(BotFundsReturnView);
+        /** Self-contained, `'static` owned view of a `BotFundsReturn` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BotFundsReturnView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BotFundsReturnView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BotFundsReturnOwnedView(
+            ::buffa::OwnedView<BotFundsReturnView<'static>>,
+        );
+        impl BotFundsReturnOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BotFundsReturnOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BotFundsReturnOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BotFundsReturn,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BotFundsReturnOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`BotFundsReturnView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BotFundsReturnView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BotFundsReturn,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public return ID: GetBotFundsReturn reads the return by it.
+            ///
+            /// Field 1: `return_id`
+            #[must_use]
+            pub fn return_id(&self) -> u64 {
+                self.0.reborrow().return_id
+            }
+            /// Public bot ID of the bot whose funds it returns.
+            ///
+            /// Field 2: `bot_id`
+            #[must_use]
+            pub fn bot_id(&self) -> u64 {
+                self.0.reborrow().bot_id
+            }
+            /// How the return stands.
+            ///
+            /// Field 3: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::BotFundsReturnStatus> {
+                self.0.reborrow().status
+            }
+            /// The amounts moved so far from the bot's subaccount to the main account,
+            /// one per asset, confirmed only: an amount the return is still moving
+            /// counts once the move is confirmed. It grows while RETURN_PROCESSING, as
+            /// more becomes spendable; empty for RETURN_NOTHING_MOVED.
+            ///
+            /// Field 4: `assets`
+            #[must_use]
+            pub fn assets(
+                &self,
+            ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::MoneyView<'_>> {
+                &self.0.reborrow().assets
+            }
+            /// When the return was requested.
+            ///
+            /// Field 5: `requested_at`
+            #[must_use]
+            pub fn requested_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().requested_at
+            }
+            /// When it completed or ended with nothing moved; unset while processing.
+            ///
+            /// Field 6: `finished_at`
+            #[must_use]
+            pub fn finished_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().finished_at
+            }
+            /// What still stays on the bot's subaccount, one per asset, as the return
+            /// last read it: what its open orders' holds reserve. The return takes
+            /// it once released, as the orders fill or end. Empty once the return
+            /// finished.
+            ///
+            /// Field 7: `held`
+            #[must_use]
+            pub fn held(
+                &self,
+            ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::MoneyView<'_>> {
+                &self.0.reborrow().held
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<BotFundsReturnView<'static>>>
+        for BotFundsReturnOwnedView {
+            fn from(inner: ::buffa::OwnedView<BotFundsReturnView<'static>>) -> Self {
+                BotFundsReturnOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BotFundsReturnOwnedView>
+        for ::buffa::OwnedView<BotFundsReturnView<'static>> {
+            fn from(wrapper: BotFundsReturnOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<BotFundsReturnView<'static>>>
+        for BotFundsReturnOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<BotFundsReturnView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BotFundsReturn {
+            type View<'a> = BotFundsReturnView<'a>;
+            type ViewHandle = BotFundsReturnOwnedView;
+        }
+        impl ::serde::Serialize for BotFundsReturnOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ReturnBotFundsRequest returns one stopped bot's funds to the caller's main
+        /// account.
+        #[derive(Clone, Debug, Default)]
+        pub struct ReturnBotFundsRequestView<'a> {
+            /// Public bot ID. The bot must belong to the caller's main account.
+            ///
+            /// Field 1: `bot_id`
+            pub bot_id: u64,
+            /// Client-chosen key, unique per caller, that makes the call idempotent: the
+            /// same key and bot return the same return, as it stands now, and never
+            /// start a second one; the same key for another bot is
+            /// IDEMPOTENCY_CONFLICT. Required.
+            ///
+            /// Field 2: `idempotency_key`
+            pub idempotency_key: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ReturnBotFundsRequestView<'a> {
+            type Owned = super::super::ReturnBotFundsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.bot_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReturnBotFundsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ReturnBotFundsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ReturnBotFundsRequest {
+                    bot_id: self.bot_id,
+                    idempotency_key: self.idempotency_key.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ReturnBotFundsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.bot_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.idempotency_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.idempotency_key)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.bot_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.bot_id, buf);
+                }
+                if !self.idempotency_key.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ReturnBotFundsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.bot_id) {
+                    __map
+                        .serialize_entry(
+                            "botId",
+                            &::buffa::json_helpers::ProtoJson(&self.bot_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
+                    __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ReturnBotFundsRequestView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "ReturnBotFundsRequest";
+            const FULL_NAME: &'static str = "strategies.v1.ReturnBotFundsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReturnBotFundsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ReturnBotFundsRequestView);
+        ::buffa::impl_view_reborrow!(ReturnBotFundsRequestView);
+        /** Self-contained, `'static` owned view of a `ReturnBotFundsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ReturnBotFundsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ReturnBotFundsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ReturnBotFundsRequestOwnedView(
+            ::buffa::OwnedView<ReturnBotFundsRequestView<'static>>,
+        );
+        impl ReturnBotFundsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReturnBotFundsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReturnBotFundsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ReturnBotFundsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReturnBotFundsRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ReturnBotFundsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ReturnBotFundsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReturnBotFundsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public bot ID. The bot must belong to the caller's main account.
+            ///
+            /// Field 1: `bot_id`
+            #[must_use]
+            pub fn bot_id(&self) -> u64 {
+                self.0.reborrow().bot_id
+            }
+            /// Client-chosen key, unique per caller, that makes the call idempotent: the
+            /// same key and bot return the same return, as it stands now, and never
+            /// start a second one; the same key for another bot is
+            /// IDEMPOTENCY_CONFLICT. Required.
+            ///
+            /// Field 2: `idempotency_key`
+            #[must_use]
+            pub fn idempotency_key(&self) -> &'_ str {
+                self.0.reborrow().idempotency_key
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ReturnBotFundsRequestView<'static>>,
+        > for ReturnBotFundsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ReturnBotFundsRequestView<'static>>,
+            ) -> Self {
+                ReturnBotFundsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ReturnBotFundsRequestOwnedView>
+        for ::buffa::OwnedView<ReturnBotFundsRequestView<'static>> {
+            fn from(wrapper: ReturnBotFundsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ReturnBotFundsRequestView<'static>>,
+        > for ReturnBotFundsRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ReturnBotFundsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ReturnBotFundsRequest {
+            type View<'a> = ReturnBotFundsRequestView<'a>;
+            type ViewHandle = ReturnBotFundsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ReturnBotFundsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ReturnBotFundsResponse is the return the call started or joined.
+        #[derive(Clone, Debug, Default)]
+        pub struct ReturnBotFundsResponseView<'a> {
+            /// The return. It reads RETURN_PROCESSING while anything stays on the bot's
+            /// subaccount, then RETURN_COMPLETED.
+            ///
+            /// Field 1: `funds_return`
+            pub funds_return: ::buffa::MessageFieldView<
+                super::super::__buffa::view::BotFundsReturnView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ReturnBotFundsResponseView<'a> {
+            type Owned = super::super::ReturnBotFundsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.funds_return.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.funds_return = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::BotFundsReturnView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReturnBotFundsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ReturnBotFundsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ReturnBotFundsResponse {
+                    funds_return: match self.funds_return.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::BotFundsReturn,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ReturnBotFundsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.funds_return.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.funds_return.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.funds_return.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.funds_return.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ReturnBotFundsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .funds_return
+                        .as_option()
+                    {
+                        __map.serialize_entry("fundsReturn", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ReturnBotFundsResponseView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "ReturnBotFundsResponse";
+            const FULL_NAME: &'static str = "strategies.v1.ReturnBotFundsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReturnBotFundsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ReturnBotFundsResponseView);
+        ::buffa::impl_view_reborrow!(ReturnBotFundsResponseView);
+        /** Self-contained, `'static` owned view of a `ReturnBotFundsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ReturnBotFundsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ReturnBotFundsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ReturnBotFundsResponseOwnedView(
+            ::buffa::OwnedView<ReturnBotFundsResponseView<'static>>,
+        );
+        impl ReturnBotFundsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReturnBotFundsResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReturnBotFundsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ReturnBotFundsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReturnBotFundsResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ReturnBotFundsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ReturnBotFundsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReturnBotFundsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The return. It reads RETURN_PROCESSING while anything stays on the bot's
+            /// subaccount, then RETURN_COMPLETED.
+            ///
+            /// Field 1: `funds_return`
+            #[must_use]
+            pub fn funds_return(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::BotFundsReturnView<'_>,
+            > {
+                &self.0.reborrow().funds_return
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ReturnBotFundsResponseView<'static>>,
+        > for ReturnBotFundsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ReturnBotFundsResponseView<'static>>,
+            ) -> Self {
+                ReturnBotFundsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ReturnBotFundsResponseOwnedView>
+        for ::buffa::OwnedView<ReturnBotFundsResponseView<'static>> {
+            fn from(wrapper: ReturnBotFundsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ReturnBotFundsResponseView<'static>>,
+        > for ReturnBotFundsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ReturnBotFundsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ReturnBotFundsResponse {
+            type View<'a> = ReturnBotFundsResponseView<'a>;
+            type ViewHandle = ReturnBotFundsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ReturnBotFundsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetBotFundsReturnRequest reads one return of the caller's.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetBotFundsReturnRequestView<'a> {
+            /// Public return ID, as ReturnBotFunds answered it.
+            ///
+            /// Field 1: `return_id`
+            pub return_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetBotFundsReturnRequestView<'a> {
+            type Owned = super::super::GetBotFundsReturnRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.return_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBotFundsReturnRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetBotFundsReturnRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetBotFundsReturnRequest {
+                    return_id: self.return_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetBotFundsReturnRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.return_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.return_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.return_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetBotFundsReturnRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.return_id) {
+                    __map
+                        .serialize_entry(
+                            "returnId",
+                            &::buffa::json_helpers::ProtoJson(&self.return_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetBotFundsReturnRequestView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "GetBotFundsReturnRequest";
+            const FULL_NAME: &'static str = "strategies.v1.GetBotFundsReturnRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.GetBotFundsReturnRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetBotFundsReturnRequestView);
+        ::buffa::impl_view_reborrow!(GetBotFundsReturnRequestView);
+        /** Self-contained, `'static` owned view of a `GetBotFundsReturnRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetBotFundsReturnRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetBotFundsReturnRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetBotFundsReturnRequestOwnedView(
+            ::buffa::OwnedView<GetBotFundsReturnRequestView<'static>>,
+        );
+        impl GetBotFundsReturnRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBotFundsReturnRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBotFundsReturnRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetBotFundsReturnRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBotFundsReturnRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetBotFundsReturnRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetBotFundsReturnRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBotFundsReturnRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public return ID, as ReturnBotFunds answered it.
+            ///
+            /// Field 1: `return_id`
+            #[must_use]
+            pub fn return_id(&self) -> u64 {
+                self.0.reborrow().return_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetBotFundsReturnRequestView<'static>>,
+        > for GetBotFundsReturnRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetBotFundsReturnRequestView<'static>>,
+            ) -> Self {
+                GetBotFundsReturnRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetBotFundsReturnRequestOwnedView>
+        for ::buffa::OwnedView<GetBotFundsReturnRequestView<'static>> {
+            fn from(wrapper: GetBotFundsReturnRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetBotFundsReturnRequestView<'static>>,
+        > for GetBotFundsReturnRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetBotFundsReturnRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetBotFundsReturnRequest {
+            type View<'a> = GetBotFundsReturnRequestView<'a>;
+            type ViewHandle = GetBotFundsReturnRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetBotFundsReturnRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetBotFundsReturnResponse is the return as it stands.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetBotFundsReturnResponseView<'a> {
+            /// The return.
+            ///
+            /// Field 1: `funds_return`
+            pub funds_return: ::buffa::MessageFieldView<
+                super::super::__buffa::view::BotFundsReturnView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetBotFundsReturnResponseView<'a> {
+            type Owned = super::super::GetBotFundsReturnResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.funds_return.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.funds_return = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::BotFundsReturnView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBotFundsReturnResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetBotFundsReturnResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetBotFundsReturnResponse {
+                    funds_return: match self.funds_return.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::BotFundsReturn,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetBotFundsReturnResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.funds_return.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.funds_return.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.funds_return.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.funds_return.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetBotFundsReturnResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .funds_return
+                        .as_option()
+                    {
+                        __map.serialize_entry("fundsReturn", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetBotFundsReturnResponseView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "GetBotFundsReturnResponse";
+            const FULL_NAME: &'static str = "strategies.v1.GetBotFundsReturnResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.GetBotFundsReturnResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetBotFundsReturnResponseView);
+        ::buffa::impl_view_reborrow!(GetBotFundsReturnResponseView);
+        /** Self-contained, `'static` owned view of a `GetBotFundsReturnResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetBotFundsReturnResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetBotFundsReturnResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetBotFundsReturnResponseOwnedView(
+            ::buffa::OwnedView<GetBotFundsReturnResponseView<'static>>,
+        );
+        impl GetBotFundsReturnResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBotFundsReturnResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBotFundsReturnResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetBotFundsReturnResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBotFundsReturnResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetBotFundsReturnResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetBotFundsReturnResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBotFundsReturnResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The return.
+            ///
+            /// Field 1: `funds_return`
+            #[must_use]
+            pub fn funds_return(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::BotFundsReturnView<'_>,
+            > {
+                &self.0.reborrow().funds_return
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetBotFundsReturnResponseView<'static>>,
+        > for GetBotFundsReturnResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetBotFundsReturnResponseView<'static>>,
+            ) -> Self {
+                GetBotFundsReturnResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetBotFundsReturnResponseOwnedView>
+        for ::buffa::OwnedView<GetBotFundsReturnResponseView<'static>> {
+            fn from(wrapper: GetBotFundsReturnResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetBotFundsReturnResponseView<'static>>,
+        > for GetBotFundsReturnResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetBotFundsReturnResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetBotFundsReturnResponse {
+            type View<'a> = GetBotFundsReturnResponseView<'a>;
+            type ViewHandle = GetBotFundsReturnResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetBotFundsReturnResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// GetBotResponse is a bot with its money rules, settings and recent
         /// decisions. The bot's subaccount is read like any other, by its
         /// subaccount_id: its balances with LedgerReadService.GetBalances, its open
@@ -60969,6 +65605,19 @@ pub mod __buffa {
             pub stopped_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Public ID of the strategy the run was deployed from, as its deploy
+            /// proposal recorded it. Zero when the run has no linked strategy, for
+            /// example once the strategy is deleted.
+            ///
+            /// Field 6: `strategy_id`
+            pub strategy_id: u64,
+            /// The strategy's revision whose version the run ran, the number
+            /// ListStrategyRevisions shows, as its deploy proposal recorded it. Zero
+            /// when the run has no linked strategy, for example once the strategy is
+            /// deleted.
+            ///
+            /// Field 7: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BotVersionView<'a> {
@@ -61073,6 +65722,20 @@ pub mod __buffa {
                             }
                         }
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.strategy_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -61115,6 +65778,8 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    strategy_id: self.strategy_id,
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -61160,6 +65825,14 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.strategy_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.revision != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -61195,6 +65868,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.stopped_at.write_to(__cache, buf);
+                }
+                if self.strategy_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(6u32, self.strategy_id, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(7u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -61241,6 +65920,20 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("stoppedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.strategy_id) {
+                    __map
+                        .serialize_entry(
+                            "strategyId",
+                            &::buffa::json_helpers::ProtoJson(&self.strategy_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -61376,6 +66069,25 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().stopped_at
+            }
+            /// Public ID of the strategy the run was deployed from, as its deploy
+            /// proposal recorded it. Zero when the run has no linked strategy, for
+            /// example once the strategy is deleted.
+            ///
+            /// Field 6: `strategy_id`
+            #[must_use]
+            pub fn strategy_id(&self) -> u64 {
+                self.0.reborrow().strategy_id
+            }
+            /// The strategy's revision whose version the run ran, the number
+            /// ListStrategyRevisions shows, as its deploy proposal recorded it. Zero
+            /// when the run has no linked strategy, for example once the strategy is
+            /// deleted.
+            ///
+            /// Field 7: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<BotVersionView<'static>>>
@@ -65156,6 +69868,10 @@ pub mod __buffa {
             pub published_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Why moderation holds the listing. Set only when state is HELD.
+            ///
+            /// Field 5: `hold_reason`
+            pub hold_reason: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for StrategyListingView<'a> {
@@ -65237,6 +69953,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.hold_reason = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -65277,6 +70000,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    hold_reason: self.hold_reason.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -65314,6 +70038,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if !self.hold_reason.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.hold_reason)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -65344,6 +70074,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.published_at.write_to(__cache, buf);
+                }
+                if !self.hold_reason.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.hold_reason, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -65386,6 +70119,9 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("publishedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.hold_reason) {
+                    __map.serialize_entry("holdReason", self.hold_reason)?;
                 }
                 __map.end()
             }
@@ -65516,6 +70252,13 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().published_at
+            }
+            /// Why moderation holds the listing. Set only when state is HELD.
+            ///
+            /// Field 5: `hold_reason`
+            #[must_use]
+            pub fn hold_reason(&self) -> &'_ str {
+                self.0.reborrow().hold_reason
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<StrategyListingView<'static>>>
@@ -65934,6 +70677,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::strategy_origin::Source::Fork(
+                                ref mut existing,
+                            ),
+                        ) = view.source
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.source = Some(
+                                super::super::__buffa::view::oneof::strategy_origin::Source::Fork(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::StrategyForkOriginView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -65983,6 +70757,15 @@ pub mod __buffa {
                                             ),
                                         )
                                     }
+                                    super::super::__buffa::view::oneof::strategy_origin::Source::Fork(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::strategy_origin::Source::Fork(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -66010,6 +70793,16 @@ pub mod __buffa {
                             size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
                         }
                         super::super::__buffa::view::oneof::strategy_origin::Source::Duplicate(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::strategy_origin::Source::Fork(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -66049,6 +70842,16 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::strategy_origin::Source::Fork(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -66083,6 +70886,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("duplicate", v)?;
+                        }
+                        super::super::__buffa::view::oneof::strategy_origin::Source::Fork(
+                            v,
+                        ) => {
+                            __map.serialize_entry("fork", v)?;
                         }
                     }
                 }
@@ -66215,6 +71023,373 @@ pub mod __buffa {
             type ViewHandle = StrategyOriginOwnedView;
         }
         impl ::serde::Serialize for StrategyOriginOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// StrategyForkOrigin is the community listing a strategy was forked from.
+        /// The strategy shows it was forked even once the listing is no longer
+        /// public; it then names the listing no more.
+        #[derive(Clone, Debug, Default)]
+        pub struct StrategyForkOriginView<'a> {
+            /// Public listing ID, while the listing is public. Zero once it isn't.
+            ///
+            /// Field 1: `listing_id`
+            pub listing_id: u64,
+            /// The listing's title, while it is public. Empty otherwise.
+            ///
+            /// Field 2: `title`
+            pub title: &'a str,
+            /// The listing author's current username, while it is public. Empty
+            /// otherwise.
+            ///
+            /// Field 3: `author_username`
+            pub author_username: &'a str,
+            /// The published version copied, which is the strategy's revision 1.
+            ///
+            /// Field 4: `source_version_id`
+            pub source_version_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for StrategyForkOriginView<'a> {
+            type Owned = super::super::StrategyForkOrigin;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.listing_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.title = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.author_username = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.source_version_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::StrategyForkOrigin,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::StrategyForkOrigin,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::StrategyForkOrigin {
+                    listing_id: self.listing_id,
+                    title: self.title.to_string(),
+                    author_username: self.author_username.to_string(),
+                    source_version_id: self.source_version_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for StrategyForkOriginView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.listing_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.title.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+                }
+                if !self.author_username.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.author_username)
+                                as u32;
+                }
+                if !self.source_version_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.source_version_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.listing_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+                }
+                if !self.title.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.title, buf);
+                }
+                if !self.author_username.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.author_username, buf);
+                }
+                if !self.source_version_id.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.source_version_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for StrategyForkOriginView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.listing_id) {
+                    __map
+                        .serialize_entry(
+                            "listingId",
+                            &::buffa::json_helpers::ProtoJson(&self.listing_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.title) {
+                    __map.serialize_entry("title", self.title)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.author_username) {
+                    __map.serialize_entry("authorUsername", self.author_username)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.source_version_id,
+                ) {
+                    __map.serialize_entry("sourceVersionId", self.source_version_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for StrategyForkOriginView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "StrategyForkOrigin";
+            const FULL_NAME: &'static str = "strategies.v1.StrategyForkOrigin";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.StrategyForkOrigin";
+        }
+        ::buffa::impl_default_view_instance!(StrategyForkOriginView);
+        ::buffa::impl_view_reborrow!(StrategyForkOriginView);
+        /** Self-contained, `'static` owned view of a `StrategyForkOrigin` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`StrategyForkOriginView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`StrategyForkOriginView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct StrategyForkOriginOwnedView(
+            ::buffa::OwnedView<StrategyForkOriginView<'static>>,
+        );
+        impl StrategyForkOriginOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StrategyForkOriginOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StrategyForkOriginOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::StrategyForkOrigin,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StrategyForkOriginOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`StrategyForkOriginView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &StrategyForkOriginView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::StrategyForkOrigin,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public listing ID, while the listing is public. Zero once it isn't.
+            ///
+            /// Field 1: `listing_id`
+            #[must_use]
+            pub fn listing_id(&self) -> u64 {
+                self.0.reborrow().listing_id
+            }
+            /// The listing's title, while it is public. Empty otherwise.
+            ///
+            /// Field 2: `title`
+            #[must_use]
+            pub fn title(&self) -> &'_ str {
+                self.0.reborrow().title
+            }
+            /// The listing author's current username, while it is public. Empty
+            /// otherwise.
+            ///
+            /// Field 3: `author_username`
+            #[must_use]
+            pub fn author_username(&self) -> &'_ str {
+                self.0.reborrow().author_username
+            }
+            /// The published version copied, which is the strategy's revision 1.
+            ///
+            /// Field 4: `source_version_id`
+            #[must_use]
+            pub fn source_version_id(&self) -> &'_ str {
+                self.0.reborrow().source_version_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<StrategyForkOriginView<'static>>>
+        for StrategyForkOriginOwnedView {
+            fn from(inner: ::buffa::OwnedView<StrategyForkOriginView<'static>>) -> Self {
+                StrategyForkOriginOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<StrategyForkOriginOwnedView>
+        for ::buffa::OwnedView<StrategyForkOriginView<'static>> {
+            fn from(wrapper: StrategyForkOriginOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<StrategyForkOriginView<'static>>>
+        for StrategyForkOriginOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<StrategyForkOriginView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::StrategyForkOrigin {
+            type View<'a> = StrategyForkOriginView<'a>;
+            type ViewHandle = StrategyForkOriginOwnedView;
+        }
+        impl ::serde::Serialize for StrategyForkOriginOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -77545,6 +82720,11 @@ pub mod __buffa {
             pub published_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// How many accounts forked the listing. An account that forked it more
+            /// than once counts once, and its author's own copies never count.
+            ///
+            /// Field 8: `forks`
+            pub forks: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CommunityStrategySummaryView<'a> {
@@ -77649,6 +82829,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.forks = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
                     3u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -77738,6 +82925,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    forks: self.forks,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -77794,6 +82982,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.forks != 0u32 {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.forks) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -77843,6 +83034,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.published_at.write_to(__cache, buf);
+                }
+                if self.forks != 0u32 {
+                    ::buffa::types::put_uint32_field(8u32, self.forks, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -77901,6 +83095,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("publishedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.forks) {
+                    __map
+                        .serialize_entry(
+                            "forks",
+                            &::buffa::json_helpers::ProtoJson(&self.forks),
+                        )?;
                 }
                 __map.end()
             }
@@ -78062,6 +83263,14 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().published_at
             }
+            /// How many accounts forked the listing. An account that forked it more
+            /// than once counts once, and its author's own copies never count.
+            ///
+            /// Field 8: `forks`
+            #[must_use]
+            pub fn forks(&self) -> u32 {
+                self.0.reborrow().forks
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<CommunityStrategySummaryView<'static>>,
@@ -78092,6 +83301,344 @@ pub mod __buffa {
             type ViewHandle = CommunityStrategySummaryOwnedView;
         }
         impl ::serde::Serialize for CommunityStrategySummaryOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CommunityForkSource is the community listing a listed strategy was
+        /// forked from. It never shows more of the source than the source's own
+        /// listing does.
+        #[derive(Clone, Debug, Default)]
+        pub struct CommunityForkSourceView<'a> {
+            /// Public listing ID of the source, while it is public. Zero once it
+            /// isn't: the strategy is then shown as forked from a community strategy.
+            ///
+            /// Field 1: `listing_id`
+            pub listing_id: u64,
+            /// The source listing's title, while it is public. Empty otherwise.
+            ///
+            /// Field 2: `title`
+            pub title: &'a str,
+            /// The source author's current username, while the source is public.
+            /// Empty otherwise.
+            ///
+            /// Field 3: `author_username`
+            pub author_username: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CommunityForkSourceView<'a> {
+            type Owned = super::super::CommunityForkSource;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.listing_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.title = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.author_username = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CommunityForkSource,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CommunityForkSource,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CommunityForkSource {
+                    listing_id: self.listing_id,
+                    title: self.title.to_string(),
+                    author_username: self.author_username.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CommunityForkSourceView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.listing_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.title.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+                }
+                if !self.author_username.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.author_username)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.listing_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+                }
+                if !self.title.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.title, buf);
+                }
+                if !self.author_username.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.author_username, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CommunityForkSourceView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.listing_id) {
+                    __map
+                        .serialize_entry(
+                            "listingId",
+                            &::buffa::json_helpers::ProtoJson(&self.listing_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.title) {
+                    __map.serialize_entry("title", self.title)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.author_username) {
+                    __map.serialize_entry("authorUsername", self.author_username)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CommunityForkSourceView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "CommunityForkSource";
+            const FULL_NAME: &'static str = "strategies.v1.CommunityForkSource";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.CommunityForkSource";
+        }
+        ::buffa::impl_default_view_instance!(CommunityForkSourceView);
+        ::buffa::impl_view_reborrow!(CommunityForkSourceView);
+        /** Self-contained, `'static` owned view of a `CommunityForkSource` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CommunityForkSourceView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CommunityForkSourceView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CommunityForkSourceOwnedView(
+            ::buffa::OwnedView<CommunityForkSourceView<'static>>,
+        );
+        impl CommunityForkSourceOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CommunityForkSourceOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CommunityForkSourceOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CommunityForkSource,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CommunityForkSourceOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CommunityForkSourceView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CommunityForkSourceView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CommunityForkSource,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public listing ID of the source, while it is public. Zero once it
+            /// isn't: the strategy is then shown as forked from a community strategy.
+            ///
+            /// Field 1: `listing_id`
+            #[must_use]
+            pub fn listing_id(&self) -> u64 {
+                self.0.reborrow().listing_id
+            }
+            /// The source listing's title, while it is public. Empty otherwise.
+            ///
+            /// Field 2: `title`
+            #[must_use]
+            pub fn title(&self) -> &'_ str {
+                self.0.reborrow().title
+            }
+            /// The source author's current username, while the source is public.
+            /// Empty otherwise.
+            ///
+            /// Field 3: `author_username`
+            #[must_use]
+            pub fn author_username(&self) -> &'_ str {
+                self.0.reborrow().author_username
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CommunityForkSourceView<'static>>>
+        for CommunityForkSourceOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CommunityForkSourceView<'static>>,
+            ) -> Self {
+                CommunityForkSourceOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CommunityForkSourceOwnedView>
+        for ::buffa::OwnedView<CommunityForkSourceView<'static>> {
+            fn from(wrapper: CommunityForkSourceOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CommunityForkSourceView<'static>>>
+        for CommunityForkSourceOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CommunityForkSourceView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CommunityForkSource {
+            type View<'a> = CommunityForkSourceView<'a>;
+            type ViewHandle = CommunityForkSourceOwnedView;
+        }
+        impl ::serde::Serialize for CommunityForkSourceOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -78181,6 +83728,19 @@ pub mod __buffa {
             /// Field 15: `backtest`
             pub backtest: ::buffa::MessageFieldView<
                 super::super::__buffa::view::CommunityBacktestView<'a>,
+            >,
+            /// How many accounts forked the listing. An account that forked it more
+            /// than once counts once, and its author's own copies never count.
+            ///
+            /// Field 16: `forks`
+            pub forks: u32,
+            /// The listing the strategy was forked from. Unset when it wasn't forked.
+            /// The platform sets it from the strategy's origin at each publish; its
+            /// author can't remove or change it.
+            ///
+            /// Field 17: `forked_from`
+            pub forked_from: ::buffa::MessageFieldView<
+                super::super::__buffa::view::CommunityForkSourceView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -78389,6 +83949,38 @@ pub mod __buffa {
                             }
                         }
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.forks = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.forked_from.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.forked_from = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::CommunityForkSourceView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     4u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -78526,6 +84118,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    forks: self.forks,
+                    forked_from: match self.forked_from.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::CommunityForkSource,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -78635,6 +84236,17 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.forks != 0u32 {
+                    size += 2u32 + ::buffa::types::uint32_encoded_len(self.forks) as u32;
+                }
+                if self.forked_from.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.forked_from.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -78729,6 +84341,17 @@ pub mod __buffa {
                     );
                     self.backtest.write_to(__cache, buf);
                 }
+                if self.forks != 0u32 {
+                    ::buffa::types::put_uint32_field(16u32, self.forks, buf);
+                }
+                if self.forked_from.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        17u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.forked_from.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -78819,6 +84442,21 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.backtest.as_option()
                     {
                         __map.serialize_entry("backtest", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.forks) {
+                    __map
+                        .serialize_entry(
+                            "forks",
+                            &::buffa::json_helpers::ProtoJson(&self.forks),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .forked_from
+                        .as_option()
+                    {
+                        __map.serialize_entry("forkedFrom", __v)?;
                     }
                 }
                 __map.end()
@@ -79052,6 +84690,27 @@ pub mod __buffa {
                 super::super::__buffa::view::CommunityBacktestView<'_>,
             > {
                 &self.0.reborrow().backtest
+            }
+            /// How many accounts forked the listing. An account that forked it more
+            /// than once counts once, and its author's own copies never count.
+            ///
+            /// Field 16: `forks`
+            #[must_use]
+            pub fn forks(&self) -> u32 {
+                self.0.reborrow().forks
+            }
+            /// The listing the strategy was forked from. Unset when it wasn't forked.
+            /// The platform sets it from the strategy's origin at each publish; its
+            /// author can't remove or change it.
+            ///
+            /// Field 17: `forked_from`
+            #[must_use]
+            pub fn forked_from(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::CommunityForkSourceView<'_>,
+            > {
+                &self.0.reborrow().forked_from
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CommunityStrategyView<'static>>>
@@ -81257,6 +86916,1436 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// ForkStrategyRequest copies one public community listing's published
+        /// version into a new strategy of the caller.
+        #[derive(Clone, Debug, Default)]
+        pub struct ForkStrategyRequestView<'a> {
+            /// Public listing ID.
+            ///
+            /// Field 1: `listing_id`
+            pub listing_id: u64,
+            /// Name of the new strategy.
+            ///
+            /// Field 2: `name`
+            pub name: &'a str,
+            /// Client-chosen key, unique per caller, that makes the call idempotent: the
+            /// same key and request return the strategy the first call created, as it
+            /// stands now, and never fork again; another request with the same key, a
+            /// CreateStrategy's or a SaveDraftVersion's included, is
+            /// IDEMPOTENCY_CONFLICT. Required.
+            ///
+            /// Field 3: `idempotency_key`
+            pub idempotency_key: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ForkStrategyRequestView<'a> {
+            type Owned = super::super::ForkStrategyRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.listing_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ForkStrategyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ForkStrategyRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ForkStrategyRequest {
+                    listing_id: self.listing_id,
+                    name: self.name.to_string(),
+                    idempotency_key: self.idempotency_key.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ForkStrategyRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.listing_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.name.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
+                }
+                if !self.idempotency_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.idempotency_key)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.listing_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                if !self.idempotency_key.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.idempotency_key, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ForkStrategyRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.listing_id) {
+                    __map
+                        .serialize_entry(
+                            "listingId",
+                            &::buffa::json_helpers::ProtoJson(&self.listing_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
+                    __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ForkStrategyRequestView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "ForkStrategyRequest";
+            const FULL_NAME: &'static str = "strategies.v1.ForkStrategyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ForkStrategyRequest";
+        }
+        ::buffa::impl_default_view_instance!(ForkStrategyRequestView);
+        ::buffa::impl_view_reborrow!(ForkStrategyRequestView);
+        /** Self-contained, `'static` owned view of a `ForkStrategyRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ForkStrategyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ForkStrategyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ForkStrategyRequestOwnedView(
+            ::buffa::OwnedView<ForkStrategyRequestView<'static>>,
+        );
+        impl ForkStrategyRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ForkStrategyRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ForkStrategyRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ForkStrategyRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ForkStrategyRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ForkStrategyRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ForkStrategyRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ForkStrategyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public listing ID.
+            ///
+            /// Field 1: `listing_id`
+            #[must_use]
+            pub fn listing_id(&self) -> u64 {
+                self.0.reborrow().listing_id
+            }
+            /// Name of the new strategy.
+            ///
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+            /// Client-chosen key, unique per caller, that makes the call idempotent: the
+            /// same key and request return the strategy the first call created, as it
+            /// stands now, and never fork again; another request with the same key, a
+            /// CreateStrategy's or a SaveDraftVersion's included, is
+            /// IDEMPOTENCY_CONFLICT. Required.
+            ///
+            /// Field 3: `idempotency_key`
+            #[must_use]
+            pub fn idempotency_key(&self) -> &'_ str {
+                self.0.reborrow().idempotency_key
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ForkStrategyRequestView<'static>>>
+        for ForkStrategyRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ForkStrategyRequestView<'static>>,
+            ) -> Self {
+                ForkStrategyRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ForkStrategyRequestOwnedView>
+        for ::buffa::OwnedView<ForkStrategyRequestView<'static>> {
+            fn from(wrapper: ForkStrategyRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ForkStrategyRequestView<'static>>>
+        for ForkStrategyRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ForkStrategyRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ForkStrategyRequest {
+            type View<'a> = ForkStrategyRequestView<'a>;
+            type ViewHandle = ForkStrategyRequestOwnedView;
+        }
+        impl ::serde::Serialize for ForkStrategyRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ForkStrategyResponse is the new strategy.
+        #[derive(Clone, Debug, Default)]
+        pub struct ForkStrategyResponseView<'a> {
+            /// The strategy, as it stands now: the published version is its revision
+            /// 1, and its origin names the listing.
+            ///
+            /// Field 1: `strategy`
+            pub strategy: ::buffa::MessageFieldView<
+                super::super::__buffa::view::StrategyView<'a>,
+            >,
+            /// The check result of revision 1's version, as the listing published it.
+            ///
+            /// Field 2: `version`
+            pub version: ::buffa::MessageFieldView<
+                super::super::__buffa::view::VersionValidationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ForkStrategyResponseView<'a> {
+            type Owned = super::super::ForkStrategyResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.strategy.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.strategy = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::StrategyView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.version.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.version = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::VersionValidationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ForkStrategyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ForkStrategyResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ForkStrategyResponse {
+                    strategy: match self.strategy.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Strategy,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    version: match self.version.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::VersionValidation,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ForkStrategyResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.strategy.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.strategy.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.version.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.version.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.strategy.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.strategy.write_to(__cache, buf);
+                }
+                if self.version.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.version.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ForkStrategyResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.strategy.as_option()
+                    {
+                        __map.serialize_entry("strategy", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.version.as_option() {
+                        __map.serialize_entry("version", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ForkStrategyResponseView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "ForkStrategyResponse";
+            const FULL_NAME: &'static str = "strategies.v1.ForkStrategyResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ForkStrategyResponse";
+        }
+        ::buffa::impl_default_view_instance!(ForkStrategyResponseView);
+        ::buffa::impl_view_reborrow!(ForkStrategyResponseView);
+        /** Self-contained, `'static` owned view of a `ForkStrategyResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ForkStrategyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ForkStrategyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ForkStrategyResponseOwnedView(
+            ::buffa::OwnedView<ForkStrategyResponseView<'static>>,
+        );
+        impl ForkStrategyResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ForkStrategyResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ForkStrategyResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ForkStrategyResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ForkStrategyResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ForkStrategyResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ForkStrategyResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ForkStrategyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The strategy, as it stands now: the published version is its revision
+            /// 1, and its origin names the listing.
+            ///
+            /// Field 1: `strategy`
+            #[must_use]
+            pub fn strategy(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::StrategyView<'_>,
+            > {
+                &self.0.reborrow().strategy
+            }
+            /// The check result of revision 1's version, as the listing published it.
+            ///
+            /// Field 2: `version`
+            #[must_use]
+            pub fn version(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::VersionValidationView<'_>,
+            > {
+                &self.0.reborrow().version
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ForkStrategyResponseView<'static>>>
+        for ForkStrategyResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ForkStrategyResponseView<'static>>,
+            ) -> Self {
+                ForkStrategyResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ForkStrategyResponseOwnedView>
+        for ::buffa::OwnedView<ForkStrategyResponseView<'static>> {
+            fn from(wrapper: ForkStrategyResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ForkStrategyResponseView<'static>>,
+        > for ForkStrategyResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ForkStrategyResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ForkStrategyResponse {
+            type View<'a> = ForkStrategyResponseView<'a>;
+            type ViewHandle = ForkStrategyResponseOwnedView;
+        }
+        impl ::serde::Serialize for ForkStrategyResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ReportCommunityStrategyRequest reports one public community listing to
+        /// moderation.
+        #[derive(Clone, Debug, Default)]
+        pub struct ReportCommunityStrategyRequestView<'a> {
+            /// Public listing ID.
+            ///
+            /// Field 1: `listing_id`
+            pub listing_id: u64,
+            /// The version the reader saw, as GetCommunityStrategy returned it: the
+            /// report is about that version, whatever the listing shows later.
+            ///
+            /// Field 2: `version_id`
+            pub version_id: &'a str,
+            /// Why it is reported.
+            ///
+            /// Field 3: `reason`
+            pub reason: ::buffa::EnumValue<super::super::ReportReason>,
+            /// What the reader adds. At most 500 characters; required when reason is
+            /// OTHER.
+            ///
+            /// Field 4: `note`
+            pub note: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ReportCommunityStrategyRequestView<'a> {
+            type Owned = super::super::ReportCommunityStrategyRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.listing_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.version_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.note = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReportCommunityStrategyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ReportCommunityStrategyRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ReportCommunityStrategyRequest {
+                    listing_id: self.listing_id,
+                    version_id: self.version_id.to_string(),
+                    reason: self.reason,
+                    note: self.note.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ReportCommunityStrategyRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.listing_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.version_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.version_id)
+                                as u32;
+                }
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.note.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.note) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.listing_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.listing_id, buf);
+                }
+                if !self.version_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.version_id, buf);
+                }
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if !self.note.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.note, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ReportCommunityStrategyRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.listing_id) {
+                    __map
+                        .serialize_entry(
+                            "listingId",
+                            &::buffa::json_helpers::ProtoJson(&self.listing_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.version_id) {
+                    __map.serialize_entry("versionId", self.version_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.reason) {
+                    __map.serialize_entry("reason", &self.reason)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.note) {
+                    __map.serialize_entry("note", self.note)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ReportCommunityStrategyRequestView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "ReportCommunityStrategyRequest";
+            const FULL_NAME: &'static str = "strategies.v1.ReportCommunityStrategyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReportCommunityStrategyRequest";
+        }
+        ::buffa::impl_default_view_instance!(ReportCommunityStrategyRequestView);
+        ::buffa::impl_view_reborrow!(ReportCommunityStrategyRequestView);
+        /** Self-contained, `'static` owned view of a `ReportCommunityStrategyRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ReportCommunityStrategyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ReportCommunityStrategyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ReportCommunityStrategyRequestOwnedView(
+            ::buffa::OwnedView<ReportCommunityStrategyRequestView<'static>>,
+        );
+        impl ReportCommunityStrategyRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReportCommunityStrategyRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReportCommunityStrategyRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ReportCommunityStrategyRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReportCommunityStrategyRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ReportCommunityStrategyRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ReportCommunityStrategyRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReportCommunityStrategyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public listing ID.
+            ///
+            /// Field 1: `listing_id`
+            #[must_use]
+            pub fn listing_id(&self) -> u64 {
+                self.0.reborrow().listing_id
+            }
+            /// The version the reader saw, as GetCommunityStrategy returned it: the
+            /// report is about that version, whatever the listing shows later.
+            ///
+            /// Field 2: `version_id`
+            #[must_use]
+            pub fn version_id(&self) -> &'_ str {
+                self.0.reborrow().version_id
+            }
+            /// Why it is reported.
+            ///
+            /// Field 3: `reason`
+            #[must_use]
+            pub fn reason(&self) -> ::buffa::EnumValue<super::super::ReportReason> {
+                self.0.reborrow().reason
+            }
+            /// What the reader adds. At most 500 characters; required when reason is
+            /// OTHER.
+            ///
+            /// Field 4: `note`
+            #[must_use]
+            pub fn note(&self) -> &'_ str {
+                self.0.reborrow().note
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ReportCommunityStrategyRequestView<'static>>,
+        > for ReportCommunityStrategyRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ReportCommunityStrategyRequestView<'static>>,
+            ) -> Self {
+                ReportCommunityStrategyRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ReportCommunityStrategyRequestOwnedView>
+        for ::buffa::OwnedView<ReportCommunityStrategyRequestView<'static>> {
+            fn from(wrapper: ReportCommunityStrategyRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ReportCommunityStrategyRequestView<'static>>,
+        > for ReportCommunityStrategyRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ReportCommunityStrategyRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ReportCommunityStrategyRequest {
+            type View<'a> = ReportCommunityStrategyRequestView<'a>;
+            type ViewHandle = ReportCommunityStrategyRequestOwnedView;
+        }
+        impl ::serde::Serialize for ReportCommunityStrategyRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ReportCommunityStrategyResponse confirms the report.
+        #[derive(Clone, Debug, Default)]
+        pub struct ReportCommunityStrategyResponseView<'a> {
+            /// When the report was recorded. A repeat of the caller's report of the
+            /// same version answers the first report's time.
+            ///
+            /// Field 1: `reported_at`
+            pub reported_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ReportCommunityStrategyResponseView<'a> {
+            type Owned = super::super::ReportCommunityStrategyResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.reported_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.reported_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReportCommunityStrategyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ReportCommunityStrategyResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ReportCommunityStrategyResponse {
+                    reported_at: match self.reported_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ReportCommunityStrategyResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.reported_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.reported_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.reported_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.reported_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ReportCommunityStrategyResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .reported_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("reportedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ReportCommunityStrategyResponseView<'a> {
+            const PACKAGE: &'static str = "strategies.v1";
+            const NAME: &'static str = "ReportCommunityStrategyResponse";
+            const FULL_NAME: &'static str = "strategies.v1.ReportCommunityStrategyResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/strategies.v1.ReportCommunityStrategyResponse";
+        }
+        ::buffa::impl_default_view_instance!(ReportCommunityStrategyResponseView);
+        ::buffa::impl_view_reborrow!(ReportCommunityStrategyResponseView);
+        /** Self-contained, `'static` owned view of a `ReportCommunityStrategyResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ReportCommunityStrategyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ReportCommunityStrategyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ReportCommunityStrategyResponseOwnedView(
+            ::buffa::OwnedView<ReportCommunityStrategyResponseView<'static>>,
+        );
+        impl ReportCommunityStrategyResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReportCommunityStrategyResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReportCommunityStrategyResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ReportCommunityStrategyResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ReportCommunityStrategyResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ReportCommunityStrategyResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ReportCommunityStrategyResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ReportCommunityStrategyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// When the report was recorded. A repeat of the caller's report of the
+            /// same version answers the first report's time.
+            ///
+            /// Field 1: `reported_at`
+            #[must_use]
+            pub fn reported_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().reported_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ReportCommunityStrategyResponseView<'static>>,
+        > for ReportCommunityStrategyResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ReportCommunityStrategyResponseView<'static>>,
+            ) -> Self {
+                ReportCommunityStrategyResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ReportCommunityStrategyResponseOwnedView>
+        for ::buffa::OwnedView<ReportCommunityStrategyResponseView<'static>> {
+            fn from(wrapper: ReportCommunityStrategyResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ReportCommunityStrategyResponseView<'static>>,
+        > for ReportCommunityStrategyResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ReportCommunityStrategyResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ReportCommunityStrategyResponse {
+            type View<'a> = ReportCommunityStrategyResponseView<'a>;
+            type ViewHandle = ReportCommunityStrategyResponseOwnedView;
+        }
+        impl ::serde::Serialize for ReportCommunityStrategyResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// GetCommunityStrategyRequest reads one public community listing.
         #[derive(Clone, Debug, Default)]
         pub struct GetCommunityStrategyRequestView<'a> {
@@ -81873,6 +88962,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    Fork(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::StrategyForkOriginView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod create_strategy_request {
@@ -81901,6 +88997,9 @@ pub mod __buffa {
                         super::super::super::StrategyDuplicateOrigin,
                     >,
                 ),
+                Fork(
+                    ::buffa::alloc::boxed::Box<super::super::super::StrategyForkOrigin>,
+                ),
             }
             impl ::buffa::Oneof for Source {}
             impl From<super::super::super::StrategyDuplicateOrigin> for Source {
@@ -81911,6 +89010,17 @@ pub mod __buffa {
             impl From<super::super::super::StrategyDuplicateOrigin>
             for ::core::option::Option<Source> {
                 fn from(v: super::super::super::StrategyDuplicateOrigin) -> Self {
+                    Self::Some(Source::from(v))
+                }
+            }
+            impl From<super::super::super::StrategyForkOrigin> for Source {
+                fn from(v: super::super::super::StrategyForkOrigin) -> Self {
+                    Self::Fork(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::StrategyForkOrigin>
+            for ::core::option::Option<Source> {
+                fn from(v: super::super::super::StrategyForkOrigin) -> Self {
                     Self::Some(Source::from(v))
                 }
             }
@@ -81927,6 +89037,9 @@ pub mod __buffa {
                         }
                         Self::Duplicate(v) => {
                             map.serialize_entry("duplicate", v)?;
+                        }
+                        Self::Fork(v) => {
+                            map.serialize_entry("fork", v)?;
                         }
                     }
                     map.end()
@@ -82034,6 +89147,11 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_BOT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__STOP_BOT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__STOP_BOT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__BOT_FUNDS_RETURN_JSON_ANY);
+        reg.register_json_any(super::__RETURN_BOT_FUNDS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RETURN_BOT_FUNDS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_BOT_FUNDS_RETURN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_BOT_FUNDS_RETURN_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_BOT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_BOT_VERSIONS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__BOT_VERSION_JSON_ANY);
@@ -82048,6 +89166,7 @@ pub mod __buffa {
         reg.register_json_any(super::__STRATEGY_LISTING_JSON_ANY);
         reg.register_json_any(super::__STRATEGY_BOT_JSON_ANY);
         reg.register_json_any(super::__STRATEGY_ORIGIN_JSON_ANY);
+        reg.register_json_any(super::__STRATEGY_FORK_ORIGIN_JSON_ANY);
         reg.register_json_any(super::__STRATEGY_DUPLICATE_ORIGIN_JSON_ANY);
         reg.register_json_any(super::__STRATEGY_REVISION_JSON_ANY);
         reg.register_json_any(super::__CREATE_STRATEGY_REQUEST_JSON_ANY);
@@ -82079,6 +89198,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_BOT_LOGS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__COMMUNITY_BACKTEST_JSON_ANY);
         reg.register_json_any(super::__COMMUNITY_STRATEGY_SUMMARY_JSON_ANY);
+        reg.register_json_any(super::__COMMUNITY_FORK_SOURCE_JSON_ANY);
         reg.register_json_any(super::__COMMUNITY_STRATEGY_JSON_ANY);
         reg.register_json_any(super::__PUBLISH_STRATEGY_VERSION_REQUEST_JSON_ANY);
         reg.register_json_any(super::__PUBLISH_STRATEGY_VERSION_RESPONSE_JSON_ANY);
@@ -82086,6 +89206,10 @@ pub mod __buffa {
         reg.register_json_any(super::__UNPUBLISH_STRATEGY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_COMMUNITY_STRATEGIES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_COMMUNITY_STRATEGIES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__FORK_STRATEGY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__FORK_STRATEGY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REPORT_COMMUNITY_STRATEGY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REPORT_COMMUNITY_STRATEGY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_COMMUNITY_STRATEGY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_COMMUNITY_STRATEGY_RESPONSE_JSON_ANY);
     }
@@ -82363,6 +89487,26 @@ pub use self::__buffa::view::StopBotResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::StopBotResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::BotFundsReturnView;
+#[doc(inline)]
+pub use self::__buffa::view::BotFundsReturnOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReturnBotFundsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ReturnBotFundsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReturnBotFundsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ReturnBotFundsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBotFundsReturnRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBotFundsReturnRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBotFundsReturnResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBotFundsReturnResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::GetBotResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetBotResponseOwnedView;
@@ -82418,6 +89562,10 @@ pub use self::__buffa::view::StrategyBotOwnedView;
 pub use self::__buffa::view::StrategyOriginView;
 #[doc(inline)]
 pub use self::__buffa::view::StrategyOriginOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::StrategyForkOriginView;
+#[doc(inline)]
+pub use self::__buffa::view::StrategyForkOriginOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::StrategyDuplicateOriginView;
 #[doc(inline)]
@@ -82543,6 +89691,10 @@ pub use self::__buffa::view::CommunityStrategySummaryView;
 #[doc(inline)]
 pub use self::__buffa::view::CommunityStrategySummaryOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::CommunityForkSourceView;
+#[doc(inline)]
+pub use self::__buffa::view::CommunityForkSourceOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::CommunityStrategyView;
 #[doc(inline)]
 pub use self::__buffa::view::CommunityStrategyOwnedView;
@@ -82570,6 +89722,22 @@ pub use self::__buffa::view::ListCommunityStrategiesRequestOwnedView;
 pub use self::__buffa::view::ListCommunityStrategiesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListCommunityStrategiesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ForkStrategyRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ForkStrategyRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ForkStrategyResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ForkStrategyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReportCommunityStrategyRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ReportCommunityStrategyRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReportCommunityStrategyResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ReportCommunityStrategyResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetCommunityStrategyRequestView;
 #[doc(inline)]

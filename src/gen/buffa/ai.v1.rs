@@ -15,7 +15,8 @@ pub enum ErrorCode {
     /// No memory of the caller has this ID.
     MEMORY_NOT_FOUND = 4i32,
     /// The conversation already has an active run. Wait for it to end, or cancel
-    /// it, before sending another message.
+    /// it, before sending another message. When the run is waiting for the
+    /// user's decision, ErrorDetail.pending_approval_id names the approval.
     RUN_ACTIVE = 5i32,
     /// The idempotency key was already used with a different request. The
     /// original run stands.
@@ -65,8 +66,11 @@ pub enum ErrorCode {
     /// No image of the caller's messages has this ID.
     IMAGE_NOT_FOUND = 20i32,
     /// The message names a subject other than its conversation's: a
-    /// conversation's subject is fixed when it starts. Nothing is recorded.
+    /// conversation's subject never changes once set. Nothing is recorded.
     CONVERSATION_SUBJECT_MISMATCH = 21i32,
+    /// The approval's run ended before it was decided, for example stopped by
+    /// the user; nothing was executed.
+    APPROVAL_RUN_ENDED = 22i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -135,6 +139,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::CONVERSATION_SUBJECT_MISMATCH`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ConversationSubjectMismatch: Self = Self::CONVERSATION_SUBJECT_MISMATCH;
+    ///Idiomatic alias for [`Self::APPROVAL_RUN_ENDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApprovalRunEnded: Self = Self::APPROVAL_RUN_ENDED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -252,6 +259,7 @@ impl ::buffa::Enumeration for ErrorCode {
             19i32 => ::core::option::Option::Some(Self::TOO_MANY_IMAGES),
             20i32 => ::core::option::Option::Some(Self::IMAGE_NOT_FOUND),
             21i32 => ::core::option::Option::Some(Self::CONVERSATION_SUBJECT_MISMATCH),
+            22i32 => ::core::option::Option::Some(Self::APPROVAL_RUN_ENDED),
             _ => ::core::option::Option::None,
         }
     }
@@ -282,6 +290,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::TOO_MANY_IMAGES => "TOO_MANY_IMAGES",
             Self::IMAGE_NOT_FOUND => "IMAGE_NOT_FOUND",
             Self::CONVERSATION_SUBJECT_MISMATCH => "CONVERSATION_SUBJECT_MISMATCH",
+            Self::APPROVAL_RUN_ENDED => "APPROVAL_RUN_ENDED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -336,6 +345,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "CONVERSATION_SUBJECT_MISMATCH" => {
                 ::core::option::Option::Some(Self::CONVERSATION_SUBJECT_MISMATCH)
             }
+            "APPROVAL_RUN_ENDED" => {
+                ::core::option::Option::Some(Self::APPROVAL_RUN_ENDED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -363,6 +375,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::TOO_MANY_IMAGES,
             Self::IMAGE_NOT_FOUND,
             Self::CONVERSATION_SUBJECT_MISMATCH,
+            Self::APPROVAL_RUN_ENDED,
         ]
     }
 }
@@ -898,6 +911,9 @@ pub enum ApprovalStatus {
     REJECTED = 3i32,
     /// Expired before a decision; the action did not run.
     EXPIRED = 4i32,
+    /// The run ended before a decision, for example stopped by the user; the
+    /// action did not run.
+    APPROVAL_CANCELLED = 5i32,
 }
 impl ApprovalStatus {
     ///Idiomatic alias for [`Self::APPROVAL_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -915,6 +931,9 @@ impl ApprovalStatus {
     ///Idiomatic alias for [`Self::EXPIRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Expired: Self = Self::EXPIRED;
+    ///Idiomatic alias for [`Self::APPROVAL_CANCELLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApprovalCancelled: Self = Self::APPROVAL_CANCELLED;
 }
 impl ::core::default::Default for ApprovalStatus {
     fn default() -> Self {
@@ -1017,6 +1036,7 @@ impl ::buffa::Enumeration for ApprovalStatus {
             2i32 => ::core::option::Option::Some(Self::APPROVED),
             3i32 => ::core::option::Option::Some(Self::REJECTED),
             4i32 => ::core::option::Option::Some(Self::EXPIRED),
+            5i32 => ::core::option::Option::Some(Self::APPROVAL_CANCELLED),
             _ => ::core::option::Option::None,
         }
     }
@@ -1030,6 +1050,7 @@ impl ::buffa::Enumeration for ApprovalStatus {
             Self::APPROVED => "APPROVED",
             Self::REJECTED => "REJECTED",
             Self::EXPIRED => "EXPIRED",
+            Self::APPROVAL_CANCELLED => "APPROVAL_CANCELLED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1041,6 +1062,9 @@ impl ::buffa::Enumeration for ApprovalStatus {
             "APPROVED" => ::core::option::Option::Some(Self::APPROVED),
             "REJECTED" => ::core::option::Option::Some(Self::REJECTED),
             "EXPIRED" => ::core::option::Option::Some(Self::EXPIRED),
+            "APPROVAL_CANCELLED" => {
+                ::core::option::Option::Some(Self::APPROVAL_CANCELLED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1051,6 +1075,7 @@ impl ::buffa::Enumeration for ApprovalStatus {
             Self::APPROVED,
             Self::REJECTED,
             Self::EXPIRED,
+            Self::APPROVAL_CANCELLED,
         ]
     }
 }
@@ -3373,13 +3398,31 @@ pub struct ErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ErrorCode>,
+    /// With RUN_ACTIVE only: the approval the conversation's active run is
+    /// waiting for, set only while that approval is still PENDING and not past
+    /// its expiry when the message is refused. Unset when the run is not waiting
+    /// for a decision (for example, the approval was already decided, even if
+    /// the run has not reported it yet). Show that approval's Approve and Reject
+    /// choices instead of a generic "busy" message.
+    ///
+    /// Field 2: `pending_approval_id`
+    #[serde(
+        rename = "pendingApprovalId",
+        alias = "pending_approval_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub pending_approval_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ErrorDetail {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ErrorDetail").field("code", &self.code).finish()
+        f.debug_struct("ErrorDetail")
+            .field("code", &self.code)
+            .field("pending_approval_id", &self.pending_approval_id)
+            .finish()
     }
 }
 impl ErrorDetail {
@@ -3413,6 +3456,9 @@ impl ::buffa::Message for ErrorDetail {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if self.pending_approval_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3428,6 +3474,9 @@ impl ::buffa::Message for ErrorDetail {
             if val != 0 {
                 ::buffa::types::put_int32_field(1u32, val, buf);
             }
+        }
+        if self.pending_approval_id != 0u64 {
+            ::buffa::types::put_fixed64_field(2u32, self.pending_approval_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3449,6 +3498,13 @@ impl ::buffa::Message for ErrorDetail {
                 )?;
                 self.code = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.pending_approval_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3458,6 +3514,7 @@ impl ::buffa::Message for ErrorDetail {
     }
     fn clear(&mut self) {
         self.code = ::buffa::EnumValue::from(0);
+        self.pending_approval_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3533,8 +3590,9 @@ pub struct Conversation {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// What the conversation is about, fixed when it started. Omitted for a
-    /// general conversation.
+    /// What the conversation is about: set when it started, or when the
+    /// assistant created a strategy in it (see Subject), and never changed once
+    /// set. Omitted for a general conversation.
     ///
     /// Field 5: `subject`
     #[serde(
@@ -20992,7 +21050,7 @@ pub struct ApprovalResolved {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub approval_id: u64,
-    /// APPROVED, REJECTED or EXPIRED.
+    /// APPROVED, REJECTED, EXPIRED or APPROVAL_CANCELLED.
     ///
     /// Field 2: `status`
     #[serde(
@@ -23863,6 +23921,16 @@ pub const __CURRENT_PAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
 /// and tells the assistant what the user is working on. It grants nothing:
 /// every read and change the assistant makes is still checked against the
 /// caller's own access.
+///
+/// A conversation without a subject gets one at most once: when the assistant
+/// creates a strategy in it, the conversation becomes about that strategy,
+/// unless another conversation of the caller is already about it. Only when it
+/// does is it the conversation that strategy's subject selects, with its
+/// history, and later messages may still omit the subject. When another
+/// conversation of the caller is already about the strategy, that conversation
+/// keeps it and is the one its subject selects, and this one stays without a
+/// subject. A second strategy created in a conversation leaves the subject on
+/// the first; another strategy is created in a new conversation.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -24348,10 +24416,11 @@ pub struct SendMessageRequest {
     /// What the conversation is about. Without conversation_id, the message
     /// continues the caller's conversation about this subject, or starts it:
     /// there is at most one per subject. With conversation_id, omit it or send
-    /// the conversation's own subject. A conversation's subject is fixed when it
-    /// starts: any other subject, or a subject for a conversation that has none,
-    /// is FAILED_PRECONDITION with CONVERSATION_SUBJECT_MISMATCH, and nothing is
-    /// recorded. It is part of the request the idempotency key covers.
+    /// the conversation's own subject. A conversation's subject never changes
+    /// once set (see Subject): any other subject, or a subject for a
+    /// conversation that has none, is FAILED_PRECONDITION with
+    /// CONVERSATION_SUBJECT_MISMATCH, and nothing is recorded. It is part of the
+    /// request the idempotency key covers.
     ///
     /// Field 11: `subject`
     #[serde(
@@ -26270,8 +26339,8 @@ pub struct ListMessagesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub last_account: ::buffa::MessageField<ConversationAccount>,
-    /// What the conversation is about: the same as Conversation.subject, fixed
-    /// when the conversation started. Set on every page; omitted for a general
+    /// What the conversation is about: the same as Conversation.subject, never
+    /// changed once set (see Subject). Set on every page; omitted for a general
     /// conversation. A client that opens a conversation by its ID learns from it
     /// whether the conversation is about one of the caller's strategies.
     ///
@@ -30209,6 +30278,15 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// With RUN_ACTIVE only: the approval the conversation's active run is
+            /// waiting for, set only while that approval is still PENDING and not past
+            /// its expiry when the message is refused. Unset when the run is not waiting
+            /// for a decision (for example, the approval was already decided, even if
+            /// the run has not reported it yet). Show that approval's Approve and Reject
+            /// choices instead of a generic "busy" message.
+            ///
+            /// Field 2: `pending_approval_id`
+            pub pending_approval_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -30251,6 +30329,15 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.pending_approval_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -30281,6 +30368,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ErrorDetail {
                     code: self.code,
+                    pending_approval_id: self.pending_approval_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -30301,6 +30389,9 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if self.pending_approval_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -30317,6 +30408,13 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(1u32, val, buf);
                     }
+                }
+                if self.pending_approval_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        2u32,
+                        self.pending_approval_id,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -30341,6 +30439,15 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.code) {
                     __map.serialize_entry("code", &self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.pending_approval_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "pendingApprovalId",
+                            &::buffa::json_helpers::ProtoJson(&self.pending_approval_id),
+                        )?;
                 }
                 __map.end()
             }
@@ -30443,6 +30550,18 @@ pub mod __buffa {
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
                 self.0.reborrow().code
             }
+            /// With RUN_ACTIVE only: the approval the conversation's active run is
+            /// waiting for, set only while that approval is still PENDING and not past
+            /// its expiry when the message is refused. Unset when the run is not waiting
+            /// for a decision (for example, the approval was already decided, even if
+            /// the run has not reported it yet). Show that approval's Approve and Reject
+            /// choices instead of a generic "busy" message.
+            ///
+            /// Field 2: `pending_approval_id`
+            #[must_use]
+            pub fn pending_approval_id(&self) -> u64 {
+                self.0.reborrow().pending_approval_id
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
         for ErrorDetailOwnedView {
@@ -30498,8 +30617,9 @@ pub mod __buffa {
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// What the conversation is about, fixed when it started. Omitted for a
-            /// general conversation.
+            /// What the conversation is about: set when it started, or when the
+            /// assistant created a strategy in it (see Subject), and never changed once
+            /// set. Omitted for a general conversation.
             ///
             /// Field 5: `subject`
             pub subject: ::buffa::MessageFieldView<
@@ -31018,8 +31138,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().updated_at
             }
-            /// What the conversation is about, fixed when it started. Omitted for a
-            /// general conversation.
+            /// What the conversation is about: set when it started, or when the
+            /// assistant created a strategy in it (see Subject), and never changed once
+            /// set. Omitted for a general conversation.
             ///
             /// Field 5: `subject`
             #[must_use]
@@ -57449,7 +57570,7 @@ pub mod __buffa {
             ///
             /// Field 1: `approval_id`
             pub approval_id: u64,
-            /// APPROVED, REJECTED or EXPIRED.
+            /// APPROVED, REJECTED, EXPIRED or APPROVAL_CANCELLED.
             ///
             /// Field 2: `status`
             pub status: ::buffa::EnumValue<super::super::ApprovalStatus>,
@@ -57710,7 +57831,7 @@ pub mod __buffa {
             pub fn approval_id(&self) -> u64 {
                 self.0.reborrow().approval_id
             }
-            /// APPROVED, REJECTED or EXPIRED.
+            /// APPROVED, REJECTED, EXPIRED or APPROVAL_CANCELLED.
             ///
             /// Field 2: `status`
             #[must_use]
@@ -62012,6 +62133,16 @@ pub mod __buffa {
         /// and tells the assistant what the user is working on. It grants nothing:
         /// every read and change the assistant makes is still checked against the
         /// caller's own access.
+        ///
+        /// A conversation without a subject gets one at most once: when the assistant
+        /// creates a strategy in it, the conversation becomes about that strategy,
+        /// unless another conversation of the caller is already about it. Only when it
+        /// does is it the conversation that strategy's subject selects, with its
+        /// history, and later messages may still omit the subject. When another
+        /// conversation of the caller is already about the strategy, that conversation
+        /// keeps it and is the one its subject selects, and this one stays without a
+        /// subject. A second strategy created in a conversation leaves the subject on
+        /// the first; another strategy is created in a new conversation.
         #[derive(Clone, Debug, Default)]
         pub struct SubjectView<'a> {
             pub kind: ::core::option::Option<
@@ -62704,10 +62835,11 @@ pub mod __buffa {
             /// What the conversation is about. Without conversation_id, the message
             /// continues the caller's conversation about this subject, or starts it:
             /// there is at most one per subject. With conversation_id, omit it or send
-            /// the conversation's own subject. A conversation's subject is fixed when it
-            /// starts: any other subject, or a subject for a conversation that has none,
-            /// is FAILED_PRECONDITION with CONVERSATION_SUBJECT_MISMATCH, and nothing is
-            /// recorded. It is part of the request the idempotency key covers.
+            /// the conversation's own subject. A conversation's subject never changes
+            /// once set (see Subject): any other subject, or a subject for a
+            /// conversation that has none, is FAILED_PRECONDITION with
+            /// CONVERSATION_SUBJECT_MISMATCH, and nothing is recorded. It is part of the
+            /// request the idempotency key covers.
             ///
             /// Field 11: `subject`
             pub subject: ::buffa::MessageFieldView<
@@ -63432,10 +63564,11 @@ pub mod __buffa {
             /// What the conversation is about. Without conversation_id, the message
             /// continues the caller's conversation about this subject, or starts it:
             /// there is at most one per subject. With conversation_id, omit it or send
-            /// the conversation's own subject. A conversation's subject is fixed when it
-            /// starts: any other subject, or a subject for a conversation that has none,
-            /// is FAILED_PRECONDITION with CONVERSATION_SUBJECT_MISMATCH, and nothing is
-            /// recorded. It is part of the request the idempotency key covers.
+            /// the conversation's own subject. A conversation's subject never changes
+            /// once set (see Subject): any other subject, or a subject for a
+            /// conversation that has none, is FAILED_PRECONDITION with
+            /// CONVERSATION_SUBJECT_MISMATCH, and nothing is recorded. It is part of the
+            /// request the idempotency key covers.
             ///
             /// Field 11: `subject`
             #[must_use]
@@ -66584,8 +66717,8 @@ pub mod __buffa {
             pub last_account: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ConversationAccountView<'a>,
             >,
-            /// What the conversation is about: the same as Conversation.subject, fixed
-            /// when the conversation started. Set on every page; omitted for a general
+            /// What the conversation is about: the same as Conversation.subject, never
+            /// changed once set (see Subject). Set on every page; omitted for a general
             /// conversation. A client that opens a conversation by its ID learns from it
             /// whether the conversation is about one of the caller's strategies.
             ///
@@ -67000,8 +67133,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().last_account
             }
-            /// What the conversation is about: the same as Conversation.subject, fixed
-            /// when the conversation started. Set on every page; omitted for a general
+            /// What the conversation is about: the same as Conversation.subject, never
+            /// changed once set (see Subject). Set on every page; omitted for a general
             /// conversation. A client that opens a conversation by its ID learns from it
             /// whether the conversation is about one of the caller's strategies.
             ///
