@@ -84,13 +84,6 @@ pub struct GetSubaccountResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct CreateSubaccountResult {
-    pub subaccount_id: String,
-    /// Initial monotonic revision for the next revision-gated mutation.
-    pub revision: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SubAccountMember {
     pub grantee_account_id: String,
     pub role: String,
