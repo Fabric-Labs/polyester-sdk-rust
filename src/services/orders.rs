@@ -12,9 +12,10 @@ use crate::codecs::decode::{
     batch_replace_from_proto, batch_replace_status_from_proto, cancel_all_after_from_proto,
     cancel_all_from_proto, get_order_from_proto, modify_order_from_proto,
     order_mutation_from_cancel, order_mutation_from_create, orders_list_from_history,
-    orders_list_from_open, preview_order_from_proto, user_trades_list_from_proto,
+    orders_list_from_open, preview_order_from_proto, require_echoed_id,
+    user_trades_list_from_proto,
 };
-use crate::codecs::scalars::id_to_u64;
+use crate::codecs::scalars::{format_id, id_to_u64};
 use crate::connect::orders::v1::{OrdersReadServiceClient, OrdersServiceClient};
 use crate::errors::{Error, Result};
 use crate::models::SubAccountScope;
@@ -166,6 +167,22 @@ fn status_window_end(
         .duration_since(SystemTime::now())
         .unwrap_or(Duration::ZERO);
     tokio::time::Instant::now() + left
+}
+
+/// A `GetBatchReplaceStatus` answer for `batch_request_id`, refused with
+/// [`Error::ResponseContract`] when it names another batch.
+fn batch_replace_status_of(
+    resp: &crate::proto::orders::v1::GetBatchReplaceStatusResponse,
+    batch_request_id: &str,
+) -> Result<BatchReplaceStatusResult> {
+    let status = batch_replace_status_from_proto(resp)?;
+    require_echoed_id(
+        "GetBatchReplaceStatus",
+        "batch_request_id",
+        &status.batch_request_id,
+        batch_request_id,
+    )?;
+    Ok(status)
 }
 
 #[derive(Clone)]
@@ -359,10 +376,10 @@ impl OrdersService {
             ));
         }
         let limit = check_optional_limit("orders.get", opts.limit, ORDER_READ_LIMIT_MAX)?;
-        let key = Some(Self::encode_get_order_key(&opts.key)?);
+        let key = Self::encode_get_order_key(&opts.key)?;
         let req = GetOrderRequest {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
-            key,
+            key: Some(key.clone()),
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
             include_execution_history: opts.include_execution_history,
@@ -380,6 +397,17 @@ impl OrdersService {
         .await?
         .into_owned();
         let mut result = get_order_from_proto(&resp)?;
+        // A read by key must answer the order it asked for.
+        if let Some(order) = &result.order {
+            match &key {
+                get_order_request::Key::OrderId(id) => {
+                    require_echoed_id("GetOrder", "order_id", &order.order_id, &format_id(*id))?
+                }
+                get_order_request::Key::ClientOrderId(id) => {
+                    require_echoed_id("GetOrder", "client_order_id", &order.client_order_id, id)?
+                }
+            }
+        }
         self.ctx.settle_catalogs().await;
         if let Some(order) = result.order.as_mut() {
             scale_order(&self.ctx.catalogs, order);
@@ -1636,7 +1664,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        batch_replace_status_from_proto(&resp)
+        batch_replace_status_of(&resp, batch_request_id)
     }
 
     /// Poll [`Self::get_batch_replace_status`] until no item is `admitted`:
@@ -1695,7 +1723,7 @@ impl OrdersService {
             .map_err(|_| timed_out())??;
             match attempt {
                 Ok(resp) => {
-                    let status = batch_replace_status_from_proto(&resp.into_owned())?;
+                    let status = batch_replace_status_of(&resp.into_owned(), batch_request_id)?;
                     if status.is_settled() {
                         return Ok(status);
                     }

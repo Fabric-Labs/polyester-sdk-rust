@@ -464,6 +464,7 @@ impl TriggersService {
     /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
     /// account.
     async fn get_scoped(&self, req: GetTriggerRequest) -> Result<Option<Trigger>> {
+        let requested = crate::codecs::scalars::format_id(req.trigger_id);
         // The trigger is labelled with its symbol from the catalogs.
         self.ctx.settle_catalogs().await;
         let client = self.client();
@@ -476,7 +477,17 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(get_trigger_from_proto(&resp)?.map(|mut trigger| {
+        let trigger = get_trigger_from_proto(&resp)?;
+        // A read by ID must answer the trigger it asked for.
+        if let Some(trigger) = &trigger {
+            crate::codecs::decode::require_echoed_id(
+                "GetTrigger",
+                "trigger_id",
+                &trigger.trigger_id,
+                &requested,
+            )?;
+        }
+        Ok(trigger.map(|mut trigger| {
             self.label_from_catalogs(&mut trigger);
             trigger
         }))

@@ -732,11 +732,10 @@ impl SubAccountsService {
         use crate::proto::auth::v1::GetSubaccountRequest;
         let invites_direction = invite_direction_from_label(&opts.invites_direction)
             .map_err(crate::errors::Error::validation)?;
+        let req_subaccount_id =
+            crate::codecs::scalars::parse_account_id(subaccount_id, "subaccount_id")?;
         let req = GetSubaccountRequest {
-            subaccount_id: crate::codecs::scalars::parse_account_id(
-                subaccount_id,
-                "subaccount_id",
-            )?,
+            subaccount_id: req_subaccount_id,
             include_api_keys: opts.include_api_keys,
             include_members: opts.include_members,
             include_invites: opts.include_invites,
@@ -761,6 +760,15 @@ impl SubAccountsService {
             .into_owned()
         };
         let mut result = get_subaccount_from_proto(&resp)?;
+        // A read by ID must answer the sub-account it asked for.
+        if let Some(subaccount) = &result.subaccount {
+            crate::codecs::decode::require_echoed_id(
+                "GetSubaccount",
+                "subaccount_id",
+                &subaccount.subaccount_id,
+                &crate::codecs::scalars::format_id(req_subaccount_id),
+            )?;
+        }
         result.balances = if opts.include_balances {
             Some(result.balances.unwrap_or_default())
         } else {
@@ -1497,7 +1505,14 @@ impl LifecycleService {
         let resp = super::unary::await_public(client.get_flow_by_id(req))
             .await?
             .into_owned();
-        flow_from_get_response(&resp)
+        let flow = flow_from_get_response(&resp)?;
+        crate::codecs::decode::require_echoed_id(
+            "GetFlowById",
+            "flow_id",
+            &flow.intent_id,
+            flow_id,
+        )?;
+        Ok(flow)
     }
 
     /// List the authenticated account's own lifecycle flows: the flows it
@@ -1577,7 +1592,14 @@ impl LifecycleService {
         )
         .await?
         .into_owned();
-        account_flow_from_get_response(&resp)
+        let flow = account_flow_from_get_response(&resp)?;
+        crate::codecs::decode::require_echoed_id(
+            "GetAccountFlow",
+            "flow_id",
+            &flow.intent_id,
+            flow_id,
+        )?;
+        Ok(flow)
     }
 
     /// List the lifecycle flows a chain transaction references, one page at
