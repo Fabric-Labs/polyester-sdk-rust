@@ -744,6 +744,12 @@ pub mod ledger_codes {
     pub const STATEMENT_EXPORT_NOT_CANCELABLE: &str = "ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE";
     /// The export was canceled and has no file (REST 409). Final.
     pub const STATEMENT_EXPORT_CANCELED: &str = "ERROR_CODE_STATEMENT_EXPORT_CANCELED";
+    /// A balances export's period starts before the earliest instant whose
+    /// balances the account history holds (REST 409). Nothing was created:
+    /// create it again from
+    /// [`super::Error::statement_history_available_from`] on. Not retryable
+    /// as is.
+    pub const STATEMENT_HISTORY_UNAVAILABLE: &str = "ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE";
 }
 
 pub mod order_codes {
@@ -871,6 +877,23 @@ const WITHDRAW_MIN_FLOOR_METADATA: &str = "withdraw_min_floor_e18";
 /// [`Error::Api`] metadata key holding [`Error::withdraw_payable_from`], as
 /// `<unix seconds>.<nanoseconds>`.
 const WITHDRAW_PAYABLE_FROM_METADATA: &str = "withdraw_payable_from";
+
+/// [`Error::Api`] metadata key holding
+/// [`Error::statement_history_available_from`], as
+/// `<unix seconds>.<nanoseconds>`.
+const STATEMENT_HISTORY_AVAILABLE_FROM_METADATA: &str = "statement_history_available_from";
+
+/// The optional fields of a `ledger.read.v1.ErrorDetail`, as [`Error::Api`]
+/// metadata.
+fn ledger_detail_metadata(detail: &LedgerErrorDetail) -> Vec<(String, String)> {
+    detail
+        .history_available_from
+        .as_option()
+        .and_then(timestamp_metadata)
+        .map(|at| (STATEMENT_HISTORY_AVAILABLE_FROM_METADATA.to_owned(), at))
+        .into_iter()
+        .collect()
+}
 
 /// The optional fields of a `chain.withdraw.v1.ErrorDetail`, as
 /// [`Error::Api`] metadata.
@@ -1943,9 +1966,29 @@ impl Error {
     /// With `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`: when the
     /// destination can be paid; `None` when the server does not know yet.
     pub fn withdraw_payable_from(&self) -> Option<std::time::SystemTime> {
-        let (seconds, nanos) = self
-            .api_metadata(WITHDRAW_PAYABLE_FROM_METADATA)?
-            .split_once('.')?;
+        self.api_metadata_time(WITHDRAW_PAYABLE_FROM_METADATA)
+    }
+
+    /// True for `ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE`
+    /// ([`ledger_codes::STATEMENT_HISTORY_UNAVAILABLE`]): a balances
+    /// statement export whose period starts before the account history.
+    /// Nothing was created; create it again from
+    /// [`Self::statement_history_available_from`] on. Not
+    /// [`Self::is_retryable`].
+    pub fn is_statement_history_unavailable(&self) -> bool {
+        matches!(self, Self::Api { code, .. } if code == ledger_codes::STATEMENT_HISTORY_UNAVAILABLE)
+    }
+
+    /// With `ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE`: the earliest instant
+    /// whose balances the account history holds, where a balances export's
+    /// period may start; `None` when the server did not name it.
+    pub fn statement_history_available_from(&self) -> Option<std::time::SystemTime> {
+        self.api_metadata_time(STATEMENT_HISTORY_AVAILABLE_FROM_METADATA)
+    }
+
+    /// An [`Error::Api`] metadata time written by `timestamp_metadata`.
+    fn api_metadata_time(&self, key: &str) -> Option<std::time::SystemTime> {
+        let (seconds, nanos) = self.api_metadata(key)?.split_once('.')?;
         let duration = Duration::new(seconds.parse().ok()?, nanos.parse().ok()?);
         std::time::UNIX_EPOCH.checked_add(duration)
     }
@@ -2818,7 +2861,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             return Error::Api {
                 message: fallback_message.clone(),
                 code,
-                metadata: Vec::new(),
+                metadata: ledger_detail_metadata(&ledger_detail),
                 violations: Vec::new(),
                 answer: None,
             };
@@ -4425,6 +4468,45 @@ mod tests {
             Some(UNIX_EPOCH + StdDuration::new(1_794_405_600, 5))
         );
         assert!(!cooling.is_retryable() && !cooling.mutation_outcome_unknown());
+
+        // A balances export before the account history names where it starts.
+        let history = map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "statement_history_unavailable")
+                .with_detail(ErrorDetail::from_message(
+                    "ledger.read.v1.ErrorDetail",
+                    &LedgerErrorDetail {
+                        code: crate::proto::ledger::read::v1::ErrorCode::ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE
+                            .into(),
+                        history_available_from: Timestamp {
+                            seconds: 1_795_964_102,
+                            nanos: 123_456_789,
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    },
+                )),
+        );
+        assert!(history.is_statement_history_unavailable(), "{history:?}");
+        assert_eq!(
+            history.statement_history_available_from(),
+            Some(UNIX_EPOCH + StdDuration::new(1_795_964_102, 123_456_789))
+        );
+        assert!(!history.is_retryable() && !history.mutation_outcome_unknown());
+        let not_ready = map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "not ready").with_detail(
+                ErrorDetail::from_message(
+                    "ledger.read.v1.ErrorDetail",
+                    &LedgerErrorDetail {
+                        code: crate::proto::ledger::read::v1::ErrorCode::ERROR_CODE_STATEMENT_EXPORT_NOT_READY
+                            .into(),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert!(!not_ready.is_statement_history_unavailable());
+        assert_eq!(not_ready.statement_history_available_from(), None);
 
         let floor = map_connect_error(
             ConnectError::new(ErrorCode::InvalidArgument, "below floor").with_detail(

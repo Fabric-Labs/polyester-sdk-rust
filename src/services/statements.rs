@@ -1,6 +1,6 @@
 //! Account statements (`ledger.read.v1.StatementExportService`): a
 //! whole-period statement of one account, produced in the background as one
-//! CSV file.
+//! CSV file: an account statement, a ledger or the account's balances.
 
 use super::changelog::timestamp_field;
 use super::limits::{
@@ -18,10 +18,13 @@ use crate::codecs::scalars::parse_account_id;
 use crate::connect::ledger::read::v1::StatementExportServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::SubAccountScope;
-use crate::models::{StatementExport, StatementExportDownloadUrl, StatementExportsList};
+use crate::models::{
+    StatementExport, StatementExportDownloadUrl, StatementExportType, StatementExportsList,
+};
 use crate::proto::ledger::read::v1::{
     CancelStatementExportRequest, CreateStatementExportRequest,
     GetStatementExportDownloadUrlRequest, GetStatementExportRequest, ListStatementExportsRequest,
+    StatementExportType as ProtoStatementExportType,
 };
 use crate::transport::SharedTransport;
 use std::time::SystemTime;
@@ -36,9 +39,19 @@ const CANCEL_STATEMENT_EXPORT: &str =
 const LIST_STATEMENT_EXPORTS: &str = "/ledger.read.v1.StatementExportService/ListStatementExports";
 
 /// What [`StatementsService::create_export`] asks for: a whole-period
-/// statement file of one account, optionally one asset.
+/// statement, ledger or balances file of one account, optionally one asset.
 #[derive(Debug, Clone, Default)]
 pub struct CreateStatementExportOptions {
+    /// The kind of file to produce. Required, with no default, since the
+    /// server refuses a create without one: `None` is refused before
+    /// sending. Every type has the same period, asset filter, limits and
+    /// lifecycle; a balances period must also start inside the account
+    /// history, or the create is refused
+    /// ([`crate::Error::is_statement_history_unavailable`],
+    /// [`crate::Error::statement_history_available_from`]). Repeating an
+    /// idempotency key with another type is refused
+    /// (`ERROR_CODE_IDEMPOTENCY_KEY_REUSED`).
+    pub export_type: Option<StatementExportType>,
     /// The account the statement covers (see [`SubAccountScope`]). With
     /// [`SubAccountScope::Default`] and no default configured, a key scoped
     /// to a sub-account reads that sub-account and other callers their main
@@ -76,8 +89,9 @@ impl StatementsService {
         )
     }
 
-    /// Create a whole-period statement file of one account, produced in the
-    /// background, or return the export already created under the same
+    /// Create a whole-period statement, ledger or balances file of one
+    /// account, as
+    /// `opts.export_type` says, produced in the background, or return the export already created under the same
     /// idempotency key. Poll [`Self::get_export`] until its status is
     /// `ready`, or ends `failed`, `expired` or `canceled`; then download the
     /// file (see [`StatementExport`] and [`Self::get_export_download_url`]).
@@ -87,7 +101,7 @@ impl StatementsService {
     /// A main account has at most 5 exports `queued` or `processing`;
     /// another create is refused with `ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`
     /// (not retryable: wait for one to finish). Refused before sending: a
-    /// missing start or end, an end not after the start or more than 366
+    /// missing type, a missing start or end, an end not after the start or more than 366
     /// days after it, and an idempotency key that is empty, over 64
     /// characters or holds a character other than letters, digits, `.`, `_`,
     /// `:` or `-`.
@@ -96,6 +110,18 @@ impl StatementsService {
         opts: CreateStatementExportOptions,
     ) -> Result<StatementExport> {
         const OP: &str = "create_statement_export";
+        let export_type = match opts.export_type {
+            Some(StatementExportType::AccountStatement) => {
+                ProtoStatementExportType::ACCOUNT_STATEMENT
+            }
+            Some(StatementExportType::Ledger) => ProtoStatementExportType::LEDGER,
+            Some(StatementExportType::Balances) => ProtoStatementExportType::BALANCES,
+            None => {
+                return Err(Error::validation(format!(
+                    "{OP} export_type is required: AccountStatement, Ledger or Balances"
+                )));
+            }
+        };
         let start = opts
             .start_time
             .ok_or_else(|| Error::validation(format!("{OP} start_time is required")))?;
@@ -140,6 +166,7 @@ impl StatementsService {
             end_time: timestamp_field(Some(end)),
             asset_id: opts.asset_id.unwrap_or(0),
             idempotency_key: opts.idempotency_key,
+            r#type: export_type.into(),
             ..Default::default()
         };
         let client = self.export_client();
@@ -178,7 +205,8 @@ impl StatementsService {
     }
 
     /// A URL that downloads a `ready` export's file without credentials, for
-    /// a browser to save it as `filename` (`statement-<export_id>.csv`). It
+    /// a browser to save it as `filename` (`account-statement-<export_id>.csv`,
+    /// `ledger-<export_id>.csv` or `balances-<export_id>.csv`, by type). It
     /// works until `expires_at`, at most 60 seconds after the call; each call
     /// returns a new URL. Anyone holding it can download the file until
     /// then: never log, store or share it (the result's `Debug` redacts it).

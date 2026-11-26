@@ -210,8 +210,10 @@ procedure	access
 /strategies.v1.StrategiesService/DeleteStrategy	signed
 /strategies.v1.StrategiesService/DeployBot	signed
 /strategies.v1.StrategiesService/ExplainStrategy	signed
+/strategies.v1.StrategiesService/ForkStrategy	signed
 /strategies.v1.StrategiesService/GetBacktest	signed
 /strategies.v1.StrategiesService/GetBot	signed
+/strategies.v1.StrategiesService/GetBotFundsReturn	signed
 /strategies.v1.StrategiesService/GetCommunityStrategy	public
 /strategies.v1.StrategiesService/GetDeployProposal	signed
 /strategies.v1.StrategiesService/GetDeployStatus	signed
@@ -232,6 +234,8 @@ procedure	access
 /strategies.v1.StrategiesService/ProposeDeploy	signed
 /strategies.v1.StrategiesService/PublishStrategyVersion	signed
 /strategies.v1.StrategiesService/RenameStrategy	signed
+/strategies.v1.StrategiesService/ReportCommunityStrategy	signed
+/strategies.v1.StrategiesService/ReturnBotFunds	signed
 /strategies.v1.StrategiesService/RunScenarios	signed
 /strategies.v1.StrategiesService/SaveDraftVersion	signed
 /strategies.v1.StrategiesService/SaveStrategyNotes	signed

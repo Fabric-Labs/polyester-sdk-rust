@@ -17,6 +17,7 @@ use polyester::proto::ledger::read::v1::{
     BalanceSeries, CreateStatementExportRequest, CreateStatementExportResponse,
     GetBalanceHistoryRequest, GetBalanceHistoryResponse, ListStatementExportsRequest,
     ListStatementExportsResponse, StatementExport, StatementExportStatus,
+    StatementExportType as ProtoStatementExportType,
 };
 use polyester::proto::polyester::r#type::v1::U128;
 use polyester::proto::transfer::v1::{
@@ -1240,6 +1241,7 @@ fn export(id: u64) -> StatementExport {
         export_id: id,
         status: StatementExportStatus::STATEMENT_EXPORT_STATUS_QUEUED.into(),
         idempotency_key: "statement-2026".into(),
+        r#type: ProtoStatementExportType::LEDGER.into(),
         ..Default::default()
     }
 }
@@ -1265,6 +1267,7 @@ async fn statement_export_files_are_created_and_listed() {
     .await;
     let start = UNIX_EPOCH + Duration::from_secs(1_767_225_600);
     let opts = |end_secs: u64, end_nanos: u32, key: &str| CreateStatementExportOptions {
+        export_type: Some(polyester::models::StatementExportType::Ledger),
         start_time: Some(start),
         end_time: Some(start + Duration::new(end_secs, end_nanos)),
         idempotency_key: key.into(),
@@ -1277,8 +1280,12 @@ async fn statement_export_files_are_created_and_listed() {
         .await
         .unwrap();
     assert_eq!(
-        (created.status.as_str(), created.export_id.is_empty()),
-        ("queued", false)
+        (
+            created.status.as_str(),
+            created.export_id.is_empty(),
+            created.export_type.as_str()
+        ),
+        ("queued", false, "ledger")
     );
     let list = client
         .statements
@@ -1296,6 +1303,7 @@ async fn statement_export_files_are_created_and_listed() {
     let c = CreateStatementExportRequest::decode_from_slice(&sent[0].2).unwrap();
     assert_eq!(c.subaccount_id, Some(default_sub()));
     assert_eq!(c.idempotency_key, "statement-2026:a_b.c");
+    assert_eq!(c.r#type.as_known(), Some(ProtoStatementExportType::LEDGER));
     let end = c.end_time.as_option().unwrap();
     assert_eq!(end.seconds, 1_767_225_600 + max as i64);
     let l = ListStatementExportsRequest::decode_from_slice(&sent[1].2).unwrap();
@@ -1312,6 +1320,13 @@ async fn statement_export_files_are_created_and_listed() {
             "no start",
             CreateStatementExportOptions {
                 start_time: None,
+                ..opts(60, 0, "k")
+            },
+        ),
+        (
+            "no type",
+            CreateStatementExportOptions {
+                export_type: None,
                 ..opts(60, 0, "k")
             },
         ),
@@ -1335,6 +1350,50 @@ async fn statement_export_files_are_created_and_listed() {
         assert!(matches!(err, Err(Error::Validation(_))), "{err:?}");
     }
     assert!(requests(&seen).is_empty(), "refused calls were sent");
+}
+
+/// Each statement export type is sent as the contract's type.
+#[tokio::test]
+async fn statement_export_types_are_sent_as_the_contract_names_them() {
+    use polyester::models::StatementExportType;
+
+    let (client, seen) = server(|_path| {
+        connect_proto_ok(&CreateStatementExportResponse {
+            export: export(7).into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let start = UNIX_EPOCH + Duration::from_secs(1_767_225_600);
+    for (export_type, want) in [
+        (
+            StatementExportType::AccountStatement,
+            ProtoStatementExportType::ACCOUNT_STATEMENT,
+        ),
+        (
+            StatementExportType::Ledger,
+            ProtoStatementExportType::LEDGER,
+        ),
+        (
+            StatementExportType::Balances,
+            ProtoStatementExportType::BALANCES,
+        ),
+    ] {
+        client
+            .statements
+            .create_export(CreateStatementExportOptions {
+                export_type: Some(export_type),
+                start_time: Some(start),
+                end_time: Some(start + Duration::from_secs(86_400)),
+                idempotency_key: export_type.as_str().into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let sent = requests(&seen);
+        let c = CreateStatementExportRequest::decode_from_slice(&sent.last().unwrap().2).unwrap();
+        assert_eq!(c.r#type.as_known(), Some(want), "{export_type:?}");
+    }
 }
 
 /// Balance history reads each point's exact 18-decimal balance, and a server

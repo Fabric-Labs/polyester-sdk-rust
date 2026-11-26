@@ -193,4 +193,4 @@ reason = "The public live price band read is not wrapped in this SDK yet; call i
 
 [[allowlist]]
 service = "strategies.v1.StrategiesService"
-reason = "preview, not served yet"
+reason = "Preview; not wrapped in this SDK yet. ReportCommunityStrategy accepts only the user's own session, never an API key."
