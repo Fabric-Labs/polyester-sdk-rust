@@ -668,6 +668,108 @@ fn sparkline_interval(
     }
 }
 
+type OverviewRows =
+    std::sync::Arc<std::sync::Mutex<std::collections::HashMap<u32, MarketOverviewEntry>>>;
+type OverviewBatchesFn = std::sync::Arc<dyn Fn(Vec<MarketOverviewList>) + Send + Sync>;
+
+/// The callbacks a managed market overview gives its snapshot coordinator.
+struct OverviewCallbacks {
+    apply_snapshot:
+        std::sync::Arc<dyn Fn(MarketOverviewList, Vec<MarketOverviewList>) + Send + Sync>,
+    apply_drained: OverviewBatchesFn,
+    apply_live: OverviewBatchesFn,
+}
+
+/// Builds the callbacks that merge a managed market overview into `rows`,
+/// calling `emit` after each merge. The snapshot replaces the set; the
+/// publications buffered while it loaded, and the ones the coordinator drains
+/// while it is applied, are merged by freshness; publications it dispatches
+/// live apply as they come.
+fn overview_stream_callbacks(
+    rows: OverviewRows,
+    symbol_ids: std::collections::HashSet<u32>,
+    emit: std::sync::Arc<dyn Fn() + Send + Sync>,
+) -> OverviewCallbacks {
+    let symbol_ids = std::sync::Arc::new(symbol_ids);
+    let merge = |guard: bool| -> OverviewBatchesFn {
+        let rows = rows.clone();
+        let symbol_ids = symbol_ids.clone();
+        let emit = emit.clone();
+        std::sync::Arc::new(move |batches: Vec<MarketOverviewList>| {
+            {
+                let mut map = crate::realtime::lock_unpoisoned(&rows);
+                for batch in batches {
+                    merge_overview_rows(&mut map, &symbol_ids, batch.markets, guard);
+                }
+            }
+            emit();
+        })
+    };
+    let apply_drained = merge(true);
+    let apply_live = merge(false);
+    let apply_snapshot = {
+        let rows = rows.clone();
+        let symbol_ids = symbol_ids.clone();
+        let emit = emit.clone();
+        std::sync::Arc::new(
+            move |snapshot: MarketOverviewList, buffered: Vec<MarketOverviewList>| {
+                {
+                    let mut map = crate::realtime::lock_unpoisoned(&rows);
+                    map.clear();
+                    merge_overview_rows(&mut map, &symbol_ids, snapshot.markets, false);
+                    for batch in buffered {
+                        merge_overview_rows(&mut map, &symbol_ids, batch.markets, true);
+                    }
+                }
+                emit();
+            },
+        )
+    };
+    OverviewCallbacks {
+        apply_snapshot,
+        apply_drained,
+        apply_live,
+    }
+}
+
+/// Merges `rows` into a managed market overview's set, keeping only the
+/// markets in `symbol_ids` (all when empty). With `guard`, while a snapshot is
+/// merged, a row whose last trade is older than the row it would replace was
+/// published before that row and does not replace it. An equal last-trade time
+/// still does, with the index, volume and book changes made since.
+fn merge_overview_rows(
+    map: &mut std::collections::HashMap<u32, MarketOverviewEntry>,
+    symbol_ids: &std::collections::HashSet<u32>,
+    rows: Vec<MarketOverviewEntry>,
+    guard: bool,
+) {
+    for mut row in rows {
+        if !symbol_ids.is_empty() && !symbol_ids.contains(&row.symbol_id) {
+            continue;
+        }
+        if guard
+            && map
+                .get(&row.symbol_id)
+                .is_some_and(|previous| trade_ts_ns(&row) < trade_ts_ns(previous))
+        {
+            continue;
+        }
+        // Live publications carry no sparklines: keep the snapshot's.
+        if row.sparklines.is_empty()
+            && let Some(previous) = map.get(&row.symbol_id)
+        {
+            row.sparklines = previous.sparklines.clone();
+        }
+        map.insert(row.symbol_id, row);
+    }
+}
+
+/// A row's last-trade time in epoch nanoseconds; 0 when the market has no
+/// trade.
+fn trade_ts_ns(row: &MarketOverviewEntry) -> u64 {
+    row.last_trade_ts_ns.parse().unwrap_or(0)
+}
+
 /// Options for [`MarketOverviewService::list`].
 #[derive(Debug, Clone, Default)]
 pub struct ListMarketOverviewOptions {
@@ -962,23 +1064,7 @@ impl MarketOverviewService {
 
         // The channel carries every market; a filtered subscription keeps
         // only its own, in buffered and live updates alike.
-        let apply_rows = {
-            let by_symbol_id = by_symbol_id.clone();
-            Arc::new(move |rows: Vec<MarketOverviewEntry>| {
-                let mut map = crate::realtime::lock_unpoisoned(&by_symbol_id);
-                for mut row in rows {
-                    if symbol_ids.is_empty() || symbol_ids.contains(&row.symbol_id) {
-                        // Live publications carry no sparklines: keep the snapshot's.
-                        if row.sparklines.is_empty()
-                            && let Some(previous) = map.get(&row.symbol_id)
-                        {
-                            row.sparklines = previous.sparklines.clone();
-                        }
-                        map.insert(row.symbol_id, row);
-                    }
-                }
-            }) as Arc<dyn Fn(Vec<MarketOverviewEntry>) + Send + Sync>
-        };
+        let callbacks = overview_stream_callbacks(by_symbol_id.clone(), symbol_ids, emit.clone());
 
         let svc = self.clone();
         let fetch_symbols = symbols.clone();
@@ -1003,31 +1089,9 @@ impl MarketOverviewService {
                 })
             }),
             read_publication: Arc::new(|batch: MarketOverviewList| vec![batch]),
-            apply_snapshot: {
-                let apply_rows = apply_rows.clone();
-                let emit = emit.clone();
-                let by_symbol_id = by_symbol_id.clone();
-                Arc::new(
-                    move |snapshot: MarketOverviewList, buffered: Vec<MarketOverviewList>| {
-                        crate::realtime::lock_unpoisoned(&by_symbol_id).clear();
-                        apply_rows(snapshot.markets);
-                        for batch in buffered {
-                            apply_rows(batch.markets);
-                        }
-                        emit();
-                    },
-                )
-            },
-            apply_live_publications: {
-                let apply_rows = apply_rows.clone();
-                let emit = emit.clone();
-                Arc::new(move |batches: Vec<MarketOverviewList>| {
-                    for batch in batches {
-                        apply_rows(batch.markets);
-                    }
-                    emit();
-                })
-            },
+            apply_snapshot: callbacks.apply_snapshot,
+            apply_live_publications: callbacks.apply_live,
+            apply_drained_publications: Some(callbacks.apply_drained),
             max_buffered: 2000,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -1476,6 +1540,7 @@ impl OrderbookService {
                     }
                 })
             },
+            apply_drained_publications: None,
             max_buffered: 200,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -1533,6 +1598,106 @@ const UNAVAILABLE_SNAPSHOT_MAX_DELAY: std::time::Duration = std::time::Duration:
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicBool;
+
+    const SNAPSHOT_TRADE: u64 = 1_795_721_087_978_971_514;
+    const OLDER_TRADE: u64 = 1_795_721_087_185_742_363;
+    const NEWER_TRADE: u64 = 1_795_721_088_000_000_000;
+
+    fn overview_row(symbol_id: u32, trade: u64, change: i32) -> MarketOverviewEntry {
+        crate::codecs::decode::market_overview_entry_from_proto(
+            &crate::proto::marketoverview::v1::MarketOverview {
+                symbol_id,
+                last_trade_ts_ns: trade,
+                change_24h_bps: change,
+                ..Default::default()
+            },
+        )
+        .expect("row")
+    }
+
+    fn overview_batch(markets: Vec<MarketOverviewEntry>) -> MarketOverviewList {
+        MarketOverviewList {
+            markets,
+            next_page_token: String::new(),
+        }
+    }
+
+    type OverviewView = Arc<Mutex<std::collections::HashMap<u32, MarketOverviewEntry>>>;
+
+    // The callbacks create_subscription gives the snapshot coordinator, over a
+    // fresh set, and the last view they emitted.
+    fn overview_test_callbacks() -> (OverviewCallbacks, OverviewView) {
+        let rows: OverviewRows = Arc::default();
+        let view: OverviewView = Arc::default();
+        let emit = {
+            let rows = rows.clone();
+            let view = view.clone();
+            Arc::new(move || {
+                *view.lock().expect("view") = rows.lock().expect("rows").clone();
+            }) as Arc<dyn Fn() + Send + Sync>
+        };
+        (
+            overview_stream_callbacks(rows, std::collections::HashSet::new(), emit),
+            view,
+        )
+    }
+
+    // Rows buffered while the snapshot loaded are merged by freshness: an older
+    // one does not replace the snapshot's newer row; a newer one does, and so
+    // does one with the same last-trade time, with its changes; a market the
+    // snapshot did not have is added.
+    #[test]
+    fn overview_buffered_rows_are_merged_by_freshness() {
+        let mut equal = overview_row(1, SNAPSHOT_TRADE, 7);
+        equal.volume_24h_usd_scaled = Some("250".to_owned());
+        for (name, buffered, want_trade, want_change) in [
+            ("older", overview_row(1, OLDER_TRADE, 3), SNAPSHOT_TRADE, 0),
+            ("newer", overview_row(1, NEWER_TRADE, 5), NEWER_TRADE, 5),
+            ("equal timestamp", equal, SNAPSHOT_TRADE, 7),
+        ] {
+            let (callbacks, view) = overview_test_callbacks();
+            (callbacks.apply_snapshot)(
+                overview_batch(vec![overview_row(1, SNAPSHOT_TRADE, 0)]),
+                vec![overview_batch(vec![
+                    buffered,
+                    overview_row(2, OLDER_TRADE, 1),
+                ])],
+            );
+            let view = view.lock().expect("view");
+            assert_eq!(view[&1].last_trade_ts_ns, want_trade.to_string(), "{name}");
+            assert_eq!(view[&1].change_24h_bps, want_change, "{name}");
+            if name == "equal timestamp" {
+                assert_eq!(view[&1].volume_24h_usd_scaled.as_deref(), Some("250"));
+            }
+            assert!(view.contains_key(&2), "{name}: buffered market 2 not added");
+        }
+    }
+
+    // Publications the coordinator drains while the snapshot is being applied
+    // are merged with the same guard; publications it dispatched live apply as
+    // they come, an older last-trade time included.
+    #[test]
+    fn overview_drained_publications_are_guarded_and_live_ones_are_not() {
+        let (callbacks, view) = overview_test_callbacks();
+        (callbacks.apply_snapshot)(
+            overview_batch(vec![overview_row(1, SNAPSHOT_TRADE, 0)]),
+            Vec::new(),
+        );
+        let row = |view: &OverviewView| view.lock().expect("view")[&1].clone();
+
+        (callbacks.apply_drained)(vec![overview_batch(vec![overview_row(1, OLDER_TRADE, 3)])]);
+        assert_eq!(row(&view).last_trade_ts_ns, SNAPSHOT_TRADE.to_string());
+        (callbacks.apply_drained)(vec![overview_batch(vec![overview_row(
+            1,
+            SNAPSHOT_TRADE,
+            7,
+        )])]);
+        assert_eq!(row(&view).change_24h_bps, 7);
+        (callbacks.apply_live)(vec![overview_batch(vec![overview_row(1, OLDER_TRADE, 9)])]);
+        let live = row(&view);
+        assert_eq!(live.last_trade_ts_ns, OLDER_TRADE.to_string());
+        assert_eq!(live.change_24h_bps, 9);
+    }
     use std::sync::{Arc, Mutex};
     use tokio::sync::mpsc;
 
@@ -1861,6 +2026,7 @@ mod tests {
                 read_publication: Arc::new(|d| vec![d]),
                 apply_snapshot: Arc::new(|_, _| {}),
                 apply_live_publications: Arc::new(|_| {}),
+                apply_drained_publications: None,
                 max_buffered: 10,
                 on_reconnect: None,
                 on_snapshot_refresh: None,
@@ -1925,6 +2091,7 @@ mod tests {
                 read_publication: Arc::new(|d| vec![d]),
                 apply_snapshot: Arc::new(|_, _| {}),
                 apply_live_publications: Arc::new(|_| {}),
+                apply_drained_publications: None,
                 max_buffered: 10,
                 on_reconnect: None,
                 on_snapshot_refresh: None,

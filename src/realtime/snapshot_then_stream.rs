@@ -33,6 +33,12 @@ pub struct SnapshotThenStreamConfig<TSnapshot, TPublication> {
     pub read_publication: ReadPublicationFn<TPublication>,
     pub apply_snapshot: ApplySnapshotFn<TSnapshot, TPublication>,
     pub apply_live_publications: ApplyLiveFn<TPublication>,
+    /// Receives the publications that arrive while `apply_snapshot` runs, which
+    /// the coordinator drains before the stream becomes ready. The coordinator
+    /// decides, under its publication lock, whether a publication is drained or
+    /// dispatched live, so a callback can treat drained publications as part of
+    /// the snapshot merge. When `None`, they go to `apply_live_publications`.
+    pub apply_drained_publications: Option<ApplyLiveFn<TPublication>>,
     pub max_buffered: usize,
     pub on_reconnect: Option<NotifyFn>,
     pub on_snapshot_refresh: Option<NotifyFn>,
@@ -53,6 +59,7 @@ struct Inner<TSnapshot, TPublication> {
     read_publication: ReadPublicationFn<TPublication>,
     apply_snapshot: ApplySnapshotFn<TSnapshot, TPublication>,
     apply_live_publications: ApplyLiveFn<TPublication>,
+    apply_drained_publications: ApplyLiveFn<TPublication>,
     max_buffered: usize,
     on_reconnect: Option<NotifyFn>,
     on_snapshot_refresh: Option<NotifyFn>,
@@ -99,6 +106,9 @@ where
                 fetch_snapshot: cfg.fetch_snapshot,
                 read_publication: cfg.read_publication,
                 apply_snapshot: cfg.apply_snapshot,
+                apply_drained_publications: cfg
+                    .apply_drained_publications
+                    .unwrap_or_else(|| cfg.apply_live_publications.clone()),
                 apply_live_publications: cfg.apply_live_publications,
                 max_buffered,
                 on_reconnect: cfg.on_reconnect,
@@ -326,11 +336,12 @@ where
                 break;
             }
             if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                (self.apply_live_publications)(buffered)
+                (self.apply_drained_publications)(buffered)
             }))
             .is_err()
             {
-                let err = Error::realtime("apply_live_publications callback panicked".to_owned());
+                let err =
+                    Error::realtime("apply_drained_publications callback panicked".to_owned());
                 self.fail_closed(err.clone());
                 return Err(err);
             }
@@ -752,6 +763,7 @@ mod tests {
             read_publication: Arc::new(|p| vec![p]),
             apply_snapshot: Arc::new(|_s, _p| {}),
             apply_live_publications: Arc::new(|_p| {}),
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: Some(Arc::new(move || {
@@ -796,6 +808,7 @@ mod tests {
                 merged_cb.lock().expect("merged lock").extend(pending);
             }),
             apply_live_publications: Arc::new(|_publications| {}),
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -863,6 +876,7 @@ mod tests {
             read_publication: Arc::new(|p| vec![p]),
             apply_snapshot: Arc::new(|_s, _p| {}),
             apply_live_publications: Arc::new(|_p| {}),
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -911,6 +925,7 @@ mod tests {
                 merged_cb.lock().expect("merged").extend(pending);
             }),
             apply_live_publications: Arc::new(|_p| {}),
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -969,6 +984,7 @@ mod tests {
                     live.lock().expect("live lock").extend(publications);
                 })
             },
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -994,6 +1010,172 @@ mod tests {
             &[42],
             "drained publication must not be replayed"
         );
+    }
+
+    type Dispatched = Arc<Mutex<Vec<(u8, &'static str)>>>;
+
+    // An engine whose first snapshot apply waits on `entered` and `release`,
+    // whose later fetches fail, and whose live callback waits on `live_entered`
+    // and `live_release` for publication 43. It records which callback each
+    // publication reached.
+    fn dispatch_engine(
+        entered: Arc<Barrier>,
+        release: Arc<Barrier>,
+        live_entered: Arc<Barrier>,
+        live_release: Arc<Barrier>,
+        dispatched: Dispatched,
+    ) -> SnapshotThenStream<String, u8> {
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let fetches = Arc::new(AtomicUsize::new(0));
+        let record = |label: &'static str, dispatched: Dispatched| {
+            move |publications: Vec<u8>| {
+                dispatched
+                    .lock()
+                    .expect("dispatched lock")
+                    .extend(publications.into_iter().map(|p| (p, label)));
+            }
+        };
+        let drained = record("drained", dispatched.clone());
+        let live = record("live", dispatched);
+        SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(move || {
+                let first = fetches.fetch_add(1, Ordering::SeqCst) == 0;
+                async move {
+                    if first {
+                        Ok("snap".to_owned())
+                    } else {
+                        Err(Error::realtime("snapshot unavailable".to_owned()))
+                    }
+                }
+                .boxed()
+            }),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(move |_snapshot, _pending| {
+                entered.wait();
+                release.wait();
+            }),
+            apply_live_publications: Arc::new(move |publications: Vec<u8>| {
+                let blocks = publications.contains(&43);
+                live(publications);
+                if blocks {
+                    live_entered.wait();
+                    live_release.wait();
+                }
+            }),
+            apply_drained_publications: Some(Arc::new(drained)),
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+            on_error: None,
+        })
+    }
+
+    // A publication that arrives while the snapshot is being applied is drained
+    // to apply_drained_publications before the stream is ready; once it is
+    // ready, publications go to apply_live_publications. A live-dispatched
+    // publication stays live even when a refresh marks the stream not ready
+    // before its callback returns: the coordinator chose the callback under its
+    // lock, and nothing samples readiness afterwards.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn drained_and_live_publications_reach_their_own_callbacks() {
+        let entered = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let live_entered = Arc::new(Barrier::new(2));
+        let live_release = Arc::new(Barrier::new(2));
+        let dispatched: Dispatched = Arc::default();
+        let sts = dispatch_engine(
+            entered.clone(),
+            release.clone(),
+            live_entered.clone(),
+            live_release.clone(),
+            dispatched.clone(),
+        );
+
+        let refresh = {
+            let sts = sts.clone();
+            tokio::spawn(async move { sts.refresh_snapshot().await })
+        };
+        entered.wait();
+        sts.inner
+            .handle_publication(42)
+            .expect("publication during apply");
+        release.wait();
+        refresh.await.expect("refresh task").expect("refresh");
+        assert!(sts.is_ready());
+
+        let live = {
+            let inner = sts.inner.clone();
+            std::thread::spawn(move || inner.handle_publication(43))
+        };
+        live_entered.wait();
+        // The live callback is running; a refresh starts and fails.
+        assert!(sts.refresh_snapshot().await.is_err());
+        assert!(!sts.is_ready());
+        live_release.wait();
+        live.join().expect("live thread").expect("live publication");
+
+        assert_eq!(
+            dispatched.lock().expect("dispatched lock").as_slice(),
+            &[(42, "drained"), (43, "live")]
+        );
+    }
+
+    // Without apply_drained_publications, drained publications go to
+    // apply_live_publications as before.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn drained_publications_default_to_apply_live() {
+        let entered = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let seen = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(|| async { Ok("snap".to_owned()) }.boxed()),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: {
+                let entered = entered.clone();
+                let release = release.clone();
+                Arc::new(move |_snapshot, _pending| {
+                    entered.wait();
+                    release.wait();
+                })
+            },
+            apply_live_publications: {
+                let seen = seen.clone();
+                Arc::new(move |publications| seen.lock().expect("seen").extend(publications))
+            },
+            apply_drained_publications: None,
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+            on_error: None,
+        });
+        let refresh = {
+            let sts = sts.clone();
+            tokio::spawn(async move { sts.refresh_snapshot().await })
+        };
+        entered.wait();
+        sts.inner
+            .handle_publication(42)
+            .expect("publication during apply");
+        release.wait();
+        refresh.await.expect("refresh task").expect("refresh");
+        assert_eq!(seen.lock().expect("seen").as_slice(), &[42]);
     }
 
     #[tokio::test]
@@ -1040,6 +1222,7 @@ mod tests {
             read_publication: Arc::new(|p| vec![p]),
             apply_snapshot: Arc::new(|_snapshot: String, _pending: Vec<u8>| {}),
             apply_live_publications: Arc::new(|_publications| {}),
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -1103,6 +1286,7 @@ mod tests {
             read_publication: Arc::new(|p| vec![p]),
             apply_snapshot: Arc::new(|_snapshot: String, _pending: Vec<u8>| {}),
             apply_live_publications: Arc::new(|_publications| {}),
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -1160,6 +1344,7 @@ mod tests {
                 })
             },
             apply_live_publications: Arc::new(|_publications| {}),
+            apply_drained_publications: None,
             max_buffered: 8,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -1201,6 +1386,7 @@ mod tests {
             read_publication: Arc::new(|p| vec![p]),
             apply_snapshot: Arc::new(|_s, _p| {}),
             apply_live_publications: Arc::new(|_p| {}),
+            apply_drained_publications: None,
             max_buffered: 1,
             on_reconnect: None,
             on_snapshot_refresh: None,
@@ -1232,6 +1418,7 @@ mod tests {
             read_publication: Arc::new(|p| vec![p]),
             apply_snapshot: Arc::new(|_s, _p| {}),
             apply_live_publications: Arc::new(|_p| {}),
+            apply_drained_publications: None,
             max_buffered: 1,
             on_reconnect: None,
             on_snapshot_refresh: None,
