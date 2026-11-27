@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Breaking:** `market_overview.list` takes the sort and the sparklines, the contract's `ListMarketOverviewRequest` fields 4, 5 and 7: `ListMarketOverviewOptions` gains `order_by` (`Option<MarketOverviewOrderBy>`: `Change24hBps`, the absolute 24h change; `Volume24hUsd`; `LastPrice`; `DateAdded`, the listing time), `sort` (`Option<MarketOverviewSort>`: `Asc` or `Desc`) and `sparkline_intervals` (`Vec<MarketOverviewSparklineInterval>`: `OneHour`, `TwentyFourHours`, `OneWeek`, `OneMonth`, whose `as_str()` is the `MarketOverviewSparkline::interval` they return). Unset, nothing is sent and the server keeps its defaults: descending 24h USD volume, and the 24h sparkline. A `page_token` is bound to the symbols and sort it was returned for. Code that builds `ListMarketOverviewOptions` with a struct literal and no `..Default::default()` must set the new fields. Affected: `services::ListMarketOverviewOptions`; `models::MarketOverviewOrderBy`, `MarketOverviewSort`, `MarketOverviewSparklineInterval` (new).
+
 ## 0.33.0
 
 Package version: `0.33.0`. Git tag: `v0.33.0`. Released 2026-11-27. Built on public contract `11e2cec`.
