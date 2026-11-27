@@ -1021,15 +1021,27 @@ def sync_release(
 # --------------------------------------------------------------------------- cli
 
 
-def detect(root: Path) -> str:
+def detect(root: Path, rev: str | None = None) -> str:
+    """The SDK of ``root``: from the files the commit ``rev`` holds, or from the
+    working tree when ``rev`` is None (the build commands act on it)."""
     for marker, ecosystem in (
         ("go.mod", "go"),
         ("Cargo.toml", "rust"),
         ("pyproject.toml", "python"),
     ):
-        if (root / marker).is_file():
+        if rev is None:
+            found = (root / marker).is_file()
+        else:
+            found = (
+                subprocess.run(
+                    ["git", "cat-file", "-e", f"{rev}:{marker}"], cwd=root, capture_output=True
+                ).returncode
+                == 0
+            )
+        if found:
             return ecosystem
-    raise ReleaseError(f"{root} has no go.mod, Cargo.toml or pyproject.toml")
+    where = root if rev is None else f"{root} at {rev}"
+    raise ReleaseError(f"{where} has no go.mod, Cargo.toml or pyproject.toml")
 
 
 def emit(values: dict[str, str]) -> None:
@@ -1088,7 +1100,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"route: {r.reason}", file=sys.stderr)
             emit({"channel": r.channel, "dry_run": str(r.dry_run).lower()})
             return 0
-        ecosystem = args.ecosystem or detect(root)
+        # The notes commands describe a commit: its SDK is the one it holds.
+        notes_rev: str | None = None
+        if args.command == "plan":
+            notes_rev = args.rev
+        elif args.command == "stable-notes":
+            notes_rev = args.rev or f"v{args.version}"
+        ecosystem = args.ecosystem or detect(root, notes_rev)
         if args.command == "plan":
             result = plan(root, ecosystem, args.rev)
             print(f"plan: {result.reason}", file=sys.stderr)

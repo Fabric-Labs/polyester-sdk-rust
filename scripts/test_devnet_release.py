@@ -515,6 +515,25 @@ class CliTest(GitRepoCase):
         self.assertIn("would run: gh release create v0.34.1-devnet.20261117093000", out)
         self.assertEqual(gh.calls, [])
 
+    def test_the_notes_commands_detect_the_sdk_at_the_selected_commit(self) -> None:
+        sha = self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T05:00:00+00:00")
+        run_git(self.repo, "tag", "-a", "v0.35.0", "-m", "v0.35.0")
+        self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-27T06:00:00+00:00")
+        # The working tree no longer has the package manifest; the commits do.
+        (self.repo / "go.mod").unlink()
+        notes = self.repo / "notes.md"
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": "Fabric-Labs/polyester-sdk-z"}):
+            code, out = self.main("plan", "--notes", str(notes))
+            self.assertEqual(code, 0)
+            self.assertIn("go get example.com/sdk@v0.35.1-devnet.", notes.read_text())
+            code, _ = self.main("stable-notes", "--version", "0.35.0", "--notes", str(notes))
+            self.assertEqual(code, 0)
+            self.assertIn("go get example.com/sdk@v0.35.0", notes.read_text())
+            code, _ = self.main(
+                "stable-notes", "--version", "0.35.0", "--rev", sha, "--notes", str(notes)
+            )
+            self.assertEqual(code, 0)
+
     def test_plan_fails_loudly_without_a_backend_release(self) -> None:
         self.write_manifest({"schemaVersion": 1})
         self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
