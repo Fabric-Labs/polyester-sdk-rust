@@ -77,6 +77,10 @@ def run_git(cwd: Path, *args: str, date: str | None = None) -> str:
     ).stdout.strip()
 
 
+# The SDK's manifest.json as the contract publication writes it: the backend
+# release whose public contract the SDK carries.
+MANIFEST = {"backendRelease": "0.93.12", "schemaVersion": 1, "sdk": "go"}
+
 CHANGELOG = """# Changelog
 
 ## Unreleased
@@ -178,11 +182,15 @@ class GitRepoCase(unittest.TestCase):
         self.repo = Path(self.tmp.name)
         run_git(self.repo, "init", "-q", "-b", "main")
         (self.repo / "go.mod").write_text("module example.com/sdk\n\ngo 1.22\n")
+        self.write_manifest(MANIFEST)
         self.commit(CHANGELOG.format(entries=""), "2026-11-01T10:00:00+00:00")
         run_git(self.repo, "tag", "-a", "v0.34.0", "-m", "v0.34.0")
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
+
+    def write_manifest(self, manifest: dict[str, object]) -> None:
+        (self.repo / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
     def commit(self, changelog: str, date: str) -> str:
         (self.repo / "CHANGELOG.md").write_text(changelog)
@@ -317,6 +325,143 @@ class ReleaseNotesSizeTest(GitRepoCase):
                 dr.github_repository(self.repo)
 
 
+class BackendReleaseTest(GitRepoCase):
+    """Every release names the backend release its contract comes from:
+    manifest.json backendRelease at the released commit."""
+
+    def test_devnet_notes_start_with_the_backend_release(self) -> None:
+        self.commit(CHANGELOG.format(entries="- a change\n"), "2026-11-17T09:30:00+00:00")
+        notes = dr.release_notes(self.repo, dr.plan(self.repo, "go"))
+        self.assertEqual(notes.splitlines()[0], "Targets Polyester backend 0.93.12")
+        self.assertIn("- a change", notes)
+
+    def test_oversized_devnet_notes_keep_the_backend_release_first(self) -> None:
+        entry = "- a long entry " + "word " * 80 + "\n"
+        entries = entry * (dr.GITHUB_RELEASE_BODY_LIMIT // len(entry) + 10)
+        self.commit(CHANGELOG.format(entries=entries), "2026-11-17T09:30:00+00:00")
+        notes = dr.release_notes(self.repo, dr.plan(self.repo, "go"), "Fabric-Labs/x")
+        self.assertLessEqual(len(notes), dr.RELEASE_NOTES_BUDGET)
+        self.assertEqual(notes.splitlines()[0], "Targets Polyester backend 0.93.12")
+        self.assertNotIn("a long entry", notes)
+
+    def test_the_release_is_read_at_the_released_commit(self) -> None:
+        first = self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        self.write_manifest({**MANIFEST, "backendRelease": "0.94.0"})
+        later = self.commit(CHANGELOG.format(entries="- a\n- b\n"), "2026-11-17T09:40:00+00:00")
+        # The working tree is not what is released.
+        self.write_manifest({**MANIFEST, "backendRelease": "0.94.7"})
+        self.assertEqual(dr.backend_release(self.repo, first), "0.93.12")
+        self.assertEqual(dr.backend_release(self.repo, later), "0.94.0")
+        notes = dr.release_notes(self.repo, dr.plan(self.repo, "go", first))
+        self.assertTrue(notes.startswith("Targets Polyester backend 0.93.12\n\n"))
+
+    def test_a_missing_or_malformed_release_fails_loudly(self) -> None:
+        for manifest in (
+            {"schemaVersion": 1},
+            {**MANIFEST, "backendRelease": ""},
+            {**MANIFEST, "backendRelease": "0.93"},
+            {**MANIFEST, "backendRelease": "v0.93.12"},
+            {**MANIFEST, "backendRelease": "0.93.12-rc1"},
+            {**MANIFEST, "backendRelease": 9312},
+        ):
+            with self.subTest(manifest=manifest):
+                self.write_manifest(manifest)
+                self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+                with self.assertRaisesRegex(dr.ReleaseError, "backendRelease"):
+                    dr.release_notes(self.repo, dr.plan(self.repo, "go"))
+        (self.repo / "manifest.json").unlink()
+        self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        with self.assertRaisesRegex(dr.ReleaseError, "manifest.json"):
+            dr.release_notes(self.repo, dr.plan(self.repo, "go"))
+        (self.repo / "manifest.json").write_text("{not json\n")
+        self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        with self.assertRaisesRegex(dr.ReleaseError, "manifest.json"):
+            dr.release_notes(self.repo, dr.plan(self.repo, "go"))
+
+    def test_this_repository_names_its_backend_release(self) -> None:
+        manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
+        self.assertRegex(manifest.get("backendRelease", ""), dr.BACKEND_RELEASE)
+
+
+STABLE_CHANGELOG = """# Changelog
+
+## Unreleased
+
+## 0.35.0
+
+{entries}
+## 0.34.0
+
+- **Breaking:** an older breaking entry that must not count.
+"""
+
+
+class StableNotesTest(GitRepoCase):
+    """stable-notes: the body of a stable GitHub release, for the maintainer
+    to create it with."""
+
+    REPOSITORY = "Fabric-Labs/polyester-sdk-example"
+
+    def tag(self, entries: str) -> str:
+        sha = self.commit(STABLE_CHANGELOG.format(entries=entries), "2026-11-27T05:00:00+00:00")
+        run_git(self.repo, "tag", "-a", "v0.35.0", "-m", "v0.35.0")
+        return sha
+
+    def test_stable_notes_name_the_backend_release_first(self) -> None:
+        self.tag("- **Breaking:** a change\n")
+        notes = dr.stable_notes(self.repo, "go", "0.35.0", "v0.35.0", self.REPOSITORY)
+        self.assertEqual(
+            notes,
+            "Targets Polyester backend 0.93.12\n\n"
+            "Stable release for testnet. Install with "
+            "`go get example.com/sdk@v0.35.0`.\n\n"
+            "The full list of changes is in [CHANGELOG.md]"
+            f"(https://github.com/{self.REPOSITORY}/blob/v0.35.0/CHANGELOG.md#0350), "
+            "including the breaking changes in this release.\n",
+        )
+
+    def test_a_release_without_breaking_changes_does_not_mention_them(self) -> None:
+        self.tag("- a fix\n")
+        notes = dr.stable_notes(self.repo, "go", "0.35.0", "v0.35.0", self.REPOSITORY)
+        self.assertTrue(notes.endswith("/blob/v0.35.0/CHANGELOG.md#0350).\n"), notes)
+        self.assertNotIn("breaking", notes)
+
+    def test_each_ecosystem_has_its_install_line(self) -> None:
+        self.tag("- a fix\n")
+        (self.repo / "pyproject.toml").write_text('[project]\nname = "example-sdk"\n')
+        (self.repo / "Cargo.toml").write_text('[package]\nname = "example-sdk"\n')
+        python = dr.stable_notes(self.repo, "python", "0.35.0", "v0.35.0", self.REPOSITORY)
+        rust = dr.stable_notes(self.repo, "rust", "0.35.0", "v0.35.0", self.REPOSITORY)
+        self.assertIn("Install with `pip install example-sdk==0.35.0`.", python)
+        self.assertIn(
+            'Install with `cargo add example-sdk@0.35.0` (or `example-sdk = "0.35"` in '
+            "Cargo.toml).",
+            rust,
+        )
+
+    def test_the_release_is_read_at_the_tag(self) -> None:
+        self.tag("- a fix\n")
+        self.write_manifest({**MANIFEST, "backendRelease": "0.94.0"})
+        self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T06:00:00+00:00")
+        notes = dr.stable_notes(self.repo, "go", "0.35.0", "v0.35.0", self.REPOSITORY)
+        self.assertTrue(notes.startswith("Targets Polyester backend 0.93.12\n"))
+
+    def test_a_stable_release_needs_its_release_tag_section_and_backend(self) -> None:
+        self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T05:00:00+00:00")
+        with self.assertRaises(dr.ReleaseError):  # no v0.35.0 tag
+            dr.stable_notes(self.repo, "go", "0.35.0", "v0.35.0", self.REPOSITORY)
+        run_git(self.repo, "tag", "-a", "v0.35.0", "-m", "v0.35.0")
+        with self.assertRaisesRegex(dr.ReleaseError, "0.36.0"):  # no such CHANGELOG section
+            dr.stable_notes(self.repo, "go", "0.36.0", "v0.35.0", self.REPOSITORY)
+        for version in ("0.35", "v0.35.0", "0.35.0-devnet"):
+            with self.assertRaises(dr.ReleaseError):
+                dr.stable_notes(self.repo, "go", version, "v0.35.0", self.REPOSITORY)
+        self.write_manifest({"schemaVersion": 1})
+        self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T06:00:00+00:00")
+        with self.assertRaisesRegex(dr.ReleaseError, "backendRelease"):
+            dr.stable_notes(self.repo, "go", "0.35.0", "HEAD", self.REPOSITORY)
+
+
 class CliTest(GitRepoCase):
     """main() for each subcommand that needs no network, as the workflows call it."""
 
@@ -341,6 +486,31 @@ class CliTest(GitRepoCase):
         self.assertEqual(code, 0)
         self.assertIn("would run: gh release create v0.34.1-devnet.20261117093000", out)
         self.assertEqual(gh.calls, [])
+
+    def test_plan_fails_loudly_without_a_backend_release(self) -> None:
+        self.write_manifest({"schemaVersion": 1})
+        self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        notes = self.repo / "notes.md"
+        code, _ = self.main("plan", "--notes", str(notes))
+        self.assertEqual(code, 1)
+        self.assertFalse(notes.exists())
+
+    def test_stable_notes_writes_the_stable_body(self) -> None:
+        self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T05:00:00+00:00")
+        run_git(self.repo, "tag", "-a", "v0.35.0", "-m", "v0.35.0")
+        notes = self.repo / "notes.md"
+        with mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": "Fabric-Labs/polyester-sdk-z"}):
+            code, _ = self.main("stable-notes", "--version", "0.35.0", "--notes", str(notes))
+        self.assertEqual(code, 0)
+        body = notes.read_text(encoding="utf-8")
+        self.assertTrue(body.startswith("Targets Polyester backend 0.93.12\n\nStable release"))
+        self.assertIn("polyester-sdk-z/blob/v0.35.0/CHANGELOG.md#0350", body)
+        self.write_manifest({"schemaVersion": 1})
+        self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T06:00:00+00:00")
+        code, _ = self.main(
+            "stable-notes", "--version", "0.35.0", "--rev", "HEAD", "--notes", str(notes)
+        )
+        self.assertEqual(code, 1)
 
     def test_oversized_changelog_plans_a_short_body_and_release_takes_it(self) -> None:
         entry = "- a long entry " + "word " * 80 + "\n"
