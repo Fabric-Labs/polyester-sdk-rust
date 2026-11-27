@@ -26,6 +26,12 @@ version and the artefacts can be tested and dry-run without publishing:
     exists   whether the registry already has the version
     check-registry  after publishing: the version resolves, default stays stable
     release  move the rolling GitHub pre-release to this snapshot
+    stable-notes  the body of a stable GitHub release, which a maintainer creates
+
+Every release body opens with the backend release whose public contract the
+SDK carries, ``Targets Polyester backend X.Y.Z``: manifest.json
+``backendRelease`` at the released commit, which the contract publication
+writes. A release whose manifest does not name it fails.
 
 Only the Python standard library is used (Python 3.11 or later).
 """
@@ -60,6 +66,9 @@ DEVNET_MARK = "-devnet"
 BREAKING = re.compile(r"\*\*Breaking\b")
 ENTRY = re.compile(r"^\s*[-*+]\s+\S")
 UNRELEASED_HEADING = re.compile(r"^##\s+Unreleased\s*$", re.IGNORECASE)
+# A backend release as manifest.json backendRelease names it: MAJOR.MINOR.PATCH
+# in ASCII digits, matched whole (no trailing newline, no other digits).
+BACKEND_RELEASE = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", re.ASCII)
 TIMESTAMP = re.compile(r"(\d{14})$")
 
 # GitHub release tags this channel owns. Go: one immutable tag per snapshot,
@@ -255,6 +264,27 @@ def changelog_at(root: Path, sha: str) -> str:
     return git(root, "show", f"{sha}:CHANGELOG.md")
 
 
+def backend_release(root: Path, sha: str) -> str:
+    """The backend release the commit ``sha`` targets: manifest.json
+    ``backendRelease`` as that commit holds it. A release cannot name one it
+    does not have, so a missing or malformed value fails."""
+    try:
+        manifest = json.loads(git(root, "show", f"{sha}:manifest.json"))
+    except json.JSONDecodeError as error:
+        raise ReleaseError(f"manifest.json at {sha} is not JSON: {error}") from None
+    value = manifest.get("backendRelease") if isinstance(manifest, dict) else None
+    if not isinstance(value, str) or not BACKEND_RELEASE.fullmatch(value):
+        raise ReleaseError(
+            f"manifest.json at {sha} has no backendRelease X.Y.Z (found {value!r}); "
+            "the contract publication writes it"
+        )
+    return value
+
+
+def backend_line(root: Path, sha: str) -> str:
+    return f"Targets Polyester backend {backend_release(root, sha)}\n\n"
+
+
 def plan(root: Path, ecosystem: str, rev: str = "HEAD") -> Plan:
     sha = git(root, "rev-parse", f"{rev}^{{commit}}")
     section = unreleased_section(changelog_at(root, sha))
@@ -283,12 +313,14 @@ def plan(root: Path, ecosystem: str, rev: str = "HEAD") -> Plan:
     )
 
 
-def install_hint(root: Path, ecosystem: str, version: str) -> str:
+def install_hint(root: Path, ecosystem: str, version: str, sha: str) -> str:
+    """The install line of ``version``, with the package name the commit ``sha``
+    holds."""
     if ecosystem == "go":
-        return f"go get {go_module(root)}@v{version}"
+        return f"go get {go_module(root, sha)}@v{version}"
     if ecosystem == "python":
-        return f"pip install {python_project(root)}=={version}"
-    return f"cargo add {crate_name(root)}@={version}"
+        return f"pip install {python_project(root, sha)}=={version}"
+    return f"cargo add {crate_name(root, sha)}@={version}"
 
 
 def github_repository(root: Path) -> str:
@@ -310,10 +342,11 @@ def release_notes(root: Path, p: Plan, repository: str | None = None) -> str:
     entry is ever left half written."""
     section = "\n".join(unreleased_section(changelog_at(root, p.sha)))
     head = (
+        f"{backend_line(root, p.sha)}"
         f"Devnet pre-release `{p.version}`, built from {p.sha} on main. "
         f"It is not the latest release: the default install stays on the stable "
         f"release, which tracks testnet.\n\n"
-        f"```\n{install_hint(root, p.ecosystem, p.version)}\n```\n\n"
+        f"```\n{install_hint(root, p.ecosystem, p.version, p.sha)}\n```\n\n"
         f"## Changes since v{p.base}\n\n"
     )
     notes = f"{head}{section.strip()}\n"
@@ -326,6 +359,69 @@ def release_notes(root: Path, p: Plan, repository: str | None = None) -> str:
         f"{head}The {len(p.entries)} entries under `## Unreleased` are longer than a "
         f"release body holds. Read them in [CHANGELOG.md at {p.sha}]({changelog}).\n"
     )
+
+
+def stable_install_hint(root: Path, ecosystem: str, version: str, sha: str) -> str:
+    if ecosystem == "go":
+        return f"`go get {go_module(root, sha)}@v{version}`"
+    if ecosystem == "python":
+        return f"`pip install {python_project(root, sha)}=={version}`"
+    crate = crate_name(root, sha)
+    major, minor, _ = version.split(".")
+    return f'`cargo add {crate}@{version}` (or `{crate} = "{major}.{minor}"` in Cargo.toml)'
+
+
+def changelog_anchor(heading: str) -> str:
+    """The fragment GitHub gives a Markdown heading: lower case, punctuation
+    other than hyphens and underscores dropped, spaces turned into hyphens."""
+    text = re.sub(r"[^\w\- ]", "", heading.lstrip("#").strip().lower())
+    return text.replace(" ", "-")
+
+
+def stable_notes(
+    root: Path, ecosystem: str, version: str, rev: str, repository: str | None = None
+) -> str:
+    """The body of the stable GitHub release ``v<version>``: the backend
+    release, the install line and a link to the version's CHANGELOG section,
+    read at ``rev`` (its tag). The maintainer creates the release with it."""
+    if not STABLE_TAG.match(f"v{version}"):
+        raise ReleaseError(f"{version!r} is not a stable version X.Y.Z")
+    sha = git(root, "rev-parse", f"{rev}^{{commit}}")
+    # The notes link CHANGELOG.md at the tag: a tag that names another commit
+    # would show another CHANGELOG. Before the tag is pushed there is none.
+    tag = f"v{version}"
+    tagged = subprocess.run(
+        ["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}^{{commit}}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if tagged and tagged != sha:
+        raise ReleaseError(f"the tag {tag} is {tagged}, not the released commit {sha}")
+    heading_re = re.compile(rf"^##\s+v?{re.escape(version)}(?:\s.*)?$")
+    lines = changelog_at(root, sha).splitlines()
+    start = next((i for i, line in enumerate(lines) if heading_re.match(line)), None)
+    if start is None:
+        raise ReleaseError(f"CHANGELOG.md at {sha} has no ## {version} section")
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines)
+    )
+    breaking = any(BREAKING.search(line) for line in lines[start + 1 : end])
+    changelog = (
+        f"https://github.com/{repository or github_repository(root)}/blob/v{version}"
+        f"/CHANGELOG.md#{changelog_anchor(lines[start])}"
+    )
+    notes = (
+        f"{backend_line(root, sha)}"
+        f"Stable release for testnet. Install with "
+        f"{stable_install_hint(root, ecosystem, version, sha)}.\n\n"
+        f"The full list of changes is in [CHANGELOG.md]({changelog})"
+        + (", including the breaking changes in this release" if breaking else "")
+        + ".\n"
+    )
+    if len(notes) > RELEASE_NOTES_BUDGET:
+        raise ReleaseError(f"the stable notes have {len(notes)} characters")
+    return notes
 
 
 def write_notes(path: Path, notes: str) -> None:
@@ -354,21 +450,27 @@ def check_notes(notes: Path) -> None:
 # --------------------------------------------------------------------------- manifests
 
 
-def go_module(root: Path) -> str:
-    match = GO_MODULE_LINE.search((root / "go.mod").read_text(encoding="utf-8"))
+def manifest_text(root: Path, name: str, sha: str | None) -> str:
+    """The file ``name`` as the commit ``sha`` holds it, or as the working tree
+    holds it when ``sha`` is None (a build stamps and checks the working tree)."""
+    if sha is None:
+        return (root / name).read_text(encoding="utf-8")
+    return git(root, "show", f"{sha}:{name}")
+
+
+def go_module(root: Path, sha: str | None = None) -> str:
+    match = GO_MODULE_LINE.search(manifest_text(root, "go.mod", sha))
     if not match:
         raise ReleaseError("go.mod has no module line")
     return match[1]
 
 
-def python_project(root: Path) -> str:
-    with (root / "pyproject.toml").open("rb") as handle:
-        return str(tomllib.load(handle)["project"]["name"])
+def python_project(root: Path, sha: str | None = None) -> str:
+    return str(tomllib.loads(manifest_text(root, "pyproject.toml", sha))["project"]["name"])
 
 
-def crate_name(root: Path) -> str:
-    with (root / "Cargo.toml").open("rb") as handle:
-        return str(tomllib.load(handle)["package"]["name"])
+def crate_name(root: Path, sha: str | None = None) -> str:
+    return str(tomllib.loads(manifest_text(root, "Cargo.toml", sha))["package"]["name"])
 
 
 def replace_table_key(text: str, table: str, key: str, value: str) -> str:
@@ -919,15 +1021,27 @@ def sync_release(
 # --------------------------------------------------------------------------- cli
 
 
-def detect(root: Path) -> str:
+def detect(root: Path, rev: str | None = None) -> str:
+    """The SDK of ``root``: from the files the commit ``rev`` holds, or from the
+    working tree when ``rev`` is None (the build commands act on it)."""
     for marker, ecosystem in (
         ("go.mod", "go"),
         ("Cargo.toml", "rust"),
         ("pyproject.toml", "python"),
     ):
-        if (root / marker).is_file():
+        if rev is None:
+            found = (root / marker).is_file()
+        else:
+            found = (
+                subprocess.run(
+                    ["git", "cat-file", "-e", f"{rev}:{marker}"], cwd=root, capture_output=True
+                ).returncode
+                == 0
+            )
+        if found:
             return ecosystem
-    raise ReleaseError(f"{root} has no go.mod, Cargo.toml or pyproject.toml")
+    where = root if rev is None else f"{root} at {rev}"
+    raise ReleaseError(f"{where} has no go.mod, Cargo.toml or pyproject.toml")
 
 
 def emit(values: dict[str, str]) -> None:
@@ -968,6 +1082,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_verify.add_argument("--sha", default="HEAD")
     p_verify.add_argument("--dist", type=Path, default=Path("dist"))
 
+    p_stable = sub.add_parser("stable-notes")
+    p_stable.add_argument("--version", required=True)
+    p_stable.add_argument("--rev", help="the released commit (default: the tag v<version>)")
+    p_stable.add_argument("--notes", type=Path, required=True)
+
     p_release = sub.add_parser("release")
     p_release.add_argument("--rev", default="HEAD")
     p_release.add_argument("--notes", type=Path, required=True)
@@ -981,13 +1100,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"route: {r.reason}", file=sys.stderr)
             emit({"channel": r.channel, "dry_run": str(r.dry_run).lower()})
             return 0
-        ecosystem = args.ecosystem or detect(root)
+        # The notes commands describe a commit: its SDK is the one it holds.
+        notes_rev: str | None = None
+        if args.command == "plan":
+            notes_rev = args.rev
+        elif args.command == "stable-notes":
+            notes_rev = args.rev or f"v{args.version}"
+        ecosystem = args.ecosystem or detect(root, notes_rev)
         if args.command == "plan":
             result = plan(root, ecosystem, args.rev)
             print(f"plan: {result.reason}", file=sys.stderr)
             if args.notes and not result.skip:
                 write_notes(args.notes, release_notes(root, result))
             emit(result.outputs())
+            return 0
+        if args.command == "stable-notes":
+            notes = stable_notes(root, ecosystem, args.version, args.rev or f"v{args.version}")
+            write_notes(args.notes, notes)
+            check_notes(args.notes)
+            print(f"stable-notes: wrote {args.notes}", file=sys.stderr)
             return 0
         if args.command == "stamp":
             if ecosystem == "go":
