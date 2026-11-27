@@ -59,7 +59,7 @@ struct Inner<TSnapshot, TPublication> {
     read_publication: ReadPublicationFn<TPublication>,
     apply_snapshot: ApplySnapshotFn<TSnapshot, TPublication>,
     apply_live_publications: ApplyLiveFn<TPublication>,
-    apply_drained_publications: ApplyLiveFn<TPublication>,
+    apply_drained_publications: Option<ApplyLiveFn<TPublication>>,
     max_buffered: usize,
     on_reconnect: Option<NotifyFn>,
     on_snapshot_refresh: Option<NotifyFn>,
@@ -106,9 +106,7 @@ where
                 fetch_snapshot: cfg.fetch_snapshot,
                 read_publication: cfg.read_publication,
                 apply_snapshot: cfg.apply_snapshot,
-                apply_drained_publications: cfg
-                    .apply_drained_publications
-                    .unwrap_or_else(|| cfg.apply_live_publications.clone()),
+                apply_drained_publications: cfg.apply_drained_publications,
                 apply_live_publications: cfg.apply_live_publications,
                 max_buffered,
                 on_reconnect: cfg.on_reconnect,
@@ -335,13 +333,14 @@ where
             if buffered.is_empty() {
                 break;
             }
-            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                (self.apply_drained_publications)(buffered)
-            }))
-            .is_err()
-            {
-                let err =
-                    Error::realtime("apply_drained_publications callback panicked".to_owned());
+            // Without apply_drained_publications, drained publications go to
+            // apply_live_publications, and a panic there is reported as before.
+            let (apply, name) = match &self.apply_drained_publications {
+                Some(apply) => (apply, "apply_drained_publications"),
+                None => (&self.apply_live_publications, "apply_live_publications"),
+            };
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| apply(buffered))).is_err() {
+                let err = Error::realtime(format!("{name} callback panicked"));
                 self.fail_closed(err.clone());
                 return Err(err);
             }
@@ -1176,6 +1175,87 @@ mod tests {
         release.wait();
         refresh.await.expect("refresh task").expect("refresh");
         assert_eq!(seen.lock().expect("seen").as_slice(), &[42]);
+    }
+
+    // A drain whose callback panics fails the refresh closed, naming the
+    // callback that panicked: apply_drained_publications when set, and
+    // apply_live_publications, as before it existed, when drained
+    // publications fall back to it. The refresh result, the stored error and
+    // on_error report the same name.
+    async fn drain_panic_reports(with_drained: bool) -> Vec<String> {
+        let slot: Arc<Mutex<Option<SnapshotThenStream<String, u8>>>> = Arc::default();
+        let reported = Arc::new(Mutex::new(Vec::<String>::new()));
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let panics: ApplyLiveFn<u8> = Arc::new(|_publications| panic!("drain callback"));
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(|| async { Ok("snap".to_owned()) }.boxed()),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: {
+                let slot = slot.clone();
+                Arc::new(move |_snapshot, _pending| {
+                    let sts = slot.lock().expect("slot lock").clone().expect("engine");
+                    sts.inner
+                        .handle_publication(42)
+                        .expect("publication during apply");
+                })
+            },
+            apply_live_publications: if with_drained {
+                Arc::new(|_publications| {})
+            } else {
+                panics.clone()
+            },
+            apply_drained_publications: with_drained.then_some(panics),
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+            on_error: {
+                let reported = reported.clone();
+                Some(Arc::new(move |err: Error| {
+                    reported.lock().expect("reported").push(err.to_string());
+                }))
+            },
+        });
+        *slot.lock().expect("slot lock") = Some(sts.clone());
+        let refreshed = sts.refresh_snapshot().await.expect_err("drain panic");
+        *slot.lock().expect("slot lock") = None;
+        let mut reports = vec![
+            refreshed.to_string(),
+            sts.err().expect("stored error").to_string(),
+        ];
+        reports.extend(reported.lock().expect("reported").iter().cloned());
+        reports
+    }
+
+    #[tokio::test]
+    async fn a_panicking_apply_drained_publications_is_reported_by_name() {
+        let reports = drain_panic_reports(true).await;
+        assert!(reports.len() >= 3, "{reports:?}");
+        for report in reports {
+            assert!(
+                report.contains("apply_drained_publications callback panicked"),
+                "{report}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_panic_in_the_apply_live_fallback_is_reported_as_before() {
+        let reports = drain_panic_reports(false).await;
+        assert!(reports.len() >= 3, "{reports:?}");
+        for report in reports {
+            assert!(
+                report.contains("apply_live_publications callback panicked"),
+                "{report}"
+            );
+        }
     }
 
     #[tokio::test]
