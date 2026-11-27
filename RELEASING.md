@@ -6,7 +6,7 @@ that file and its `crates-io` environment; no registry token is stored.
 
 | Channel | Tracks  | Version                              | Published when                                     | Selected by                          |
 |---------|---------|--------------------------------------|----------------------------------------------------|--------------------------------------|
-| Stable  | testnet | `X.Y.Z`                              | a maintainer pushes the tag `vX.Y.Z`               | `cargo add polyester-sdk`, `"0.32"`  |
+| Stable  | testnet | `X.Y.Z`                              | a maintainer pushes the tag `vX.Y.Z`               | `cargo add polyester-sdk`, `"0.33"`  |
 | Devnet  | devnet  | `<next>-devnet.<YYYYMMDDHHmmss>`     | a push to `main` while `## Unreleased` has entries | a requirement naming it, `"=<ver>"`  |
 
 This SDK's version line is its own; the Go, Python and TypeScript SDKs number

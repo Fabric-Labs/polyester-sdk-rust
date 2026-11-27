@@ -182,7 +182,7 @@ Stable releases track testnet. While `CHANGELOG.md` has entries under
 `## Unreleased`, every push to `main` also publishes a devnet pre-release of the
 next version to crates.io, `<version>-devnet.<YYYYMMDDHHmmss>` (the commit time,
 UTC), for trying changes before they reach a stable release. Cargo selects a
-pre-release only for a requirement that names one, so `polyester-sdk = "0.32"`
+pre-release only for a requirement that names one, so `polyester-sdk = "0.33"`
 and `cargo add polyester-sdk` stay on the stable release.
 
 ```bash
