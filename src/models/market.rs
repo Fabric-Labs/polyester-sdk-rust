@@ -399,6 +399,76 @@ impl LivePriceBand {
     }
 }
 
+/// Sort key of a market overview list, the contract's `MarketOrderBy`
+/// ([`crate::services::ListMarketOverviewOptions::order_by`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MarketOverviewOrderBy {
+    /// The absolute 24h change, in basis points.
+    Change24hBps,
+    /// The 24h USD volume; markets without one sort last either way.
+    Volume24hUsd,
+    /// The last traded price.
+    LastPrice,
+    /// The listing time.
+    DateAdded,
+}
+
+impl MarketOverviewOrderBy {
+    /// `"change_24h_bps"`, `"volume_24h_usd"`, `"last_price"` or `"date_added"`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Change24hBps => "change_24h_bps",
+            Self::Volume24hUsd => "volume_24h_usd",
+            Self::LastPrice => "last_price",
+            Self::DateAdded => "date_added",
+        }
+    }
+}
+
+/// Sort direction of a market overview list, the contract's `SortDirection`
+/// ([`crate::services::ListMarketOverviewOptions::sort`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MarketOverviewSort {
+    /// Lowest or oldest first.
+    Asc,
+    /// Highest or newest first.
+    Desc,
+}
+
+impl MarketOverviewSort {
+    /// `"asc"` or `"desc"`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Asc => "asc",
+            Self::Desc => "desc",
+        }
+    }
+}
+
+/// A sparkline a market overview list asks for, the contract's
+/// `SparklineInterval`
+/// ([`crate::services::ListMarketOverviewOptions::sparkline_intervals`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MarketOverviewSparklineInterval {
+    OneHour,
+    TwentyFourHours,
+    OneWeek,
+    OneMonth,
+}
+
+impl MarketOverviewSparklineInterval {
+    /// `"SPARKLINE_1H"`, `"SPARKLINE_24H"`, `"SPARKLINE_1W"` or
+    /// `"SPARKLINE_1M"`, as [`MarketOverviewSparkline::interval`] reads it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::OneHour => "SPARKLINE_1H",
+            Self::TwentyFourHours => "SPARKLINE_24H",
+            Self::OneWeek => "SPARKLINE_1W",
+            Self::OneMonth => "SPARKLINE_1M",
+        }
+    }
+}
+
 /// A market's recent closing prices over `interval`, newest first.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarketOverviewSparkline {

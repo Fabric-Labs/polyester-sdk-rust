@@ -27,7 +27,8 @@ use crate::proto::marketdata::v1::{
 };
 use crate::proto::marketoverview::v1::{
     GetCurrencyConversionConfigRequest, GetCurrencyConversionRatesRequest,
-    GetSpotVolumeHistoryRequest, ListMarketOverviewRequest,
+    GetSpotVolumeHistoryRequest, ListMarketOverviewRequest, MarketOrderBy, SortDirection,
+    SparklineInterval,
 };
 use crate::proto::orderbook::v1::GetOrderBookRequest;
 use crate::proto::polyester::r#type::v1::DepthTier;
@@ -638,14 +639,53 @@ fn enriched_market_overview_batch(
     Ok(batch)
 }
 
+fn market_order_by(order_by: crate::models::MarketOverviewOrderBy) -> MarketOrderBy {
+    use crate::models::MarketOverviewOrderBy as By;
+    match order_by {
+        By::Change24hBps => MarketOrderBy::ORDER_BY_CHANGE_24H_BPS,
+        By::Volume24hUsd => MarketOrderBy::ORDER_BY_VOLUME_24H_USD,
+        By::LastPrice => MarketOrderBy::ORDER_BY_LAST_PRICE,
+        By::DateAdded => MarketOrderBy::ORDER_BY_DATE_ADDED,
+    }
+}
+
+fn sort_direction(sort: crate::models::MarketOverviewSort) -> SortDirection {
+    match sort {
+        crate::models::MarketOverviewSort::Asc => SortDirection::SORT_ASC,
+        crate::models::MarketOverviewSort::Desc => SortDirection::SORT_DESC,
+    }
+}
+
+fn sparkline_interval(
+    interval: crate::models::MarketOverviewSparklineInterval,
+) -> SparklineInterval {
+    use crate::models::MarketOverviewSparklineInterval as Interval;
+    match interval {
+        Interval::OneHour => SparklineInterval::SPARKLINE_1H,
+        Interval::TwentyFourHours => SparklineInterval::SPARKLINE_24H,
+        Interval::OneWeek => SparklineInterval::SPARKLINE_1W,
+        Interval::OneMonth => SparklineInterval::SPARKLINE_1M,
+    }
+}
+
 /// Options for [`MarketOverviewService::list`].
 #[derive(Debug, Clone, Default)]
 pub struct ListMarketOverviewOptions {
     pub symbols: Option<Vec<String>>,
     pub limit: Option<u32>,
-    /// Opaque token from the previous page; reuse the same filters.
+    /// Opaque token from the previous page. It is bound to the symbols,
+    /// `order_by` and `sort` it was returned for: reuse the same ones, or the
+    /// server refuses it.
     pub page_token: Option<String>,
     pub include_sparklines: bool,
+    /// Sort key; `None` sends none, and the server sorts by descending 24h
+    /// USD volume.
+    pub order_by: Option<crate::models::MarketOverviewOrderBy>,
+    /// Sort direction; `None` sends none, for the server's default.
+    pub sort: Option<crate::models::MarketOverviewSort>,
+    /// The sparklines `include_sparklines` returns; empty asks for the
+    /// server's default, the 24h one.
+    pub sparkline_intervals: Vec<crate::models::MarketOverviewSparklineInterval>,
 }
 
 impl From<Option<u32>> for ListMarketOverviewOptions {
@@ -695,6 +735,19 @@ impl MarketOverviewService {
             limit: opts.limit.unwrap_or_default(),
             page_token: opts.page_token.unwrap_or_default(),
             include_sparklines: opts.include_sparklines,
+            order_by: opts
+                .order_by
+                .map_or(MarketOrderBy::MARKET_ORDER_BY_UNSPECIFIED, market_order_by)
+                .into(),
+            sort: opts
+                .sort
+                .map_or(SortDirection::SORT_DIRECTION_UNSPECIFIED, sort_direction)
+                .into(),
+            sparkline_intervals: opts
+                .sparkline_intervals
+                .iter()
+                .map(|interval| sparkline_interval(*interval).into())
+                .collect(),
             ..Default::default()
         };
         let client = MarketOverviewServiceClient::new(

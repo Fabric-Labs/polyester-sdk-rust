@@ -2552,6 +2552,37 @@ decimal `value` string with its `source` (`coinmarketcap`, shown as "Source:
 CoinMarketCap", or `polyester`) and `as_of` time. An absent value is unknown;
 a value stays until a newer observation replaces it, so show its `as_of`.
 
+`market_overview.list` takes the sort and the sparklines in
+`ListMarketOverviewOptions`: `order_by` (`MarketOverviewOrderBy::Change24hBps`,
+the absolute 24h change; `Volume24hUsd`; `LastPrice`; `DateAdded`, the listing
+time), `sort` (`MarketOverviewSort::Asc` or `Desc`) and `sparkline_intervals`
+(`MarketOverviewSparklineInterval::OneHour`, `TwentyFourHours`, `OneWeek`,
+`OneMonth`), the sparklines `include_sparklines` returns. Unset, nothing is sent
+and the server sorts by descending 24h USD volume and returns the 24h sparkline.
+A `next_page_token` is bound to the symbols and sort it was returned for: send it
+back with the same ones.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::{MarketOverviewOrderBy, MarketOverviewSort};
+use polyester::services::ListMarketOverviewOptions;
+
+let newest = client
+    .market_overview
+    .list(ListMarketOverviewOptions {
+        limit: Some(10),
+        order_by: Some(MarketOverviewOrderBy::DateAdded),
+        sort: Some(MarketOverviewSort::Desc),
+        ..Default::default()
+    })
+    .await?;
+for market in newest.markets {
+    println!("{} {}", market.symbol, market.listed_ts_ns);
+}
+# Ok(())
+# }
+```
+
 Merged market overview stream (snapshot + live updates):
 
 ```rust,no_run

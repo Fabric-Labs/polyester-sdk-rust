@@ -49,6 +49,8 @@ mod limit_market_ref_price;
 mod live_write_gates;
 #[path = "market_data/mod.rs"]
 mod market_data;
+#[path = "market_overview_sort/mod.rs"]
+mod market_overview_sort;
 #[path = "market_tif/mod.rs"]
 mod market_tif;
 #[path = "modify_zero_values/mod.rs"]
