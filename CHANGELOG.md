@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.33.0
+
+Package version: `0.33.0`. Git tag: `v0.33.0`. Released 2026-11-27. Built on public contract `11e2cec`.
+
 - **Breaking:** `StatementsService::create_export` requires `CreateStatementExportOptions::export_type` (new), the kind of file to produce: `StatementExportType::AccountStatement`, the account statement it created before, `StatementExportType::Ledger` (new) or `StatementExportType::Balances` (new). There is no default, since the server refuses a create without a type: `None`, which `..Default::default()` leaves, is refused with `Error::Validation` before sending. Set `export_type: Some(StatementExportType::AccountStatement)` to keep the file you received before. Repeating an idempotency key with another type is refused with `ERROR_CODE_IDEMPOTENCY_KEY_REUSED`, as for any other changed field.
 - `StatementExport::export_type` (new) echoes the export's type on `create_export`, `get_export`, `cancel_export` and `list_exports`; exports created before types existed read `account_statement`. A type newer than this SDK reads `UNKNOWN(<n>)` and never fails the read, as more types will come.
 - New `codecs::decode::parse_ledger_csv` reads a ledger file into `LedgerRow`s: one row per ledger movement, each transfer leg on its own, with `transfer_id`, `account`, `asset`, `kind` (the `type` column, the transfer reason, such as `trade_base`, `trade_quote` or `taker_fee`), `side` (`debit` or `credit`), a signed `amount`, `counterparty`, `balance` (the previous balance of the same bucket and asset plus `amount`), `link_id` and `flow_id`. Like `parse_statement_csv`, it reads columns by header name, ignores columns a later release appends, keeps amounts as exact decimal strings, and returns `Error::ResponseContract` for a header without a ledger column (an account statement's included) or a malformed row.

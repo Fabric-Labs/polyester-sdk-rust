@@ -5,9 +5,9 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.32.0` (git tag `v0.32.0`). Pre-1.0: minor releases may break the API.
+**Status:** `0.33.0` (git tag `v0.33.0`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
-change breaks only one SDK's API: Rust 0.32.0 is the release of Go 0.34.0 and Python 0.33.0.
+change breaks only one SDK's API: Rust 0.33.0 is the release of Go 0.35.0 and Python 0.34.0.
 Licensed under the [Apache License 2.0](LICENSE). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
@@ -152,7 +152,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.32.0"
+polyester-sdk = "0.33.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The crate has no
@@ -162,7 +162,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.32.0" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.33.0" }
 ```
 
 For development from a git checkout:
@@ -182,7 +182,7 @@ Stable releases track testnet. While `CHANGELOG.md` has entries under
 `## Unreleased`, every push to `main` also publishes a devnet pre-release of the
 next version to crates.io, `<version>-devnet.<YYYYMMDDHHmmss>` (the commit time,
 UTC), for trying changes before they reach a stable release. Cargo selects a
-pre-release only for a requirement that names one, so `polyester-sdk = "0.32"`
+pre-release only for a requirement that names one, so `polyester-sdk = "0.33"`
 and `cargo add polyester-sdk` stay on the stable release.
 
 ```bash
