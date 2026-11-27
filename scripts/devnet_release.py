@@ -66,8 +66,9 @@ DEVNET_MARK = "-devnet"
 BREAKING = re.compile(r"\*\*Breaking\b")
 ENTRY = re.compile(r"^\s*[-*+]\s+\S")
 UNRELEASED_HEADING = re.compile(r"^##\s+Unreleased\s*$", re.IGNORECASE)
-# A backend release as manifest.json backendRelease names it: MAJOR.MINOR.PATCH.
-BACKEND_RELEASE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+# A backend release as manifest.json backendRelease names it: MAJOR.MINOR.PATCH
+# in ASCII digits, matched whole (no trailing newline, no other digits).
+BACKEND_RELEASE = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", re.ASCII)
 TIMESTAMP = re.compile(r"(\d{14})$")
 
 # GitHub release tags this channel owns. Go: one immutable tag per snapshot,
@@ -272,7 +273,7 @@ def backend_release(root: Path, sha: str) -> str:
     except json.JSONDecodeError as error:
         raise ReleaseError(f"manifest.json at {sha} is not JSON: {error}") from None
     value = manifest.get("backendRelease") if isinstance(manifest, dict) else None
-    if not isinstance(value, str) or not BACKEND_RELEASE.match(value):
+    if not isinstance(value, str) or not BACKEND_RELEASE.fullmatch(value):
         raise ReleaseError(
             f"manifest.json at {sha} has no backendRelease X.Y.Z (found {value!r}); "
             "the contract publication writes it"
@@ -312,12 +313,14 @@ def plan(root: Path, ecosystem: str, rev: str = "HEAD") -> Plan:
     )
 
 
-def install_hint(root: Path, ecosystem: str, version: str) -> str:
+def install_hint(root: Path, ecosystem: str, version: str, sha: str) -> str:
+    """The install line of ``version``, with the package name the commit ``sha``
+    holds."""
     if ecosystem == "go":
-        return f"go get {go_module(root)}@v{version}"
+        return f"go get {go_module(root, sha)}@v{version}"
     if ecosystem == "python":
-        return f"pip install {python_project(root)}=={version}"
-    return f"cargo add {crate_name(root)}@={version}"
+        return f"pip install {python_project(root, sha)}=={version}"
+    return f"cargo add {crate_name(root, sha)}@={version}"
 
 
 def github_repository(root: Path) -> str:
@@ -343,7 +346,7 @@ def release_notes(root: Path, p: Plan, repository: str | None = None) -> str:
         f"Devnet pre-release `{p.version}`, built from {p.sha} on main. "
         f"It is not the latest release: the default install stays on the stable "
         f"release, which tracks testnet.\n\n"
-        f"```\n{install_hint(root, p.ecosystem, p.version)}\n```\n\n"
+        f"```\n{install_hint(root, p.ecosystem, p.version, p.sha)}\n```\n\n"
         f"## Changes since v{p.base}\n\n"
     )
     notes = f"{head}{section.strip()}\n"
@@ -358,12 +361,12 @@ def release_notes(root: Path, p: Plan, repository: str | None = None) -> str:
     )
 
 
-def stable_install_hint(root: Path, ecosystem: str, version: str) -> str:
+def stable_install_hint(root: Path, ecosystem: str, version: str, sha: str) -> str:
     if ecosystem == "go":
-        return f"`go get {go_module(root)}@v{version}`"
+        return f"`go get {go_module(root, sha)}@v{version}`"
     if ecosystem == "python":
-        return f"`pip install {python_project(root)}=={version}`"
-    crate = crate_name(root)
+        return f"`pip install {python_project(root, sha)}=={version}`"
+    crate = crate_name(root, sha)
     major, minor, _ = version.split(".")
     return f'`cargo add {crate}@{version}` (or `{crate} = "{major}.{minor}"` in Cargo.toml)'
 
@@ -384,6 +387,17 @@ def stable_notes(
     if not STABLE_TAG.match(f"v{version}"):
         raise ReleaseError(f"{version!r} is not a stable version X.Y.Z")
     sha = git(root, "rev-parse", f"{rev}^{{commit}}")
+    # The notes link CHANGELOG.md at the tag: a tag that names another commit
+    # would show another CHANGELOG. Before the tag is pushed there is none.
+    tag = f"v{version}"
+    tagged = subprocess.run(
+        ["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}^{{commit}}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if tagged and tagged != sha:
+        raise ReleaseError(f"the tag {tag} is {tagged}, not the released commit {sha}")
     heading_re = re.compile(rf"^##\s+v?{re.escape(version)}(?:\s.*)?$")
     lines = changelog_at(root, sha).splitlines()
     start = next((i for i, line in enumerate(lines) if heading_re.match(line)), None)
@@ -400,7 +414,7 @@ def stable_notes(
     notes = (
         f"{backend_line(root, sha)}"
         f"Stable release for testnet. Install with "
-        f"{stable_install_hint(root, ecosystem, version)}.\n\n"
+        f"{stable_install_hint(root, ecosystem, version, sha)}.\n\n"
         f"The full list of changes is in [CHANGELOG.md]({changelog})"
         + (", including the breaking changes in this release" if breaking else "")
         + ".\n"
@@ -436,21 +450,27 @@ def check_notes(notes: Path) -> None:
 # --------------------------------------------------------------------------- manifests
 
 
-def go_module(root: Path) -> str:
-    match = GO_MODULE_LINE.search((root / "go.mod").read_text(encoding="utf-8"))
+def manifest_text(root: Path, name: str, sha: str | None) -> str:
+    """The file ``name`` as the commit ``sha`` holds it, or as the working tree
+    holds it when ``sha`` is None (a build stamps and checks the working tree)."""
+    if sha is None:
+        return (root / name).read_text(encoding="utf-8")
+    return git(root, "show", f"{sha}:{name}")
+
+
+def go_module(root: Path, sha: str | None = None) -> str:
+    match = GO_MODULE_LINE.search(manifest_text(root, "go.mod", sha))
     if not match:
         raise ReleaseError("go.mod has no module line")
     return match[1]
 
 
-def python_project(root: Path) -> str:
-    with (root / "pyproject.toml").open("rb") as handle:
-        return str(tomllib.load(handle)["project"]["name"])
+def python_project(root: Path, sha: str | None = None) -> str:
+    return str(tomllib.loads(manifest_text(root, "pyproject.toml", sha))["project"]["name"])
 
 
-def crate_name(root: Path) -> str:
-    with (root / "Cargo.toml").open("rb") as handle:
-        return str(tomllib.load(handle)["package"]["name"])
+def crate_name(root: Path, sha: str | None = None) -> str:
+    return str(tomllib.loads(manifest_text(root, "Cargo.toml", sha))["package"]["name"])
 
 
 def replace_table_key(text: str, table: str, key: str, value: str) -> str:

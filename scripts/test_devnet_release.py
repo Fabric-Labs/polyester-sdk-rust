@@ -355,6 +355,13 @@ class BackendReleaseTest(GitRepoCase):
         notes = dr.release_notes(self.repo, dr.plan(self.repo, "go", first))
         self.assertTrue(notes.startswith("Targets Polyester backend 0.93.12\n\n"))
 
+    def test_the_install_line_is_read_at_the_released_commit(self) -> None:
+        sha = self.commit(CHANGELOG.format(entries="- a\n"), "2026-11-17T09:30:00+00:00")
+        (self.repo / "go.mod").write_text("module example.com/dirty\n\ngo 1.22\n")
+        notes = dr.release_notes(self.repo, dr.plan(self.repo, "go", sha))
+        self.assertIn("go get example.com/sdk@v0.34.1-devnet.20261117093000", notes)
+        self.assertNotIn("dirty", notes)
+
     def test_a_missing_or_malformed_release_fails_loudly(self) -> None:
         for manifest in (
             {"schemaVersion": 1},
@@ -362,6 +369,8 @@ class BackendReleaseTest(GitRepoCase):
             {**MANIFEST, "backendRelease": "0.93"},
             {**MANIFEST, "backendRelease": "v0.93.12"},
             {**MANIFEST, "backendRelease": "0.93.12-rc1"},
+            {**MANIFEST, "backendRelease": "0.93.12\n"},
+            {**MANIFEST, "backendRelease": "0.9\u0662.12"},
             {**MANIFEST, "backendRelease": 9312},
         ):
             with self.subTest(manifest=manifest):
@@ -427,9 +436,15 @@ class StableNotesTest(GitRepoCase):
         self.assertNotIn("breaking", notes)
 
     def test_each_ecosystem_has_its_install_line(self) -> None:
-        self.tag("- a fix\n")
         (self.repo / "pyproject.toml").write_text('[project]\nname = "example-sdk"\n')
         (self.repo / "Cargo.toml").write_text('[package]\nname = "example-sdk"\n')
+        self.tag("- a fix\n")
+        # What the tag holds is released, not the working tree.
+        (self.repo / "go.mod").write_text("module example.com/dirty\n")
+        (self.repo / "pyproject.toml").write_text('[project]\nname = "dirty"\n')
+        (self.repo / "Cargo.toml").write_text('[package]\nname = "dirty"\n')
+        go = dr.stable_notes(self.repo, "go", "0.35.0", "v0.35.0", self.REPOSITORY)
+        self.assertIn("Install with `go get example.com/sdk@v0.35.0`.", go)
         python = dr.stable_notes(self.repo, "python", "0.35.0", "v0.35.0", self.REPOSITORY)
         rust = dr.stable_notes(self.repo, "rust", "0.35.0", "v0.35.0", self.REPOSITORY)
         self.assertIn("Install with `pip install example-sdk==0.35.0`.", python)
@@ -438,6 +453,18 @@ class StableNotesTest(GitRepoCase):
             "Cargo.toml).",
             rust,
         )
+
+    def test_the_tag_must_be_the_released_commit(self) -> None:
+        tagged = self.tag("- a fix\n")
+        later = self.commit(
+            STABLE_CHANGELOG.format(entries="- a fix\n- a later one\n"), "2026-11-27T06:00:00+00:00"
+        )
+        with self.assertRaisesRegex(dr.ReleaseError, "v0.35.0"):
+            dr.stable_notes(self.repo, "go", "0.35.0", later, self.REPOSITORY)
+        self.assertTrue(dr.stable_notes(self.repo, "go", "0.35.0", tagged, self.REPOSITORY))
+        # Before the tag is pushed, the notes of the commit to tag can be written.
+        run_git(self.repo, "tag", "-d", "v0.35.0")
+        self.assertTrue(dr.stable_notes(self.repo, "go", "0.35.0", later, self.REPOSITORY))
 
     def test_the_release_is_read_at_the_tag(self) -> None:
         self.tag("- a fix\n")
@@ -458,6 +485,7 @@ class StableNotesTest(GitRepoCase):
                 dr.stable_notes(self.repo, "go", version, "v0.35.0", self.REPOSITORY)
         self.write_manifest({"schemaVersion": 1})
         self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T06:00:00+00:00")
+        run_git(self.repo, "tag", "-d", "v0.35.0")
         with self.assertRaisesRegex(dr.ReleaseError, "backendRelease"):
             dr.stable_notes(self.repo, "go", "0.35.0", "HEAD", self.REPOSITORY)
 
@@ -507,6 +535,7 @@ class CliTest(GitRepoCase):
         self.assertIn("polyester-sdk-z/blob/v0.35.0/CHANGELOG.md#0350", body)
         self.write_manifest({"schemaVersion": 1})
         self.commit(STABLE_CHANGELOG.format(entries="- a fix\n"), "2026-11-27T06:00:00+00:00")
+        run_git(self.repo, "tag", "-d", "v0.35.0")
         code, _ = self.main(
             "stable-notes", "--version", "0.35.0", "--rev", "HEAD", "--notes", str(notes)
         )
